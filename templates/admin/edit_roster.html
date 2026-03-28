@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Edit Roster — {{ r.bowler.display_name }}{% endblock %}
+
+{% block content %}
+<h4>Edit: {{ r.bowler.display_name }} — {{ season.name }}</h4>
+<form method="post" class="col-md-6">
+  {% include 'admin/_roster_fields.html' %}
+  <button type="submit" class="btn btn-primary">Save</button>
+  <a href="{{ url_for('admin.season_detail', season_id=season.id) }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+</form>
+{% endblock %}

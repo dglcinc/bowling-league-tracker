@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Add Bowler — {{ season.name }}{% endblock %}
+
+{% block content %}
+<h4>Add Bowler to {{ season.name }}</h4>
+
+<ul class="nav nav-tabs mb-3" id="addTabs">
+  <li class="nav-item">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#existing">Existing Bowler</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#newbowler">New Bowler</button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <div class="tab-pane fade show active" id="existing">
+    {% if available %}
+    <form method="post" class="col-md-6">
+      <input type="hidden" name="action" value="existing">
+      <div class="mb-3">
+        <label class="form-label">Bowler</label>
+        <select name="bowler_id" class="form-select" required>
+          <option value="">— select —</option>
+          {% for b in available %}
+          <option value="{{ b.id }}">{{ b.last_name }}{% if b.first_name %}, {{ b.first_name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% include 'admin/_roster_fields.html' %}
+      <button type="submit" class="btn btn-primary">Add to Roster</button>
+    </form>
+    {% else %}
+    <p class="text-muted">All known bowlers are already on this season's roster.</p>
+    {% endif %}
+  </div>
+
+  <div class="tab-pane fade" id="newbowler">
+    <form method="post" class="col-md-6">
+      <input type="hidden" name="action" value="new">
+      <div class="mb-3">
+        <label class="form-label">Last Name</label>
+        <input type="text" name="last_name" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">First Name</label>
+        <input type="text" name="first_name" class="form-control">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Nickname</label>
+        <input type="text" name="nickname" class="form-control">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input type="email" name="email" class="form-control">
+      </div>
+      {% include 'admin/_roster_fields.html' %}
+      <button type="submit" class="btn btn-primary">Create &amp; Add to Roster</button>
+    </form>
+  </div>
+</div>
+
+<a href="{{ url_for('admin.season_detail', season_id=season.id) }}" class="btn btn-outline-secondary mt-3">Cancel</a>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Reconcile — Week {{ week.week_num }}{% endblock %}
+
+{% block content %}
+<h4>Blinds Reconciliation — Week {{ week.week_num }}</h4>
+
+<div class="row mb-4">
+  <div class="col-auto">
+    <div class="card text-center px-4 py-2">
+      <div class="fs-4 fw-bold">{{ player_count }}</div>
+      <div class="text-muted small">Players</div>
+    </div>
+  </div>
+  <div class="col-auto">
+    <div class="card text-center px-4 py-2">
+      <div class="fs-4 fw-bold">{{ blind_count }}</div>
+      <div class="text-muted small">Blinds</div>
+    </div>
+  </div>
+  <div class="col-auto">
+    <div class="card text-center px-4 py-2">
+      <div class="fs-4 fw-bold">{{ total_wood }}</div>
+      <div class="text-muted small">Total Wood (players)</div>
+    </div>
+  </div>
+  <div class="col-auto">
+    <div class="card text-center px-4 py-2">
+      <div class="fs-4 fw-bold">{{ blind_wood }}</div>
+      <div class="text-muted small">Blind Wood</div>
+    </div>
+  </div>
+</div>
+
+<h6>Entered Scores</h6>
+<table class="table table-sm table-bordered">
+  <thead>
+    <tr>
+      <th>Matchup</th><th>Team</th><th>Bowler</th><th>Blind?</th>
+      <th>G1</th><th>G2</th><th>G3</th><th>G4</th><th>G5</th><th>G6</th><th>Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in entries | sort(attribute='matchup_num') %}
+    <tr class="{{ 'table-warning' if e.is_blind else '' }}">
+      <td>{{ e.matchup_num }}</td>
+      <td>{{ e.team.number }}</td>
+      <td>{{ e.bowler.last_name if e.bowler else 'BLIND' }}</td>
+      <td>{{ '✓' if e.is_blind else '' }}</td>
+      {% for g in [e.game1, e.game2, e.game3, e.game4, e.game5, e.game6] %}
+      <td class="text-end">{{ g if g is not none else '' }}</td>
+      {% endfor %}
+      <td class="text-end fw-bold">{{ e.total_pins }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}"
+   class="btn btn-outline-secondary">Back to Week</a>
+{% endblock %}

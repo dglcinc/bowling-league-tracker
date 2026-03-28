@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ bowler.display_name }} — {{ season.name }}{% endblock %}
+
+{% block content %}
+<h4>{{ bowler.display_name }}{% if bowler.nickname %} <small class="text-muted">"{{ bowler.nickname }}"</small>{% endif %}</h4>
+<p>Team {{ roster.team.number }} — {{ roster.team.name }} &nbsp;|&nbsp; Prior Hcp: {{ roster.prior_handicap or 0 }}</p>
+
+<div class="row mb-3">
+  <div class="col-auto"><strong>Games:</strong> {{ stats.cumulative_games }}</div>
+  <div class="col-auto"><strong>Avg:</strong> {{ stats.running_avg }}</div>
+  <div class="col-auto"><strong>Hcp:</strong> {{ stats.display_handicap }}</div>
+  <div class="col-auto"><strong>HG Scr:</strong> {{ stats.ytd_high_game_scratch }}</div>
+  <div class="col-auto"><strong>HG Hcp:</strong> {{ stats.ytd_high_game_hcp }}</div>
+  <div class="col-auto"><strong>HS Scr:</strong> {{ stats.ytd_high_series_scratch }}</div>
+  <div class="col-auto"><strong>HS Hcp:</strong> {{ stats.ytd_high_series_hcp }}</div>
+</div>
+
+<h6>Week-by-Week</h6>
+<table class="table table-sm table-bordered table-striped">
+  <thead>
+    <tr>
+      <th>Wk</th><th>Games</th><th>Pins</th><th>Avg</th><th>Hcp</th>
+      <th>Cum Pins</th><th>Cum Games</th><th>Run Avg</th>
+      <th>HG Scr</th><th>HG Hcp</th><th>HS Scr</th><th>HS Hcp</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for wk in stats.weekly_stats %}
+    <tr>
+      <td>{{ wk.week_num }}</td>
+      <td>{{ wk.games | join(', ') }}</td>
+      <td>{{ wk.week_pins }}</td>
+      <td>{{ (wk.week_pins / wk.week_games) | round | int }}</td>
+      <td>{{ wk.handicap }}</td>
+      <td>{{ wk.cumulative_pins }}</td>
+      <td>{{ wk.cumulative_games }}</td>
+      <td>{{ wk.running_avg }}</td>
+      <td>{{ wk.high_game_scratch }}</td>
+      <td>{{ wk.high_game_hcp }}</td>
+      <td>{{ wk.high_series_scratch }}</td>
+      <td>{{ wk.high_series_hcp }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="12" class="text-center text-muted">No scores entered yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

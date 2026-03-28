@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Matchup {{ sched.matchup_num }} — Week {{ week.week_num }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .score-input { width: 60px; text-align: center; }
+  .team-header { font-size: 1.1rem; font-weight: bold; }
+  .blind-row { background-color: #fff3cd; }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="no-print">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('entry.week_list', season_id=season.id) }}">Weeks</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}">Week {{ week.week_num }}</a></li>
+    <li class="breadcrumb-item active">Matchup {{ sched.matchup_num }}</li>
+  </ol>
+</nav>
+
+<h4>
+  Week {{ week.week_num }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
+  {% if week.is_position_night %}<span class="badge bg-warning text-dark">Position Night</span>{% endif %}
+  &nbsp;|&nbsp; Matchup {{ sched.matchup_num }}:
+  Team {{ sched.team1.number }} {{ sched.team1.name }} vs Team {{ sched.team2.number }} {{ sched.team2.name }}
+  {% if sched.lane_pair %}<small class="text-muted">(Lanes {{ sched.lane_pair }})</small>{% endif %}
+</h4>
+
+<form method="post">
+<div class="row">
+{% for team in teams %}
+<div class="col-md-6">
+  <div class="card mb-3">
+    <div class="card-header team-header">
+      Team {{ team.number }} — {{ team.name }}
+      <span class="badge bg-secondary float-end">{{ 'Side A' if team.id == sched.team1_id else 'Side B' }}</span>
+    </div>
+    <div class="card-body p-2">
+      <table class="table table-sm table-bordered mb-0" id="team-{{ team.number }}-table">
+        <thead>
+          <tr>
+            <th>Bowler</th>
+            <th class="text-center">Hcp</th>
+            <th class="text-center">G1</th>
+            <th class="text-center">G2</th>
+            <th class="text-center">G3</th>
+            <th class="text-center">G4</th>
+            <th class="text-center">G5</th>
+            <th class="text-center">G6</th>
+            <th class="text-center">Blind</th>
+          </tr>
+        </thead>
+        <tbody id="team-{{ team.number }}-body">
+          {# Existing entries first #}
+          {% set existing = team_entries.get(team.id, []) %}
+          {% for i in range([existing|length + 4, 8]|min) %}
+          {% set entry = existing[i] if i < existing|length else none %}
+          <tr class="{{ 'blind-row' if entry and entry.is_blind else '' }}">
+            <td>
+              {% if entry and entry.is_blind %}
+                <input type="hidden" name="t{{ team.number }}_row_{{ i }}_bowler_id" value="">
+                <span class="text-warning fw-bold">BLIND</span>
+              {% else %}
+              <select name="t{{ team.number }}_row_{{ i }}_bowler_id"
+                      class="form-select form-select-sm bowler-select"
+                      data-team="{{ team.number }}" data-row="{{ i }}">
+                <option value="">— select —</option>
+                {% for r in roster_data.values() %}
+                {% if r.roster.team_id == team.id %}
+                <option value="{{ r.roster.bowler_id }}"
+                        data-hcp="{{ r.handicap }}"
+                        {% if entry and entry.bowler_id == r.roster.bowler_id %}selected{% endif %}>
+                  {{ r.roster.bowler.last_name }}{% if r.roster.bowler.first_name %}, {{ r.roster.bowler.first_name }}{% endif %}
+                </option>
+                {% endif %}
+                {% endfor %}
+              </select>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              <span class="hcp-display" id="hcp-t{{ team.number }}-{{ i }}">
+                {% if entry and entry.is_blind %}{{ season.blind_handicap }}
+                {% elif entry and entry.bowler_id and entry.bowler_id in roster_data %}{{ roster_data[entry.bowler_id].handicap }}
+                {% endif %}
+              </span>
+            </td>
+            {% for g in range(1, 7) %}
+            <td>
+              <input type="number" class="form-control form-control-sm score-input"
+                     name="t{{ team.number }}_row_{{ i }}_game{{ g }}"
+                     min="0" max="300"
+                     value="{{ entry['game'~g] if entry and entry['game'~g] is not none else '' }}"
+                     placeholder="">
+            </td>
+            {% endfor %}
+            <td class="text-center">
+              <input type="checkbox" class="form-check-input blind-check"
+                     name="t{{ team.number }}_row_{{ i }}_blind"
+                     data-team="{{ team.number }}" data-row="{{ i }}"
+                     {{ 'checked' if entry and entry.is_blind else '' }}>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button type="button" class="btn btn-sm btn-outline-secondary mt-1"
+              onclick="addRow({{ team.number }})">+ Add Row</button>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+
+<div class="d-flex gap-2 mt-2">
+  <button type="submit" class="btn btn-primary">Save Scores & Calculate Points</button>
+  <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}"
+     class="btn btn-outline-secondary">Cancel</a>
+</div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Row counters per team
+const rowCounts = {
+  {% for team in teams %}{{ team.number }}: {{ [team_entries.get(team.id, [])|length, 4]|max }},{% endfor %}
+};
+
+const handicaps = {
+  {% for bid, rdata in roster_data.items() %}{{ bid }}: {{ rdata.handicap }},{% endfor %}
+};
+
+function addRow(teamNum) {
+  const i = rowCounts[teamNum];
+  rowCounts[teamNum]++;
+  const tbody = document.getElementById(`team-${teamNum}-body`);
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td>
+      <select name="t${teamNum}_row_${i}_bowler_id" class="form-select form-select-sm bowler-select"
+              data-team="${teamNum}" data-row="${i}">
+        <option value="">— select —</option>
+        ${document.querySelector(`#team-${teamNum}-body select`).innerHTML}
+      </select>
+    </td>
+    <td class="text-center"><span class="hcp-display" id="hcp-t${teamNum}-${i}"></span></td>
+    ${[1,2,3,4,5,6].map(g => `
+      <td><input type="number" class="form-control form-control-sm score-input"
+                 name="t${teamNum}_row_${i}_game${g}" min="0" max="300" placeholder=""></td>
+    `).join('')}
+    <td class="text-center">
+      <input type="checkbox" class="form-check-input blind-check"
+             name="t${teamNum}_row_${i}_blind" data-team="${teamNum}" data-row="${i}">
+    </td>
+  `;
+  tbody.appendChild(row);
+  row.querySelector('.bowler-select').addEventListener('change', onBowlerChange);
+  row.querySelector('.blind-check').addEventListener('change', onBlindChange);
+}
+
+function onBowlerChange(e) {
+  const sel = e.target;
+  const team = sel.dataset.team;
+  const row = sel.dataset.row;
+  const bowlerId = parseInt(sel.value);
+  const hcp = handicaps[bowlerId] || '';
+  const span = document.getElementById(`hcp-t${team}-${row}`);
+  if (span) span.textContent = hcp;
+}
+
+function onBlindChange(e) {
+  const cb = e.target;
+  const tr = cb.closest('tr');
+  const team = cb.dataset.team;
+  const row = cb.dataset.row;
+  const span = document.getElementById(`hcp-t${team}-${row}`);
+  if (cb.checked) {
+    tr.classList.add('blind-row');
+    tr.querySelector('select').disabled = true;
+    if (span) span.textContent = '{{ season.blind_handicap }}';
+    // Auto-fill scratch scores
+    [1,2,3].forEach(g => {
+      const inp = tr.querySelector(`input[name$="_game${g}"]`);
+      if (inp && !inp.value) inp.value = '{{ season.blind_scratch }}';
+    });
+  } else {
+    tr.classList.remove('blind-row');
+    tr.querySelector('select').disabled = false;
+    if (span) span.textContent = '';
+  }
+}
+
+// Attach listeners
+document.querySelectorAll('.bowler-select').forEach(s => s.addEventListener('change', onBowlerChange));
+document.querySelectorAll('.blind-check').forEach(c => c.addEventListener('change', onBlindChange));
+</script>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Schedule — {{ season.name }}{% endblock %}
+
+{% block content %}
+<h4>Schedule — {{ season.name }}</h4>
+<p class="text-muted">Set which teams play each other in each matchup each week. 4 matchups per week, each on one lane pair.</p>
+
+<form method="post" action="{{ url_for('admin.save_schedule', season_id=season.id) }}">
+  <div class="table-responsive">
+    <table class="table table-sm table-bordered">
+      <thead>
+        <tr>
+          <th>Week</th>
+          {% for m in range(1, 5) %}
+          <th colspan="3" class="text-center">Matchup {{ m }}</th>
+          {% endfor %}
+        </tr>
+        <tr>
+          <th></th>
+          {% for m in range(1, 5) %}
+          <th>Team 1</th><th>Team 2</th><th>Lanes</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for wk in weeks %}
+        <tr>
+          <td>{{ wk.week_num }}{% if wk.is_position_night %} ⭐{% endif %}</td>
+          {% for m in range(1, 5) %}
+          {% set entry = sched_map.get((wk.week_num, m)) %}
+          <td>
+            <select name="week_{{ wk.week_num }}_matchup_{{ m }}_t1" class="form-select form-select-sm">
+              <option value="">—</option>
+              {% for t in teams %}
+              <option value="{{ t.id }}" {% if entry and entry.team1_id == t.id %}selected{% endif %}>
+                {{ t.number }}
+              </option>
+              {% endfor %}
+            </select>
+          </td>
+          <td>
+            <select name="week_{{ wk.week_num }}_matchup_{{ m }}_t2" class="form-select form-select-sm">
+              <option value="">—</option>
+              {% for t in teams %}
+              <option value="{{ t.id }}" {% if entry and entry.team2_id == t.id %}selected{% endif %}>
+                {{ t.number }}
+              </option>
+              {% endfor %}
+            </select>
+          </td>
+          <td>
+            <input type="text" name="week_{{ wk.week_num }}_matchup_{{ m }}_lane"
+                   class="form-control form-control-sm" style="width:60px"
+                   placeholder="1-2"
+                   value="{{ entry.lane_pair if entry and entry.lane_pair else '' }}">
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <button type="submit" class="btn btn-primary">Save Schedule</button>
+  <a href="{{ url_for('admin.season_detail', season_id=season.id) }}" class="btn btn-outline-secondary ms-2">Back</a>
+</form>
+{% endblock %}

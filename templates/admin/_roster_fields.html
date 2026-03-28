@@ -1,0 +1,23 @@
+{# Shared fields for add/edit roster forms #}
+<div class="mb-3">
+  <label class="form-label">Team</label>
+  <select name="team_id" class="form-select" required>
+    {% for team in teams %}
+    <option value="{{ team.id }}" {% if r is defined and r.team_id == team.id %}selected{% endif %}>
+      Team {{ team.number }} — {{ team.name }}
+    </option>
+    {% endfor %}
+  </select>
+</div>
+<div class="mb-3">
+  <label class="form-label">Prior Year Handicap</label>
+  <input type="number" name="prior_handicap" class="form-control" min="0" max="200"
+         value="{{ r.prior_handicap if r is defined else 0 }}">
+  <div class="form-text">Leave 0 for new bowlers with no prior average.</div>
+</div>
+<div class="mb-3">
+  <label class="form-label">Joined Week</label>
+  <input type="number" name="joined_week" class="form-control" min="1" max="23"
+         value="{{ r.joined_week if r is defined else 1 }}">
+  <div class="form-text">Set to the week they joined if mid-season.</div>
+</div>

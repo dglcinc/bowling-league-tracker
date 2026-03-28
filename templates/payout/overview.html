@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Payout Tracker — {{ season.name }}{% endblock %}
+
+{% block content %}
+<h4>Payout Tracker — {{ season.name }} through Week {{ through_week }}</h4>
+
+<div class="row">
+  <div class="col-md-4">
+    <h6>Iron Man Candidates</h6>
+    <p class="text-muted small">Bowled every week from their joined week through week {{ through_week }}.</p>
+    <ul class="list-group list-group-flush">
+      {% for b in iron_men %}
+      <li class="list-group-item py-1">{{ b.last_name }}{% if b.first_name %}, {{ b.first_name }}{% endif %}</li>
+      {% else %}
+      <li class="list-group-item text-muted">None yet</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="col-md-4">
+    <h6>Most Improved (vs Prior Year)</h6>
+    <table class="table table-sm">
+      <thead><tr><th>Bowler</th><th class="text-end">Prior Avg</th><th class="text-end">Current Avg</th><th class="text-end">+/-</th></tr></thead>
+      <tbody>
+        {% for r in most_improved[:10] %}
+        <tr>
+          <td>{{ r.bowler.last_name }}</td>
+          <td class="text-end">{{ r.prior_avg or '—' }}</td>
+          <td class="text-end">{{ r.current_avg }}</td>
+          <td class="text-end {{ 'text-success' if r.improvement and r.improvement > 0 else 'text-danger' }}">
+            {% if r.improvement is not none %}{{ '%+d' % r.improvement }}{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col-md-4">
+    <h6>Weekly High Game Scratch</h6>
+    <table class="table table-sm">
+      <thead><tr><th>Wk</th><th>Bowler</th><th class="text-end">Score</th></tr></thead>
+      <tbody>
+        {% for w in weekly_high %}
+        <tr>
+          <td>{{ w.week_num }}</td>
+          <td>{{ w.bowler.last_name }}</td>
+          <td class="text-end">{{ w.score }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

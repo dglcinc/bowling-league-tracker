@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Standings — {{ season.name }}{% endblock %}
+
+{% block content %}
+<h4>Team Standings — {{ season.name }}</h4>
+
+<div class="row">
+  <div class="col-md-4">
+    <h6>Overall</h6>
+    <table class="table table-sm table-bordered">
+      <thead><tr><th>Team</th><th class="text-end">Points</th></tr></thead>
+      <tbody>
+        {% for s in overall %}
+        <tr><td>{{ s.team.number }} — {{ s.team.name }}</td><td class="text-end fw-bold">{{ s.points }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="col-md-4">
+    <h6>First Half (Weeks 1–{{ season.half_boundary_week }})</h6>
+    <table class="table table-sm table-bordered">
+      <thead><tr><th>Team</th><th class="text-end">Points</th></tr></thead>
+      <tbody>
+        {% for s in first_half %}
+        <tr><td>{{ s.team.number }} — {{ s.team.name }}</td><td class="text-end fw-bold">{{ s.points }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="col-md-4">
+    <h6>Second Half (Weeks {{ season.half_boundary_week + 1 }}–{{ season.num_weeks }})</h6>
+    <table class="table table-sm table-bordered">
+      <thead><tr><th>Team</th><th class="text-end">Points</th></tr></thead>
+      <tbody>
+        {% for s in second_half %}
+        <tr><td>{{ s.team.number }} — {{ s.team.name }}</td><td class="text-end fw-bold">{{ s.points }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
