@@ -2,131 +2,167 @@
 
 ## Overview
 
-**Mountain Lakes Men's Bowling League** season tracker. The existing source of truth is an Excel workbook (`scoring 2025-2026 - Week 20.xlsx`) with one sheet per bowler plus summary sheets. This project aims to replace or augment that workbook with a proper application.
+**Mountain Lakes Men's Bowling League** season tracker. The existing source of truth is an Excel workbook (`scoring 2025-2026 - Week 20.xlsx`) — analyzed but not committed (contains personal info). This project replaces it with a proper web application.
 
-Season: 23 weeks (October – March), currently in Week 20 (2025-2026).
+Season: 23 weeks (October – March). Currently in season 2025-2026, Week 20.
 Teams: 4 (Team 1 Lewis, Team 2 Ferrante, Team 3 Belyea, Team 4 Mancini).
 Bowlers: ~65 total (mix of active and inactive).
-Games per week: 3 standard; weeks with double-night have 6 (rows 9–14 in individual sheets).
 
-## Source Spreadsheet Structure
+## League Structure
 
-### Parameters Sheet
-- Season start date: October 6, 2025
-- Date offsets for all 23 weeks (used by bowler sheets via lookup)
-- Procedures documentation
+### Weekly Format
+- 8 lanes per night, once a week
+- 4 matchups per week, each on one pair of lanes (1 score sheet per lane pair)
+- Each team is split across 2 of the 4 matchups simultaneously
+- Each matchup: 2 teams competing, up to 3 games (series), scored on a physical score sheet
 
-### Individual Bowler Sheets (one per bowler, e.g. `LewisD`)
+### Score Sheet
+- Two columns: one team per side
+- Teams must have equal player count per lane — if short, add a **blind** (scratch=125, hcp=60 per game, up to 3 games)
+- Players can sub in/out; no one-time bowlers (everyone is a registered league member)
+- Each bowler can bowl as often or as little as they like each season
+- 6 game slots per player per week: top 3 = first night session, bottom 3 = second (legacy from twice-a-week era; now only top 3 used)
 
-Row layout (columns A–Y = weeks 1–23 in cols C–Y):
-- Row 1: Bowler name
-- Row 2: Team
-- Row 3: Active status
-- Row 4: Handicap base (200)
-- Row 5: Handicap factor (0.9)
-- Row 6: Prior handicap (from prior year)
-- Row 7: Week numbers 1–23 (cols C–Y)
-- Row 8: Week dates (pulled from Parameters sheet)
-- Rows 9–14: Game 1 – Game 6 scores (games 4–6 used for double-night weeks only)
-- Row 15: Weekly total (`=SUM` of game rows for that week)
-- Row 16: Cumulative total (running sum of row 15)
-- Row 17: Running average (cumulative total / cumulative games played)
-- Row 18: Handicap for that week (`=INT(factor * (base - average))`, i.e. `INT(0.9 * (200 - avg))`)
-- Row 19: Cumulative game count
-- Row 20: Weekly high game scratch
-- Row 21: Weekly high game with handicap
-- Row 22: Weekly high series scratch
-- Row 23: Weekly high series with handicap
-- Row 24: Red pins (weekly)
-- Rows 27–30: YTD running highs (high game scratch, high game w/hcp, high series scratch, high series w/hcp)
-- Row 31: Cumulative 2nd-half total (weeks 12+)
+### Points per Matchup (regular weeks)
+- 1 point per game: team with higher total **handicap** pinfall wins (3 games = 3 possible)
+- 1 point for series: team with higher total handicap wood wins
+- Max 4 points per matchup × 4 matchups = 16 total points distributed per week
+- Each team participates in 2 matchups → max 8 points per team per week
+- **Forfeit**: if a team has no players on a sheet, present team wins all 4 points and can bowl for stats
 
-### `wkly alpha` Sheet — Master Roster
-Columns (approximate): Name, First, Nickname, Team, Total (pins), 2nd-half total, Games played, Average, Handicap (canonical — use this column), Current Hcp, High Game Scratch, High Game w/Hcp, High Series Scratch, High Series w/Hcp, Last Year's Hcp, Active flag, Prize Paid flag, Banquet flag.
+### Position Nights (weeks 11 and 22)
+- Same player score/handicap entry as normal
+- Points calculated by aggregating across **all 4 sheets** for each team pairing (not per sheet)
+- Per game: team with higher aggregate handicap total wins **2 points** (3 games = 6 possible)
+- Series total: team with higher aggregate wood wins **2 more points**
+- Max 8 points per matchup × 2 matchups = 16 total (same weekly max)
+- **Half winners**: team with most cumulative points after weeks 1–11 (first half) and weeks 12–22 (second half)
 
-~55 active + inactive bowlers listed. This is the authoritative roster.
-
-### `YTD alpha` Sheet
-Similar to wkly alpha; sorted differently, YTD focus.
-
-### `team scoring` Sheet
-4 teams. Weekly A+B points per team; running point totals. Maximum 16 points per week distributed across all teams.
-
-### `blinds` Sheet
-Per-week blind game count, total wood (total pins for absent bowlers), player count.
-
-### `indiv payout` Sheet
-Per-bowler prize tracking columns: Iron Man, Most Improved, Biggest Fail, Belyea Championship, Chad Harris, Club Championship, High Average, High Game/Series for year, Weekly High Games (count of weeks each bowler won). Prize dollar amounts per category.
-
-### `Payout Formula` Sheet
-- $100/bowler entry, 40 paying bowlers → ~$3,170 total prize pool
-- Prize breakdown:
-  - High Average: 1st $125 / 2nd $100 / 3rd $75
-  - High Series scratch/hcp: $75 each
-  - High Game scratch/hcp: $75 each
-  - Most Improved: $50
-  - Iron Man: $50
-  - Red Pins: $3 each occurrence
-  - Tournaments: Belyea Championship, Chad Harris Memorial
-
-### `final handicap` Sheet
-Prior-year handicap lookup table for all bowlers (used to seed starting handicap).
-
-### `High Games` / `wkly high average` Sheets
-Weekly high game and average leaders tracking.
+### Schedule
+- Fixed at start of each season (which team pair plays on which lane pair each week)
+- Rotation designed to ensure all teams play each other on different lanes over time
+- Stored in DB; set up once per season during admin setup
 
 ## Key Formulas
 
-### Handicap
+### Average
 ```
-handicap = INT(0.9 * (200 - current_average))
+average = ROUND(cumulative_season_pins / cumulative_season_games, 0)
 ```
-- Base: 200
-- Factor: 0.9
-- Applied to running average after each week
-- Prior year handicap used as starting value
+- Rounded to nearest integer (not truncated)
+- Cumulative across the full season
 
-### Running Average
+### Handicap — Three Cases
+
+**Case 1: Established bowler (6+ cumulative games)**
 ```
-average = cumulative_pins / cumulative_games
+handicap = ROUND((200 - prior_week_running_avg) * 0.9, 0)
 ```
-Cumulative games = sum of games actually bowled (not blind/absent weeks).
+- Uses previous week's cumulative running average (handicap for tonight was set by last week's results)
+- Applies whether or not they bowled this week
 
-### Handicap Score
+**Case 2: New bowler, no prior year handicap (first 6 games)**
 ```
-handicap_game = scratch_game + handicap
-handicap_series = scratch_series + (handicap * games_in_series)
+handicap = ROUND((200 - tonight_avg) * 0.9, 0)
+  where tonight_avg = tonight_total_pins / tonight_games_bowled
+```
+- Recalculated fresh each night from that session's games only (not cumulative)
+- Applies until cumulative games crosses 6
+
+**Case 3: Returning bowler with prior year handicap (first 6 games)**
+```
+handicap = prior_year_handicap
+```
+- Prior year handicap used unchanged until 6 cumulative games bowled
+- Then switches to Case 1 formula
+
+### High Game Scratch
+```
+high_game_scratch = MAX(game1, game2, game3, game4, game5, game6)
 ```
 
-### Team Points
-Each week: teams compete; A points + B points distributed based on results (max 16 total per week across all teams — 4 per head-to-head pairing).
+### High Game with Handicap
+```
+high_game_hcp = high_game_scratch + handicap  (0 if didn't bowl)
+```
 
-### Iron Man
-Bowler must bowl every week of the season. Tracked on `indiv payout` sheet.
+### High Series Scratch
+```
+high_series_scratch = MAX(SUM(games 1–3), SUM(games 4–6))
+```
+Takes the better of the two 3-game sets (handles double-night legacy).
 
-## Application Goals
+### High Series with Handicap
+```
+winning_set = whichever of games 1–3 or 4–6 had higher scratch total
+high_series_hcp = high_series_scratch + (handicap × COUNT(games in winning_set))
+```
 
-1. **Score entry**: Enter game scores by week for each bowler
-2. **Automatic handicap calculation**: Recalculate after each week's entry
-3. **Standings**: Team standings (points), individual average leaders
-4. **Payout tracking**: High game/series winners, Iron Man candidates, Most Improved
-5. **Reports**: Weekly summary, YTD standings, prize payout preview
+### Cumulative 2nd Half
+Starts accumulating at week 12 (second half of 23-week season).
 
-## Tech Stack (to be decided)
+### "Use This Handicap" (wkly alpha display)
+The printable roster shows prior-year handicap if cumulative games ≤ 3, otherwise current calculated handicap. This is intentional for the print sheet (switches after first night is entered). The 6-game threshold governs the actual handicap calculation; the display just needs to show what's relevant for the current night.
 
-No stack chosen yet. Options:
-- Python + SQLite (simple, deployable on Pi or Mac)
-- Python + FastAPI + React (web UI)
-- Keep in Excel but add Python scripts for automation
+## Data Model
 
-## Files
+### Multi-year design
+All data is scoped to a `season`. Bowlers exist outside seasons; per-season `roster` records track active status, team, and starting handicap.
 
-- `scoring 2025-2026 - Week 20.xlsx` — source spreadsheet (reference only, not committed)
-- `CLAUDE.md` — this file
+### Tables
+- **bowlers**: id, last_name, first_name, nickname, email, created_at. Never deleted — mark inactive instead.
+- **seasons**: id, name (e.g. "2025-2026"), start_date, num_weeks, half_boundary_week (default 11)
+- **roster**: bowler_id, season_id, team_id, active, prior_handicap, joined_week (for mid-season additions)
+- **teams**: id, season_id, name, captain
+- **schedule**: season_id, week_num, matchup_num (1–4), team1_id, team2_id, lane_pair
+- **weeks**: season_id, week_num, date, is_position_night, notes
+- **matchup_entries**: season_id, week_num, matchup_num, team_id, bowler_id, lane_side (A/B), is_blind, game1..game6 (nullable)
+- **team_points**: season_id, week_num, matchup_num, team_id, points_earned
+- **season_snapshots**: season_id, week_num, snapshot_json, created_at
+
+All stats (average, handicap, cumulative totals, high game/series, team standings) are computed from `matchup_entries` on the fly — nothing derived is stored except snapshots.
+
+## Application Design
+
+### Stack
+- **Python 3 + Flask** — web framework, runs locally with `python app.py`
+- **SQLite** via SQLAlchemy — single `.db` file
+- **Bootstrap 5** — layout and print-friendly CSS
+- **No JavaScript frameworks** — plain HTML forms
+
+### Storage location
+- DB file: `~/OneDrive - DGLC/Claude/bowling-league-tracker/league.db` (OneDrive-backed, auto-synced)
+- JSON snapshots: `~/OneDrive - DGLC/Claude/bowling-league-tracker/snapshots/YYYY-YYYY-wkNN.json`
+- Snapshot written automatically after each weekly entry is saved
+
+### Pages / Features
+
+1. **Weekly entry**: pick week → 4 matchup sheets → assign players/blinds per lane → enter game scores. Points calculated automatically on save.
+2. **Wkly Alpha (printable)**: roster with current avg, handicap, YTD stats. Prints from browser. Shows prior-week highs.
+3. **Standings**: team points table (current half + overall), individual average leaders, high game/series records.
+4. **Bowler detail**: full season history for one bowler.
+5. **Blinds reconciliation**: enter headcount/blind count, compare against entered data.
+6. **Payout tracker**: running prize calculations — high game/series scratch & hcp by week, most improved, iron man candidates, prize pool.
+7. **Admin / Season setup**: roster management (add/activate/deactivate bowlers), season parameters (weeks, dates, schedule), prior-year handicap entry.
+8. **XLS import**: reads end-of-season spreadsheet to seed next season (roster from `wkly alpha`, final handicaps from `final handicap` sheet). Optionally imports full score history from individual player tabs.
+9. **Season rollover**: wizard to start new season — confirm active players, set teams, carry forward handicaps.
+
+### Build Order
+1. DB schema and SQLAlchemy models
+2. Season setup + roster admin
+3. Weekly score entry (core loop)
+4. Wkly Alpha printable page
+5. Standings and bowler detail
+6. Blinds reconciliation
+7. Payout tracker
+8. XLS import tool
+9. Season rollover wizard
+
+## Git Workflow
+
+Feature branches + PRs for all code changes. See global CLAUDE.md (`~/github/claude-contexts/CLAUDE.md`).
 
 ## Repo
 - GitHub: `dglcinc/bowling-league-tracker` (private)
-- Clone: `~/github/bowling-league-tracker`
-
-## Working Style
-See global CLAUDE.md (`~/github/claude-contexts/CLAUDE.md`) for git workflow, PR conventions, and working style preferences.
+- Local clone: `~/github/bowling-league-tracker`
+- VM mount: `/sessions/<session>/mnt/github/bowling-league-tracker`
