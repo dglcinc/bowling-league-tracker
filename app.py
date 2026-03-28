@@ -42,10 +42,7 @@ def create_app():
                     .order_by(Week.week_num.desc())
                     .first())
             current_week = last.week_num if last else 0
-        from flask import g as flask_g
-        flask_g.active_season = active
-        flask_g.current_week = current_week
-        return {'g': flask_g}
+        return {'active_season': active, 'current_week': current_week}
 
     @app.route('/')
     def index():

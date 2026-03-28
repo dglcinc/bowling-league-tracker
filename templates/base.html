@@ -35,11 +35,10 @@
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Reports</a>
           <ul class="dropdown-menu">
-            {% set active_season = active_season|default(none) %}
-            {% if g.active_season %}
-            <li><a class="dropdown-item" href="{{ url_for('reports.wkly_alpha', season_id=g.active_season.id, week_num=g.current_week) }}">Wkly Alpha (Print)</a></li>
-            <li><a class="dropdown-item" href="{{ url_for('reports.standings', season_id=g.active_season.id) }}">Standings</a></li>
-            <li><a class="dropdown-item" href="{{ url_for('reports.high_games', season_id=g.active_season.id) }}">High Games / Averages</a></li>
+              {% if active_season %}
+            <li><a class="dropdown-item" href="{{ url_for('reports.wkly_alpha', season_id=active_season.id, week_num=current_week) }}">Wkly Alpha (Print)</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('reports.standings', season_id=active_season.id) }}">Standings</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('reports.high_games', season_id=active_season.id) }}">High Games / Averages</a></li>
             {% endif %}
           </ul>
         </li>
@@ -47,8 +46,8 @@
           <a class="nav-link" href="{{ url_for('entry.index') }}">Score Entry</a>
         </li>
         <li class="nav-item">
-          {% if g.active_season %}
-          <a class="nav-link" href="{{ url_for('payout.payout_overview', season_id=g.active_season.id) }}">Payouts</a>
+          {% if active_season %}
+          <a class="nav-link" href="{{ url_for('payout.payout_overview', season_id=active_season.id) }}">Payouts</a>
           {% endif %}
         </li>
         <li class="nav-item">
