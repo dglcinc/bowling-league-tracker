@@ -202,7 +202,7 @@ class TeamPoints(db.Model):
     week_num = db.Column(db.Integer, nullable=False)
     matchup_num = db.Column(db.Integer, nullable=False)
     team_id = db.Column(db.Integer, db.ForeignKey('teams.id'), nullable=False)
-    points_earned = db.Column(db.Integer, default=0)
+    points_earned = db.Column(db.Float, default=0)  # Float to handle 0.5-pt ties
     is_forfeit = db.Column(db.Boolean, default=False)
 
     team = db.relationship('Team')
