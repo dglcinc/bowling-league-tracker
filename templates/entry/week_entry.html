@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Week {{ week.week_num }} — Score Entry{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('entry.week_list', season_id=season.id) }}">Weeks</a></li>
+    <li class="breadcrumb-item active">Week {{ week.week_num }}</li>
+  </ol>
+</nav>
+
+<h4>
+  Week {{ week.week_num }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
+  {% if week.is_position_night %}<span class="badge bg-warning text-dark">⭐ Position Night</span>{% endif %}
+  {% if week.is_entered %}<span class="badge bg-success">✓ Entered</span>{% endif %}
+</h4>
+
+{% if week.is_position_night %}
+<div class="alert alert-warning">
+  <strong>Position Night:</strong> Points are aggregated across all matchups for each team pairing. Score entry is the same — just enter game scores for each bowler as normal.
+</div>
+{% endif %}
+
+<div class="row">
+  {% for sched in matchups %}
+  <div class="col-md-6 mb-3">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between">
+        <strong>Matchup {{ sched.matchup_num }}</strong>
+        {% if sched.lane_pair %}<span class="text-muted">Lanes {{ sched.lane_pair }}</span>{% endif %}
+      </div>
+      <div class="card-body">
+        <p class="mb-1">
+          <strong>Team {{ sched.team1.number }}</strong> {{ sched.team1.name }}
+          vs
+          <strong>Team {{ sched.team2.number }}</strong> {{ sched.team2.name }}
+        </p>
+        {% set entries_for_matchup = matchup_data | selectattr('sched.matchup_num', 'equalto', sched.matchup_num) | list %}
+        {% set entry_count = namespace(n=0) %}
+        {% for md in entries_for_matchup %}{% set entry_count.n = entry_count.n + md.entries|length %}{% endfor %}
+        {% if entry_count.n > 0 %}
+        <p class="text-success mb-1">✓ {{ entry_count.n }} entries</p>
+        {% endif %}
+        <a href="{{ url_for('entry.matchup_entry', season_id=season.id, week_num=week.week_num, matchup_num=sched.matchup_num) }}"
+           class="btn btn-sm btn-primary">
+          {{ 'Edit Scores' if entry_count.n > 0 else 'Enter Scores' }}
+        </a>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12">
+    <div class="alert alert-warning">No schedule entries found for this week. Set up the schedule in <a href="{{ url_for('admin.schedule', season_id=season.id) }}">Admin → Schedule</a>.</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if week.is_entered %}
+<div class="mt-2">
+  <a href="{{ url_for('entry.reconcile', season_id=season.id, week_num=week.week_num) }}"
+     class="btn btn-outline-secondary btn-sm">Blinds Reconciliation</a>
+  <a href="{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=week.week_num) }}"
+     class="btn btn-outline-primary btn-sm">View / Print Wkly Alpha</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}New Season{% endblock %}
+
+{% block content %}
+<h4>New Season</h4>
+<form method="post" class="col-md-6">
+  <div class="mb-3">
+    <label class="form-label">Season Name</label>
+    <input type="text" name="name" class="form-control" placeholder="e.g. 2026-2027" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Start Date (first week)</label>
+    <input type="date" name="start_date" class="form-control">
+  </div>
+  <div class="row mb-3">
+    <div class="col">
+      <label class="form-label">Number of Weeks</label>
+      <input type="number" name="num_weeks" class="form-control" value="23" min="1" max="40">
+    </div>
+    <div class="col">
+      <label class="form-label">First Half Ends Week</label>
+      <input type="number" name="half_boundary_week" class="form-control" value="11" min="1" max="30">
+      <div class="form-text">Position night on this week and the last week of the season.</div>
+    </div>
+  </div>
+  <button type="submit" class="btn btn-primary">Create Season</button>
+  <a href="{{ url_for('admin.seasons') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+</form>
+{% endblock %}
