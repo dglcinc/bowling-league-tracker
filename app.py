@@ -65,5 +65,5 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    print("\n  Bowling League Tracker running at http://localhost:5000\n")
-    app.run(debug=True, port=5000)
+    print("\n  Bowling League Tracker running at http://localhost:5001\n")
+    app.run(debug=True, port=5001)
