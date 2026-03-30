@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Import Season from XLS{% endblock %}
+
+{% block content %}
+<h4>Import Season from XLS</h4>
+<p class="text-muted">
+  Uploads an end-of-season spreadsheet to create a new historical season.
+  Reads the <code>wkly alpha</code> sheet for roster, individual bowler sheets for scores,
+  and <code>team scoring</code> for standings. All scores are placed on the B-side
+  (matchup 2 for teams 1&amp;2, matchup 4 for teams 3&amp;4) — use Assign Matchups afterward to correct if needed.
+</p>
+
+<form method="post" enctype="multipart/form-data" class="col-md-7">
+  <div class="mb-3">
+    <label class="form-label">Spreadsheet File (.xlsx)</label>
+    <input type="file" name="xls_file" class="form-control" accept=".xlsx" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Season Name</label>
+    <input type="text" name="season_name" class="form-control" placeholder="e.g. 2024-2025" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Start Date (first week)</label>
+    <input type="date" name="start_date" class="form-control">
+  </div>
+  <div class="row mb-3">
+    <div class="col">
+      <label class="form-label">Number of Weeks</label>
+      <input type="number" name="num_weeks" class="form-control" value="23" min="1" max="40">
+    </div>
+    <div class="col">
+      <label class="form-label">First Half Ends Week</label>
+      <input type="number" name="half_boundary_week" class="form-control" value="11" min="1" max="30">
+    </div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Team Names <small class="text-muted">(leave blank for "Team 1" … "Team 4")</small></label>
+    <div class="row g-2">
+      {% for i in range(1, 5) %}
+      <div class="col-6 col-md-3">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text">T{{ i }}</span>
+          <input type="text" name="team{{ i }}_name" class="form-control" placeholder="Team {{ i }}">
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="alert alert-warning">
+    <strong>Note:</strong> This will create a new season and deactivate the current active season.
+    The import may take a few seconds for large spreadsheets.
+  </div>
+  <button type="submit" class="btn btn-primary">Import Season</button>
+  <a href="{{ url_for('admin.seasons') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+</form>
+{% endblock %}

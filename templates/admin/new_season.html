@@ -23,6 +23,27 @@
       <div class="form-text">Position night on this week and the last week of the season.</div>
     </div>
   </div>
+  <div class="mb-3">
+    <label class="form-label">Bowling Format</label>
+    <select name="bowling_format" class="form-select">
+      <option value="single">Single night (8 lanes, 3 games per bowler)</option>
+      <option value="double">Double night (4 lanes, 6 games per bowler)</option>
+    </select>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Team Names</label>
+    <div class="row g-2">
+      {% for i in range(1, 5) %}
+      <div class="col-6 col-md-3">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text">T{{ i }}</span>
+          <input type="text" name="team{{ i }}_name" class="form-control" placeholder="Team {{ i }}">
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="form-text">Leave blank to use "Team 1" … "Team 4".</div>
+  </div>
   <button type="submit" class="btn btn-primary">Create Season</button>
   <a href="{{ url_for('admin.seasons') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
 </form>

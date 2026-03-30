@@ -4,13 +4,20 @@ Score entry routes: weekly matchup entry, blind management, points calculation.
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
-                    TeamPoints, Roster, Bowler)
+                    TeamPoints, Roster, Bowler, TournamentEntry)
 from calculations import (score_matchup, score_position_night, calculate_handicap,
                           get_weekly_prizes, get_team_standings)
 from snapshots import save_snapshot
 from config import Config
 
 entry_bp = Blueprint('entry', __name__)
+
+_TOURNAMENT_LABELS = {
+    'club_championship': 'Club Team Championship',
+    'harry_russell': 'Harry E. Russell Championship',
+    'chad_harris': 'Chad Harris Memorial Bowl',
+    'shep_belyea': 'Shep Belyea Open',
+}
 
 
 @entry_bp.route('/')
@@ -27,6 +34,16 @@ def week_list(season_id):
     season = Season.query.get_or_404(season_id)
     weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
     return render_template('entry/week_list.html', season=season, weeks=weeks)
+
+
+@entry_bp.route('/season/<int:season_id>/week/<int:week_num>/cancel', methods=['POST'])
+def toggle_cancelled(season_id, week_num):
+    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
+    week.is_cancelled = not week.is_cancelled
+    db.session.commit()
+    status = 'cancelled' if week.is_cancelled else 'uncancelled'
+    flash(f'Week {week_num} {status}.', 'success')
+    return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>')
@@ -83,7 +100,8 @@ def week_entry(season_id, week_num):
                            season=season, week=week,
                            matchups=matchups,
                            matchup_data=matchup_data,
-                           recon=recon)
+                           recon=recon,
+                           tournament_labels=_TOURNAMENT_LABELS)
 
 
 def _auto_assign_position_night(season_id, position_week_num):
@@ -149,9 +167,10 @@ def matchup_entry(season_id, week_num, matchup_num):
 
             for i in row_indices:
                 prefix = f't{team.number}_row_{i}_'
-                is_blind = request.form.get(f'{prefix}blind') == 'on'
-                bowler_id_str = request.form.get(f'{prefix}bowler_id')
-                bowler_id = int(bowler_id_str) if bowler_id_str and not is_blind else None
+                bowler_id_str = request.form.get(f'{prefix}bowler_id', '').strip()
+                is_blind = (bowler_id_str == 'BLIND')
+                bowler_id = int(bowler_id_str) if (bowler_id_str and not is_blind
+                                                    and bowler_id_str.isdigit()) else None
 
                 # Skip completely empty rows
                 games = []
@@ -290,3 +309,117 @@ def reconcile(season_id, week_num):
                            blind_games=blind_games,
                            total_wood=total_wood,
                            entry_data=entry_data)
+
+
+# ---------------------------------------------------------------------------
+# Tournament entry (Harry Russell, Chad Harris, Shep Belyea, Club Championship)
+# ---------------------------------------------------------------------------
+
+@entry_bp.route('/season/<int:season_id>/week/<int:week_num>/tournament',
+                methods=['GET', 'POST'])
+def tournament_entry(season_id, week_num):
+    season = Season.query.get_or_404(season_id)
+    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
+    if not week.tournament_type:
+        flash('This week is not a tournament week.', 'warning')
+        return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+    tt = week.tournament_type
+    label = _TOURNAMENT_LABELS.get(tt, tt)
+
+    # Harry Russell: all bowlers ever (active + inactive); others: active only
+    if tt == 'harry_russell':
+        all_bowlers = (Bowler.query
+                       .join(Roster, Roster.bowler_id == Bowler.id)
+                       .filter(Roster.season_id == season_id)
+                       .order_by(Bowler.last_name)
+                       .all())
+    else:
+        all_bowlers = (Bowler.query
+                       .join(Roster, Roster.bowler_id == Bowler.id)
+                       .filter(Roster.season_id == season_id, Roster.active == True)
+                       .order_by(Bowler.last_name)
+                       .all())
+
+    num_games = 5 if tt == 'harry_russell' else 3
+    use_handicap = (tt != 'harry_russell')
+
+    if request.method == 'POST':
+        # Delete existing entries for this tournament week
+        TournamentEntry.query.filter_by(
+            season_id=season_id, week_num=week_num
+        ).delete()
+
+        for key in request.form:
+            if not key.startswith('bowler_'):
+                continue
+            row_id = key[len('bowler_'):]
+            bowler_val = request.form.get(f'bowler_{row_id}', '').strip()
+            if not bowler_val:
+                continue
+
+            games = []
+            for g in range(1, num_games + 1):
+                val = request.form.get(f'game{g}_{row_id}', '').strip()
+                games.append(int(val) if val.isdigit() else None)
+
+            if all(g is None for g in games):
+                continue
+
+            hcp = 0
+            if use_handicap:
+                hcp_val = request.form.get(f'hcp_{row_id}', '').strip()
+                hcp = int(hcp_val) if hcp_val.isdigit() else 0
+
+            if bowler_val == 'WRITE_IN':
+                guest = request.form.get(f'guest_name_{row_id}', '').strip()
+                if not guest:
+                    continue
+                te = TournamentEntry(
+                    season_id=season_id, week_num=week_num,
+                    guest_name=guest, handicap=hcp,
+                    game1=games[0] if len(games) > 0 else None,
+                    game2=games[1] if len(games) > 1 else None,
+                    game3=games[2] if len(games) > 2 else None,
+                    game4=games[3] if len(games) > 3 else None,
+                    game5=games[4] if len(games) > 4 else None,
+                )
+            else:
+                bowler_id = int(bowler_val)
+                if use_handicap and hcp == 0:
+                    hcp = calculate_handicap(bowler_id, season_id, week_num)
+                te = TournamentEntry(
+                    season_id=season_id, week_num=week_num,
+                    bowler_id=bowler_id, handicap=hcp,
+                    game1=games[0] if len(games) > 0 else None,
+                    game2=games[1] if len(games) > 1 else None,
+                    game3=games[2] if len(games) > 2 else None,
+                    game4=games[3] if len(games) > 3 else None,
+                    game5=games[4] if len(games) > 4 else None,
+                )
+            db.session.add(te)
+
+        db.session.commit()
+        week.is_entered = True
+        db.session.commit()
+        flash(f'{label} scores saved.', 'success')
+        return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+    # GET — load existing entries
+    existing = TournamentEntry.query.filter_by(
+        season_id=season_id, week_num=week_num
+    ).all()
+
+    # Pre-compute handicaps for display
+    bowler_handicaps = {}
+    for b in all_bowlers:
+        bowler_handicaps[b.id] = calculate_handicap(b.id, season_id, week_num)
+
+    return render_template('entry/tournament_entry.html',
+                           season=season, week=week, label=label,
+                           tournament_type=tt,
+                           all_bowlers=all_bowlers,
+                           existing=existing,
+                           num_games=num_games,
+                           use_handicap=use_handicap,
+                           bowler_handicaps=bowler_handicaps)

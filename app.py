@@ -9,6 +9,22 @@ from config import Config
 from models import db
 
 
+def _migrate_db(db):
+    """Add new columns to existing tables without dropping data."""
+    from sqlalchemy import text
+    migrations = [
+        "ALTER TABLE seasons ADD COLUMN bowling_format VARCHAR(10) DEFAULT 'single'",
+        "ALTER TABLE weeks ADD COLUMN tournament_type VARCHAR(32)",
+    ]
+    with db.engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # column already exists
+
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -19,6 +35,7 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        _migrate_db(db)
 
     # Register blueprints
     from routes.admin import admin_bp

@@ -6,7 +6,7 @@
 <form method="post">
   <table class="table table-sm">
     <thead>
-      <tr><th>Week</th><th>Date</th><th>Position Night</th></tr>
+      <tr><th>Week</th><th>Date</th><th>Position Night</th><th>Tournament Type</th></tr>
     </thead>
     <tbody>
       {% for wk in weeks %}
@@ -21,6 +21,13 @@
             <input type="checkbox" class="form-check-input" name="pos_{{ wk.week_num }}"
                    {{ 'checked' if wk.is_position_night else '' }}>
           </div>
+        </td>
+        <td>
+          <select name="tournament_{{ wk.week_num }}" class="form-select form-select-sm" style="width:220px">
+            {% for val, label in tournament_types %}
+            <option value="{{ val }}" {{ 'selected' if wk.tournament_type == val else '' }}>{{ label }}</option>
+            {% endfor %}
+          </select>
         </td>
       </tr>
       {% endfor %}

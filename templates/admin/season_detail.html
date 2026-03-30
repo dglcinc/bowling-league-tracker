@@ -17,6 +17,9 @@
   <div class="col-auto">
     <a href="{{ url_for('admin.assign_matchups_list', season_id=season.id) }}" class="btn btn-outline-warning btn-sm">Assign Matchups</a>
   </div>
+  <div class="col-auto">
+    <a href="{{ url_for('admin.import_season') }}" class="btn btn-outline-info btn-sm">Import Season from XLS</a>
+  </div>
 </div>
 
 <h5>Teams</h5>
@@ -59,6 +62,8 @@
         {% endif %}
       </td>
       <td>
+        <a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler_id) }}"
+           class="btn btn-sm btn-outline-info">Stats</a>
         <a href="{{ url_for('admin.edit_roster', season_id=season.id, roster_id=r.id) }}"
            class="btn btn-xs btn-outline-secondary btn-sm">Edit</a>
         <form method="post"

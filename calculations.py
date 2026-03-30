@@ -15,12 +15,20 @@ from models import db, MatchupEntry, Roster, Season, TeamPoints, ScheduleEntry
 def get_bowler_entries(bowler_id, season_id):
     """
     Returns list of MatchupEntry for a bowler, sorted by week.
-    Each entry represents one session (up to 6 games across two nights).
+    Tournament weeks are excluded so they don't count toward season averages/handicaps.
     """
-    return (MatchupEntry.query
-            .filter_by(bowler_id=bowler_id, season_id=season_id, is_blind=False)
-            .order_by(MatchupEntry.week_num)
-            .all())
+    from models import Week
+    tournament_weeks = {
+        w.week_num for w in
+        Week.query.filter_by(season_id=season_id).filter(
+            Week.tournament_type.isnot(None)
+        ).all()
+    }
+    entries = (MatchupEntry.query
+               .filter_by(bowler_id=bowler_id, season_id=season_id, is_blind=False)
+               .order_by(MatchupEntry.week_num)
+               .all())
+    return [e for e in entries if e.week_num not in tournament_weeks]
 
 
 # ---------------------------------------------------------------------------
