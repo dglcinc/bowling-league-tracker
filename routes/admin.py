@@ -260,6 +260,26 @@ def edit_weeks(season_id):
 
 
 # ---------------------------------------------------------------------------
+# Add an extra week (for post-season tournaments)
+# ---------------------------------------------------------------------------
+
+@admin_bp.route('/seasons/<int:season_id>/weeks/add', methods=['POST'])
+def add_week(season_id):
+    season = Season.query.get_or_404(season_id)
+    last = Week.query.filter_by(season_id=season_id).order_by(Week.week_num.desc()).first()
+    next_num = (last.week_num + 1) if last else 1
+    wk = Week(season_id=season_id, week_num=next_num)
+    # If previous week has a date, cascade +7 days
+    if last and last.date:
+        from datetime import timedelta
+        wk.date = last.date + timedelta(weeks=1)
+    db.session.add(wk)
+    db.session.commit()
+    flash(f'Week {next_num} added.', 'success')
+    return redirect(url_for('admin.edit_weeks', season_id=season_id))
+
+
+# ---------------------------------------------------------------------------
 # Matchup assignment (historical data fix)
 # ---------------------------------------------------------------------------
 

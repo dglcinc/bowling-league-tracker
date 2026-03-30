@@ -33,7 +33,8 @@ def index():
 def week_list(season_id):
     season = Season.query.get_or_404(season_id)
     weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
-    return render_template('entry/week_list.html', season=season, weeks=weeks)
+    return render_template('entry/week_list.html', season=season, weeks=weeks,
+                           tournament_labels=_TOURNAMENT_LABELS)
 
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/cancel', methods=['POST'])
