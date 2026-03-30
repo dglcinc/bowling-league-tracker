@@ -6,7 +6,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
                     TeamPoints, Roster, Bowler)
 from calculations import (score_matchup, score_position_night, calculate_handicap,
-                          get_weekly_prizes)
+                          get_weekly_prizes, get_team_standings)
 from snapshots import save_snapshot
 from config import Config
 
@@ -84,6 +84,38 @@ def week_entry(season_id, week_num):
                            matchups=matchups,
                            matchup_data=matchup_data,
                            recon=recon)
+
+
+def _auto_assign_position_night(season_id, position_week_num):
+    """
+    Update ScheduleEntry for a position night based on standings through the prior week.
+    Top 2 teams by points play each other (matchups 1&2), bottom 2 play each other (3&4).
+    """
+    standings = get_team_standings(season_id, through_week=position_week_num - 1)
+    if len(standings) < 4:
+        return
+    top_a, top_b = standings[0]['team'], standings[1]['team']
+    bot_a, bot_b = standings[2]['team'], standings[3]['team']
+
+    assignments = {
+        1: (top_a.id, top_b.id),
+        2: (top_a.id, top_b.id),
+        3: (bot_a.id, bot_b.id),
+        4: (bot_a.id, bot_b.id),
+    }
+    for matchup_num, (t1_id, t2_id) in assignments.items():
+        sched = ScheduleEntry.query.filter_by(
+            season_id=season_id, week_num=position_week_num,
+            matchup_num=matchup_num
+        ).first()
+        if sched:
+            sched.team1_id = t1_id
+            sched.team2_id = t2_id
+        else:
+            db.session.add(ScheduleEntry(
+                season_id=season_id, week_num=position_week_num,
+                matchup_num=matchup_num, team1_id=t1_id, team2_id=t2_id
+            ))
 
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/matchup/<int:matchup_num>',
@@ -169,6 +201,15 @@ def matchup_entry(season_id, week_num, matchup_num):
                 db.session.add(tp)
 
         db.session.commit()
+
+        # If the next week is an un-entered position night, update its lane assignments
+        next_pos = Week.query.filter_by(
+            season_id=season_id, week_num=week_num + 1,
+            is_position_night=True, is_entered=False
+        ).first()
+        if next_pos:
+            _auto_assign_position_night(season_id, week_num + 1)
+            db.session.commit()
 
         # Mark week as entered if all matchups are done
         all_matchups = ScheduleEntry.query.filter_by(

@@ -18,6 +18,10 @@
     .batch-section:last-child { page-break-after: auto; }
     .batch-label { display: none !important; }
     h2, h4, h5, h6 { font-size: 9pt !important; margin-bottom: 2px !important; }
+
+    /* Group isolation: hide the other group when printing a specific group */
+    body.print-group-1 [data-group="2"] { display: none !important; }
+    body.print-group-2 [data-group="1"] { display: none !important; }
   }
   @media screen {
     .table th, .table td { white-space: nowrap; }
@@ -26,6 +30,13 @@
                    color: #6c757d; margin-bottom: 0.25rem; }
   }
 </style>
+<script>
+function printGroup(n) {
+  document.body.classList.add('print-group-' + n);
+  window.print();
+  document.body.classList.remove('print-group-' + n);
+}
+</script>
 {% endblock %}
 
 {% macro alpha_table(rows, title) %}
@@ -38,19 +49,11 @@
 <table class="table table-bordered table-sm table-striped mb-0">
   <thead class="table-dark">
     <tr>
-      <th>Name</th>
-      <th>Nick</th>
-      <th>T</th>
-      <th class="text-end">Total</th>
-      <th class="text-end">2nd</th>
-      <th class="text-end">G</th>
-      <th class="text-end">Ave</th>
-      <th class="text-end">Use<br>Hcp</th>
-      <th class="text-end">Cur<br>Hcp</th>
-      <th class="text-end">HG<br>Scr</th>
-      <th class="text-end">HG<br>Hcp</th>
-      <th class="text-end">HS<br>Scr</th>
-      <th class="text-end">HS<br>Hcp</th>
+      <th>Name</th><th>Nick</th><th>T</th>
+      <th class="text-end">Total</th><th class="text-end">2nd</th><th class="text-end">G</th>
+      <th class="text-end">Ave</th><th class="text-end">Use<br>Hcp</th><th class="text-end">Cur<br>Hcp</th>
+      <th class="text-end">HG<br>Scr</th><th class="text-end">HG<br>Hcp</th>
+      <th class="text-end">HS<br>Scr</th><th class="text-end">HS<br>Hcp</th>
       <th class="text-end">Lst<br>Hcp</th>
     </tr>
   </thead>
@@ -81,9 +84,12 @@
 <div class="no-print d-flex justify-content-between align-items-center mb-3">
   <div>
     <h4 class="mb-0">Print Batch — Week {{ week_num }}</h4>
-    <small class="text-muted">4 × Wkly Alpha &nbsp;|&nbsp; 1 × YTD Alpha &nbsp;|&nbsp; 1 × High Avg &nbsp;|&nbsp; 1 × High Games</small>
+    <small class="text-muted">
+      Group 1: 4 × Wkly Alpha &nbsp;|&nbsp;
+      Group 2: Wkly Alpha + YTD Alpha + High Avg + High Games
+    </small>
   </div>
-  <div class="d-flex gap-2 align-items-center">
+  <div class="d-flex gap-2 align-items-center flex-wrap">
     <select class="form-select form-select-sm w-auto"
             onchange="location='{{ url_for('reports.print_batch', season_id=season.id, week_num=0) }}'.replace('/0', '/'+this.value)">
       {% for wk in weeks %}
@@ -92,21 +98,36 @@
       </option>
       {% endfor %}
     </select>
-    <button onclick="window.print()" class="btn btn-sm btn-primary">Print All (7 pages)</button>
+    <button onclick="printGroup(1)" class="btn btn-sm btn-outline-primary">
+      Print Group 1 (4× Alpha)
+    </button>
+    <button onclick="printGroup(2)" class="btn btn-sm btn-outline-primary">
+      Print Group 2 (Alpha + YTD + High Avg + HG)
+    </button>
+    <button onclick="window.print()" class="btn btn-sm btn-secondary">
+      Print All (8 pages)
+    </button>
   </div>
 </div>
 
-{# ── Copies 1-4: Weekly Alpha ── #}
+{# ── GROUP 1: Four copies of Weekly Alpha ── #}
+
 {% for copy in range(1, 5) %}
-<div class="batch-section">
-  <div class="batch-label no-print">Wkly Alpha — copy {{ copy }} of 4</div>
+<div class="batch-section" data-group="1">
+  <div class="batch-label no-print">Group 1 — Wkly Alpha, copy {{ copy }} of 4</div>
   {{ alpha_table(alpha_rows, 'Wkly Alpha') }}
 </div>
 {% endfor %}
 
-{# ── Copy 5: YTD Alpha (sorted by average) ── #}
-<div class="batch-section">
-  <div class="batch-label no-print">YTD Alpha (sorted by average)</div>
+{# ── GROUP 2: Weekly Alpha + YTD Alpha + High Avg + High Games ── #}
+
+<div class="batch-section" data-group="2">
+  <div class="batch-label no-print">Group 2 — Wkly Alpha</div>
+  {{ alpha_table(alpha_rows, 'Wkly Alpha') }}
+</div>
+
+<div class="batch-section" data-group="2">
+  <div class="batch-label no-print">Group 2 — YTD Alpha (sorted by average)</div>
   <div class="text-center mb-1" style="font-size:0.9rem">
     <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp;
     {{ season.name }} &nbsp;|&nbsp;
@@ -145,15 +166,13 @@
   </table>
 </div>
 
-{# ── Copy 6: Weekly High Averages (sorted by average, with rank) ── #}
-<div class="batch-section">
-  <div class="batch-label no-print">Weekly High Averages (sorted by average)</div>
+<div class="batch-section" data-group="2">
+  <div class="batch-label no-print">Group 2 — Weekly High Avg (sorted by average)</div>
   {{ alpha_table(high_avg_rows, 'High Avg') }}
 </div>
 
-{# ── Copy 7: High Games & Averages ── #}
-<div class="batch-section">
-  <div class="batch-label no-print">High Games &amp; Averages (through week {{ hg_through }})</div>
+<div class="batch-section" data-group="2">
+  <div class="batch-label no-print">Group 2 — High Games &amp; Averages (through week {{ hg_through }})</div>
   <div class="text-center mb-1" style="font-size:0.9rem">
     <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp;
     {{ season.name }} &nbsp;|&nbsp;
