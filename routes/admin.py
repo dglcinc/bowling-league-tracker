@@ -184,9 +184,12 @@ def save_schedule(season_id):
     """Save schedule entries from form. Expects fields like week_1_matchup_1_t1, etc."""
     season = Season.query.get_or_404(season_id)
 
+    # Collect all fields per matchup first so we never add a partial entry to the
+    # session — an in-session entry with team2_id=None would violate NOT NULL on the
+    # next query's autoflush before we get a chance to set team2_id.
+    updates = {}
     for key, val in request.form.items():
         # Expected key format: week_{wn}_matchup_{mn}_{field}
-        # field = t1 (team1_id), t2 (team2_id), lane
         parts = key.split('_')
         if len(parts) < 5 or parts[0] != 'week' or parts[2] != 'matchup':
             continue
@@ -196,7 +199,9 @@ def save_schedule(season_id):
             field = parts[4]
         except (ValueError, IndexError):
             continue
+        updates.setdefault((wn, mn), {})[field] = val
 
+    for (wn, mn), fields in updates.items():
         entry = ScheduleEntry.query.filter_by(
             season_id=season_id, week_num=wn, matchup_num=mn
         ).first()
@@ -204,12 +209,12 @@ def save_schedule(season_id):
             entry = ScheduleEntry(season_id=season_id, week_num=wn, matchup_num=mn)
             db.session.add(entry)
 
-        if field == 't1' and val:
-            entry.team1_id = int(val)
-        elif field == 't2' and val:
-            entry.team2_id = int(val)
-        elif field == 'lane' and val:
-            entry.lane_pair = val.strip()
+        if fields.get('t1'):
+            entry.team1_id = int(fields['t1'])
+        if fields.get('t2'):
+            entry.team2_id = int(fields['t2'])
+        if fields.get('lane'):
+            entry.lane_pair = fields['lane'].strip()
 
     db.session.commit()
     flash('Schedule saved.', 'success')
