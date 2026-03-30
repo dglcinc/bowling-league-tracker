@@ -7,6 +7,10 @@
   input[type=number]::-webkit-inner-spin-button,
   input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   input[type=number] { -moz-appearance: textfield; }
+  #rankings td, #rankings th { padding: 4px 8px; }
+  .rank-1st { font-weight: bold; color: #856404; }
+  .rank-2nd { color: #555; }
+  .rank-3rd { color: #6c757d; }
 </style>
 {% endblock %}
 
@@ -19,15 +23,16 @@
   </ol>
 </nav>
 
-<h4>{{ label }} — Week {{ week.week_num }}
-  {% if week.date %}<small class="text-muted">{{ week.date.strftime('%B %d, %Y') }}</small>{% endif %}
+<h4>{{ label }}
+  {% if week.date %}<small class="text-muted fs-6">{{ week.date.strftime('%B %d, %Y') }}</small>{% endif %}
 </h4>
 <p class="text-muted">
   {{ num_games }} games,
   {{ 'scratch (no handicap)' if not use_handicap else 'handicap counted' }}.
+  Tournament scores are not counted toward season averages.
 </p>
 
-<form method="post">
+<form method="post" id="tourney-form">
 <table class="table table-sm table-bordered" id="tournament-table">
   <thead>
     <tr>
@@ -40,7 +45,6 @@
     </tr>
   </thead>
   <tbody id="tourney-body">
-    {# Pre-fill existing entries first, then blank rows #}
     {% set existing_count = existing|length %}
     {% set total_rows = [existing_count + 5, 10]|min %}
     {% for i in range(total_rows) %}
@@ -68,7 +72,7 @@
       <td class="text-center">
         <input type="number" name="hcp_{{ i }}" class="form-control form-control-sm score-input hcp-input"
                min="0" max="200"
-               value="{{ entry.handicap if entry else (bowler_handicaps.get(entry.bowler_id, 0) if entry and entry.bowler_id else '') }}">
+               value="{{ entry.handicap if entry else '' }}">
       </td>
       {% endif %}
       {% for g in range(1, num_games + 1) %}
@@ -93,6 +97,27 @@
      class="btn btn-outline-secondary">Cancel</a>
 </div>
 </form>
+
+{# Live rankings #}
+<div id="rankings-section" class="mt-4">
+  <h5>Rankings</h5>
+  <table class="table table-sm table-bordered" id="rankings" style="max-width:500px">
+    <thead>
+      <tr>
+        <th style="width:50px">Rank</th>
+        <th>Bowler</th>
+        <th class="text-end">Scratch</th>
+        {% if use_handicap %}
+        <th class="text-end">Hcp</th>
+        <th class="text-end">Total</th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody id="rankings-body">
+      <tr><td colspan="{{ 5 if use_handicap else 3 }}" class="text-muted">Enter scores above to see rankings.</td></tr>
+    </tbody>
+  </table>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -105,21 +130,83 @@ const handicaps = {
   {% for b in all_bowlers %}{{ b.id }}: {{ bowler_handicaps.get(b.id, 0) }},{% endfor %}
 };
 
-function updateTotal(row) {
-  let sum = 0;
-  for (let g = 1; g <= numGames; g++) {
-    const inp = row.querySelector(`input[name^="game${g}_"]`);
-    const v = parseInt(inp ? inp.value : '');
-    if (!isNaN(v)) sum += v;
+// ── rankings ──────────────────────────────────────────────────────────────
+
+function buildRankings() {
+  const rows = document.querySelectorAll('#tourney-body tr');
+  const entries = [];
+
+  rows.forEach(row => {
+    const sel = row.querySelector('.bowler-select');
+    if (!sel || !sel.value) return;
+
+    let name;
+    if (sel.value === 'WRITE_IN') {
+      name = row.querySelector('.guest-name')?.value?.trim() || '(write-in)';
+    } else {
+      name = sel.options[sel.selectedIndex]?.text || '';
+    }
+
+    let scratch = 0;
+    let gameCount = 0;
+    for (let g = 1; g <= numGames; g++) {
+      const inp = row.querySelector(`input[name^="game${g}_"]`);
+      const v = parseInt(inp?.value || '');
+      if (!isNaN(v)) { scratch += v; gameCount++; }
+    }
+    if (gameCount === 0) return;
+
+    let hcp = 0;
+    if (useHandicap) {
+      const hcpInp = row.querySelector('.hcp-input');
+      hcp = parseInt(hcpInp?.value || '') || 0;
+    }
+
+    const total = scratch + hcp * gameCount;
+    entries.push({ name, scratch, hcp, total, gameCount });
+  });
+
+  // Sort descending by total (scratch if no handicap)
+  const sortKey = useHandicap ? 'total' : 'scratch';
+  entries.sort((a, b) => b[sortKey] - a[sortKey]);
+
+  // Assign ranks (tie = same rank, next rank skips)
+  let rank = 1;
+  for (let i = 0; i < entries.length; i++) {
+    if (i > 0 && entries[i][sortKey] === entries[i-1][sortKey]) {
+      entries[i].rank = entries[i-1].rank;
+    } else {
+      entries[i].rank = rank;
+    }
+    rank++;
   }
-  const cell = row.querySelector('.total-cell');
-  if (cell) cell.textContent = sum > 0 ? sum : '';
+
+  const tbody = document.getElementById('rankings-body');
+  if (entries.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="${useHandicap ? 5 : 3}" class="text-muted">Enter scores above to see rankings.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = entries.map(e => {
+    const rankClass = e.rank === 1 ? 'rank-1st' : e.rank === 2 ? 'rank-2nd' : e.rank === 3 ? 'rank-3rd' : '';
+    const rankLabel = e.rank === 1 ? '🥇 1st' : e.rank === 2 ? '🥈 2nd' : e.rank === 3 ? '🥉 3rd' : `${e.rank}th`;
+    const hcpCols = useHandicap
+      ? `<td class="text-end">${e.hcp}</td><td class="text-end fw-bold">${e.total}</td>`
+      : '';
+    return `<tr class="${rankClass}">
+      <td>${rankLabel}</td>
+      <td>${e.name}</td>
+      <td class="text-end">${e.scratch}</td>
+      ${hcpCols}
+    </tr>`;
+  }).join('');
 }
+
+// ── bowler change ──────────────────────────────────────────────────────────
 
 function onBowlerChange(e) {
   const sel = e.target;
   const row = sel.closest('tr');
-  const rowIdx = sel.dataset.row;
   const guestInput = row.querySelector('.guest-name');
 
   if (sel.value === 'WRITE_IN') {
@@ -134,7 +221,10 @@ function onBowlerChange(e) {
       if (hcpInp && !hcpInp.value) hcpInp.value = hcp;
     }
   }
+  buildRankings();
 }
+
+// ── add row ────────────────────────────────────────────────────────────────
 
 function addRow() {
   const i = rowCount++;
@@ -167,13 +257,32 @@ function addRow() {
   const sel = row.querySelector('.bowler-select');
   sel.value = '';
   sel.addEventListener('change', onBowlerChange);
-  row.querySelectorAll('.game-input').forEach(inp => inp.addEventListener('input', () => updateTotal(row)));
+  row.querySelectorAll('.game-input, .hcp-input').forEach(inp => {
+    inp.addEventListener('input', () => { updateRowTotal(row); buildRankings(); });
+  });
+  row.querySelector('.guest-name').addEventListener('input', buildRankings);
 }
 
-// Attach listeners
+function updateRowTotal(row) {
+  let sum = 0;
+  for (let g = 1; g <= numGames; g++) {
+    const inp = row.querySelector(`input[name^="game${g}_"]`);
+    const v = parseInt(inp?.value || '');
+    if (!isNaN(v)) sum += v;
+  }
+  const cell = row.querySelector('.total-cell');
+  if (cell) cell.textContent = sum > 0 ? sum : '';
+}
+
+// ── attach listeners ───────────────────────────────────────────────────────
+
 document.querySelectorAll('.bowler-select').forEach(s => s.addEventListener('change', onBowlerChange));
-document.querySelectorAll('.game-input').forEach(inp => {
-  inp.addEventListener('input', () => updateTotal(inp.closest('tr')));
+document.querySelectorAll('#tourney-body .game-input, #tourney-body .hcp-input').forEach(inp => {
+  inp.addEventListener('input', () => { updateRowTotal(inp.closest('tr')); buildRankings(); });
 });
+document.querySelectorAll('.guest-name').forEach(inp => inp.addEventListener('input', buildRankings));
+
+// Initial rankings render (for edit mode with existing entries)
+buildRankings();
 </script>
 {% endblock %}

@@ -24,6 +24,29 @@ def _migrate_db(db):
             except Exception:
                 pass  # column already exists
 
+    # Backfill post-season tournament weeks for seasons that only have regular weeks
+    from models import Season, Week
+    from datetime import timedelta
+    from routes.admin import _POSTSEASON_WEEKS
+    seasons = Season.query.all()
+    for season in seasons:
+        max_wk = db.session.query(db.func.max(Week.week_num)).filter_by(season_id=season.id).scalar() or 0
+        if max_wk == season.num_weeks:
+            # Post-season weeks are missing — add them
+            for offset, (tt, is_pos) in enumerate(_POSTSEASON_WEEKS, start=1):
+                wn = season.num_weeks + offset
+                last = Week.query.filter_by(season_id=season.id, week_num=wn - 1).first()
+                wk = Week(
+                    season_id=season.id,
+                    week_num=wn,
+                    tournament_type=tt,
+                    is_position_night=is_pos,
+                )
+                if last and last.date:
+                    wk.date = last.date + timedelta(weeks=1)
+                db.session.add(wk)
+    db.session.commit()
+
 
 def create_app():
     app = Flask(__name__)

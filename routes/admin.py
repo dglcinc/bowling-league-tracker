@@ -9,6 +9,29 @@ import io
 
 admin_bp = Blueprint('admin', __name__)
 
+# Post-season tournament weeks added after every regular season
+_POSTSEASON_WEEKS = [
+    ('club_championship', True),   # Club Team Championship — scored as position night
+    ('harry_russell',     False),  # Harry E. Russell Championship
+    ('chad_harris',       False),  # Chad Harris Memorial Bowl
+    ('shep_belyea',       False),  # Shep Belyea Open
+]
+
+
+def _add_postseason_weeks(season, num_regular_weeks):
+    """Append 4 post-season tournament weeks after the regular season."""
+    for offset, (tt, is_pos) in enumerate(_POSTSEASON_WEEKS, start=1):
+        wn = num_regular_weeks + offset
+        wk = Week(
+            season_id=season.id,
+            week_num=wn,
+            tournament_type=tt,
+            is_position_night=is_pos,
+        )
+        if season.start_date:
+            wk.date = season.start_date + timedelta(weeks=wn - 1)
+        db.session.add(wk)
+
 
 # ---------------------------------------------------------------------------
 # Seasons
@@ -56,7 +79,7 @@ def new_season():
             team = Team(season_id=season.id, number=i, name=tname)
             db.session.add(team)
 
-        # Create week records
+        # Create regular week records
         for wn in range(1, num_weeks + 1):
             wk = Week(
                 season_id=season.id,
@@ -66,6 +89,9 @@ def new_season():
             if season.start_date:
                 wk.date = season.start_date + timedelta(weeks=wn - 1)
             db.session.add(wk)
+
+        # Create 4 post-season tournament weeks
+        _add_postseason_weeks(season, num_weeks)
 
         db.session.commit()
         flash(f'Season "{name}" created. Add your roster and schedule next.', 'success')
@@ -260,26 +286,6 @@ def edit_weeks(season_id):
 
 
 # ---------------------------------------------------------------------------
-# Add an extra week (for post-season tournaments)
-# ---------------------------------------------------------------------------
-
-@admin_bp.route('/seasons/<int:season_id>/weeks/add', methods=['POST'])
-def add_week(season_id):
-    season = Season.query.get_or_404(season_id)
-    last = Week.query.filter_by(season_id=season_id).order_by(Week.week_num.desc()).first()
-    next_num = (last.week_num + 1) if last else 1
-    wk = Week(season_id=season_id, week_num=next_num)
-    # If previous week has a date, cascade +7 days
-    if last and last.date:
-        from datetime import timedelta
-        wk.date = last.date + timedelta(weeks=1)
-    db.session.add(wk)
-    db.session.commit()
-    flash(f'Week {next_num} added.', 'success')
-    return redirect(url_for('admin.edit_weeks', season_id=season_id))
-
-
-# ---------------------------------------------------------------------------
 # Matchup assignment (historical data fix)
 # ---------------------------------------------------------------------------
 
@@ -461,7 +467,6 @@ def import_season():
         team_map = {t.number: t for t in teams}
 
         # Create week records
-        from datetime import timedelta
         for wn in range(1, num_weeks + 1):
             wk = Week(
                 season_id=season.id,
@@ -471,6 +476,9 @@ def import_season():
             if season.start_date:
                 wk.date = season.start_date + timedelta(weeks=wn - 1)
             db.session.add(wk)
+
+        # Post-season tournament weeks
+        _add_postseason_weeks(season, num_weeks)
         db.session.flush()
 
         # ── Import roster from 'wkly alpha' sheet ──────────────────────────
