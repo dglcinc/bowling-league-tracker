@@ -1,53 +1,92 @@
 {% extends "base.html" %}
-{% block title %}Payout Tracker — {{ season.name }}{% endblock %}
+{% block title %}Payouts — {{ season.name }}{% endblock %}
 
 {% block content %}
-<h4>Payout Tracker — {{ season.name }} through Week {{ through_week }}</h4>
+<h4>Payouts — {{ season.name }} through Week {{ through_week }}</h4>
 
-<div class="row">
-  <div class="col-md-4">
-    <h6>Iron Man Candidates</h6>
-    <p class="text-muted small">Bowled every week from their joined week through week {{ through_week }}.</p>
-    <ul class="list-group list-group-flush">
-      {% for b in iron_men %}
-      <li class="list-group-item py-1">{{ b.last_name }}{% if b.first_name %}, {{ b.first_name }}{% endif %}</li>
-      {% else %}
-      <li class="list-group-item text-muted">None yet</li>
-      {% endfor %}
+{# YTD prize totals per bowler #}
+<h5>YTD Prize Summary</h5>
+<table class="table table-sm table-bordered mb-4" style="max-width:700px">
+  <thead>
+    <tr>
+      <th>Bowler</th><th>Team</th>
+      {% for key, label in prize_keys %}<th class="text-center">{{ label }}</th>{% endfor %}
+      <th class="text-center">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for row in ytd_prizes %}
+  <tr>
+    <td>{{ row.bowler.last_name }}</td>
+    <td>{{ row.team.number }}</td>
+    {% for key, label in prize_keys %}
+    <td class="text-center">{{ row.counts[key] or '' }}</td>
+    {% endfor %}
+    <td class="text-center fw-bold">{{ row.total }}</td>
+  </tr>
+  {% endfor %}
+  {% if not ytd_prizes %}
+  <tr><td colspan="{{ prize_keys|length + 3 }}" class="text-muted">No prizes yet.</td></tr>
+  {% endif %}
+  </tbody>
+</table>
+
+{# Weekly prize detail #}
+<h5>Weekly Prizes</h5>
+<table class="table table-sm table-bordered">
+  <thead>
+    <tr>
+      <th>Wk</th><th>Date</th>
+      {% for key, label in prize_keys %}<th>{{ label }}</th>{% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+  {% for wp in weekly_prizes %}
+  <tr>
+    <td>
+      <a href="{{ url_for('reports.week_prizes', season_id=season.id, week_num=wp.week.week_num) }}">
+        {{ wp.week.week_num }}
+      </a>
+    </td>
+    <td class="text-nowrap">{{ wp.week.date.strftime('%b %d') if wp.week.date else '—' }}</td>
+    {% for key, label in prize_keys %}
+    {% set cat = wp.prizes[key] %}
+    <td>
+      {{ cat.winners | map(attribute='bowler.last_name') | join(', ') }}
+      <span class="text-muted small">({{ cat.score }})</span>
+      {% if cat.winners|length > 1 %}<span class="badge bg-secondary">Tie</span>{% endif %}
+    </td>
+    {% endfor %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{# Iron Man / Most Improved #}
+<div class="row mt-4 g-4">
+  <div class="col-auto">
+    <h5>Iron Man Candidates</h5>
+    {% if iron_men %}
+    <ul class="list-unstyled">
+      {% for b in iron_men %}<li>{{ b.last_name }}{% if b.first_name %}, {{ b.first_name }}{% endif %}</li>{% endfor %}
     </ul>
+    {% else %}<p class="text-muted">None so far.</p>{% endif %}
   </div>
-
-  <div class="col-md-4">
-    <h6>Most Improved (vs Prior Year)</h6>
-    <table class="table table-sm">
-      <thead><tr><th>Bowler</th><th class="text-end">Prior Avg</th><th class="text-end">Current Avg</th><th class="text-end">+/-</th></tr></thead>
+  <div class="col-auto">
+    <h5>Most Improved</h5>
+    <table class="table table-sm table-bordered">
+      <thead><tr><th>Bowler</th><th class="text-end">Prior Avg</th><th class="text-end">Current</th><th class="text-end">+/-</th></tr></thead>
       <tbody>
-        {% for r in most_improved[:10] %}
-        <tr>
-          <td>{{ r.bowler.last_name }}</td>
-          <td class="text-end">{{ r.prior_avg or '—' }}</td>
-          <td class="text-end">{{ r.current_avg }}</td>
-          <td class="text-end {{ 'text-success' if r.improvement and r.improvement > 0 else 'text-danger' }}">
-            {% if r.improvement is not none %}{{ '%+d' % r.improvement }}{% else %}—{% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  <div class="col-md-4">
-    <h6>Weekly High Game Scratch</h6>
-    <table class="table table-sm">
-      <thead><tr><th>Wk</th><th>Bowler</th><th class="text-end">Score</th></tr></thead>
-      <tbody>
-        {% for w in weekly_high %}
-        <tr>
-          <td>{{ w.week_num }}</td>
-          <td>{{ w.bowler.last_name }}</td>
-          <td class="text-end">{{ w.score }}</td>
-        </tr>
-        {% endfor %}
+      {% for r in most_improved[:10] %}
+      <tr>
+        <td>{{ r.bowler.last_name }}</td>
+        <td class="text-end">{{ r.prior_avg or '—' }}</td>
+        <td class="text-end">{{ r.current_avg }}</td>
+        <td class="text-end {{ 'text-success' if r.improvement and r.improvement > 0 else 'text-danger' }}">
+          {{ '%+d' % r.improvement if r.improvement is not none else '—' }}
+        </td>
+      </tr>
+      {% endfor %}
       </tbody>
     </table>
   </div>

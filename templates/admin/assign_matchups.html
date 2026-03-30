@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Assign Matchups — Week {{ week.week_num }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .btn-mnum { min-width: 48px; }
+  .team-badge-a { background-color: #0d6efd; }
+  .team-badge-b { background-color: #198754; }
+  .bowler-row td { vertical-align: middle; }
+  .count-box { font-size: 0.85rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.assign_matchups_list', season_id=season.id) }}">Assign Matchups</a></li>
+    <li class="breadcrumb-item active">Week {{ week.week_num }}</li>
+  </ol>
+</nav>
+
+<h4>
+  Week {{ week.week_num }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
+  {% if week.is_position_night %}<span class="badge bg-warning text-dark ms-2">Position Night</span>{% endif %}
+</h4>
+<p class="text-muted small">Click <strong>1</strong> or <strong>2</strong> for each bowler to assign them to the first or second matchup in their pairing. Save when done — blinds are added automatically to balance each side.</p>
+
+<form method="post">
+<div class="row g-3">
+{% for pd in pairing_data %}
+<div class="col-12 col-xl-6">
+  <div class="card">
+    <div class="card-header fw-bold">
+      Matchups {{ pd.mnum1 }}&amp;{{ pd.mnum2 }} —
+      {{ pd.teams[0].name }} vs {{ pd.teams[1].name }}
+      {% if pd.sched1 and pd.sched1.lane_pair %}<small class="text-muted">(Lanes {{ pd.sched1.lane_pair }} / {{ pd.sched2.lane_pair if pd.sched2 else '?' }})</small>{% endif %}
+    </div>
+    <div class="card-body p-2">
+
+      {# Live count display #}
+      <div class="d-flex gap-3 mb-2 count-box" id="counts-{{ pd.mnum1 }}">
+        {% for team in pd.teams %}
+        <span>
+          <span class="badge" style="background-color:{{ '#0d6efd' if loop.first else '#198754' }}">{{ team.name }}</span>
+          M{{ pd.mnum1 }}: <strong id="c{{ pd.mnum1 }}-t{{ team.id }}-1">0</strong> &nbsp;
+          M{{ pd.mnum2 }}: <strong id="c{{ pd.mnum1 }}-t{{ team.id }}-2">0</strong>
+        </span>
+        {% endfor %}
+      </div>
+
+      <table class="table table-sm table-bordered mb-0">
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>Bowler</th>
+            <th class="text-center">M{{ pd.mnum1 }}</th>
+            <th class="text-center">M{{ pd.mnum2 }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for team in pd.teams %}
+          {% set color = '#0d6efd' if loop.first else '#198754' %}
+          {% for entry in pd.team_entries[team.id] %}
+          {# Determine current assignment: mnum1 or mnum2 #}
+          {% set cur = '1' if entry.matchup_num == pd.mnum1 else '2' %}
+          <tr class="bowler-row"
+              data-pairing="{{ pd.mnum1 }}"
+              data-team="{{ team.id }}"
+              data-entry="{{ entry.id }}">
+            <td><span class="badge" style="background-color:{{ color }}">{{ team.name }}</span></td>
+            <td>{{ entry.bowler.last_name }}{% if entry.bowler.first_name %}, {{ entry.bowler.first_name }}{% endif %}</td>
+            <td class="text-center">
+              <input type="radio" class="btn-check mnum-radio"
+                     name="entry_{{ entry.id }}"
+                     id="e{{ entry.id }}_m1"
+                     value="{{ pd.mnum1 }}"
+                     data-pairing="{{ pd.mnum1 }}"
+                     data-team="{{ team.id }}"
+                     {{ 'checked' if cur == '1' else '' }}>
+              <label class="btn btn-sm btn-outline-primary btn-mnum" for="e{{ entry.id }}_m1">{{ pd.mnum1 }}</label>
+            </td>
+            <td class="text-center">
+              <input type="radio" class="btn-check mnum-radio"
+                     name="entry_{{ entry.id }}"
+                     id="e{{ entry.id }}_m2"
+                     value="{{ pd.mnum2 }}"
+                     data-pairing="{{ pd.mnum1 }}"
+                     data-team="{{ team.id }}"
+                     {{ 'checked' if cur == '2' else '' }}>
+              <label class="btn btn-sm btn-outline-success btn-mnum" for="e{{ entry.id }}_m2">{{ pd.mnum2 }}</label>
+            </td>
+          </tr>
+          {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+
+<div class="mt-3">
+  <button type="submit" class="btn btn-primary">Save &amp; Continue to Next Week</button>
+  <a href="{{ url_for('admin.assign_matchups_list', season_id=season.id) }}" class="btn btn-outline-secondary ms-2">Back to List</a>
+</div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updateCounts() {
+  // Reset all counts to 0
+  document.querySelectorAll('[id^="c"]').forEach(el => el.textContent = '0');
+
+  document.querySelectorAll('.mnum-radio:checked').forEach(radio => {
+    const pairing = radio.dataset.pairing;
+    const team = radio.dataset.team;
+    const slot = radio.value == pairing ? '1' : '2';  // 1=first matchup, 2=second
+    const el = document.getElementById(`c${pairing}-t${team}-${slot}`);
+    if (el) el.textContent = parseInt(el.textContent) + 1;
+  });
+}
+
+document.querySelectorAll('.mnum-radio').forEach(r => r.addEventListener('change', updateCounts));
+updateCounts();
+</script>
+{% endblock %}

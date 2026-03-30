@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Assign Matchups — {{ season.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.season_detail', season_id=season.id) }}">{{ season.name }}</a></li>
+    <li class="breadcrumb-item active">Assign Matchups</li>
+  </ol>
+</nav>
+
+<h4>Assign Matchups — {{ season.name }}</h4>
+<p class="text-muted">For each week, assign which players bowled in matchup 1 vs matchup 2 (and 3 vs 4). Blinds are added automatically to balance each matchup after you save.</p>
+
+<table class="table table-sm table-hover" style="max-width:500px">
+  <thead><tr><th>Week</th><th>Date</th><th>Type</th><th></th></tr></thead>
+  <tbody>
+  {% for wk in weeks %}
+  <tr>
+    <td>{{ wk.week_num }}</td>
+    <td>{{ wk.date.strftime('%b %d, %Y') if wk.date else '—' }}</td>
+    <td>{% if wk.is_position_night %}<span class="badge bg-warning text-dark">Position Night</span>{% else %}Regular{% endif %}</td>
+    <td>
+      <a href="{{ url_for('admin.assign_matchups', season_id=season.id, week_num=wk.week_num) }}"
+         class="btn btn-sm btn-primary">Assign</a>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

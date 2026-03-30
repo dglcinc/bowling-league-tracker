@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Wkly Alpha — Week {{ week_num }} — {{ season.name }}{% endblock %}
+{% block title %}YTD Alpha — Week {{ week_num }} — {{ season.name }}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -13,7 +13,6 @@
     .container-fluid { padding: 0 !important; }
     thead.table-dark { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
-  /* On screen: cap table width so it stays readable */
   @media screen {
     .table th, .table td { white-space: nowrap; }
   }
@@ -22,10 +21,10 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-2 no-print">
-  <h2>Wkly Alpha — {{ season.name }}</h2>
+  <h2>YTD Alpha — {{ season.name }}</h2>
   <div>
     <select class="form-select form-select-sm d-inline-block w-auto me-2"
-            onchange="location='{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=0) }}'.replace('/0', '/'+this.value)">
+            onchange="location='{{ url_for('reports.ytd_alpha', season_id=season.id, week_num=0) }}'.replace('/0', '/'+this.value)">
       {% for wk in weeks %}
       <option value="{{ wk.week_num }}" {% if wk.week_num == week_num %}selected{% endif %}>
         Week {{ wk.week_num }}{% if wk.date %} — {{ wk.date.strftime('%b %d') }}{% endif %}
@@ -40,43 +39,37 @@
 <div class="text-center mb-1" style="font-size:0.9rem">
   <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp;
   {{ season.name }} &nbsp;|&nbsp;
-  Week {{ week_num }}{% if week and week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
+  YTD Alpha — Week {{ week_num }}{% if week and week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
   {% if week and week.is_position_night %}&nbsp;&#9733; Position Night{% endif %}
 </div>
 
 <table class="table table-bordered table-sm table-striped mb-1">
   <thead class="table-dark">
     <tr>
+      <th>#</th>
       <th>Name</th>
-      <th class="no-print">First</th>
-      <th>Nick</th>
       <th>T</th>
       <th class="text-end">Total</th>
-      <th class="text-end">2nd</th>
       <th class="text-end">G</th>
       <th class="text-end">Ave</th>
-      <th class="text-end">Use<br>Hcp</th>
-      <th class="text-end">Cur<br>Hcp</th>
+      <th class="text-end">Hcp</th>
       <th class="text-end">HG<br>Scr</th>
       <th class="text-end">HG<br>Hcp</th>
       <th class="text-end">HS<br>Scr</th>
       <th class="text-end">HS<br>Hcp</th>
-      <th class="text-end">Lst<br>Hcp</th>
+      <th class="text-end">Lst<br>Yr<br>Hcp</th>
     </tr>
   </thead>
   <tbody>
     {% for row in rows %}
     <tr>
+      <td>{{ loop.index }}</td>
       <td>{{ row.bowler.last_name }}</td>
-      <td class="no-print text-muted">{{ row.bowler.first_name or '' }}</td>
-      <td class="text-muted">{{ row.bowler.nickname or '' }}</td>
       <td>{{ row.team.number }}</td>
       <td class="text-end">{{ row.total_pins or '' }}</td>
-      <td class="text-end">{{ row.second_half_pins or '' }}</td>
       <td class="text-end">{{ row.games or '' }}</td>
       <td class="text-end">{{ row.average or '' }}</td>
       <td class="text-end fw-bold">{{ row.display_handicap or '' }}</td>
-      <td class="text-end">{{ row.current_handicap or '' }}</td>
       <td class="text-end">{{ row.high_game_scratch or '' }}</td>
       <td class="text-end">{{ row.high_game_hcp or '' }}</td>
       <td class="text-end">{{ row.high_series_scratch or '' }}</td>
@@ -84,17 +77,14 @@
       <td class="text-end text-muted">{{ row.prior_handicap or '' }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="15" class="text-center text-muted">No active bowlers. Set up your roster in Admin.</td></tr>
+    <tr><td colspan="12" class="text-center text-muted">No active bowlers.</td></tr>
     {% endfor %}
   </tbody>
 </table>
 
 <div class="no-print mt-2">
-  <a href="{{ url_for('reports.ytd_alpha', season_id=season.id, week_num=week_num) }}" class="btn btn-sm btn-outline-primary">YTD Alpha</a>
+  <a href="{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=week_num) }}" class="btn btn-sm btn-outline-primary">Wkly Alpha</a>
   <a href="{{ url_for('reports.wkly_high_avg', season_id=season.id, week_num=week_num) }}" class="btn btn-sm btn-outline-primary">High Avg</a>
   <a href="{{ url_for('reports.standings', season_id=season.id) }}" class="btn btn-sm btn-outline-primary">Standings</a>
-  <a href="{{ url_for('reports.high_games', season_id=season.id) }}" class="btn btn-sm btn-outline-primary">High Games</a>
-  <a href="{{ url_for('reports.print_batch', season_id=season.id, week_num=week_num) }}" class="btn btn-sm btn-outline-success">Print Batch</a>
-  <a href="{{ url_for('entry.week_list', season_id=season.id) }}" class="btn btn-sm btn-outline-secondary">Enter Scores</a>
 </div>
 {% endblock %}

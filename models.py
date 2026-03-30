@@ -105,6 +105,7 @@ class Week(db.Model):
     week_num = db.Column(db.Integer, nullable=False)
     date = db.Column(db.Date)
     is_position_night = db.Column(db.Boolean, default=False)
+    is_cancelled = db.Column(db.Boolean, default=False)
     notes = db.Column(db.String(256))
     is_entered = db.Column(db.Boolean, default=False)  # scores have been entered
 

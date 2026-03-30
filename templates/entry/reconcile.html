@@ -13,20 +13,14 @@
   </div>
   <div class="col-auto">
     <div class="card text-center px-4 py-2">
-      <div class="fs-4 fw-bold">{{ blind_count }}</div>
-      <div class="text-muted small">Blinds</div>
+      <div class="fs-4 fw-bold">{{ blind_games }}</div>
+      <div class="text-muted small">Blind Games</div>
     </div>
   </div>
   <div class="col-auto">
     <div class="card text-center px-4 py-2">
       <div class="fs-4 fw-bold">{{ total_wood }}</div>
-      <div class="text-muted small">Total Wood (players)</div>
-    </div>
-  </div>
-  <div class="col-auto">
-    <div class="card text-center px-4 py-2">
-      <div class="fs-4 fw-bold">{{ blind_wood }}</div>
-      <div class="text-muted small">Blind Wood</div>
+      <div class="text-muted small">Total Wood (w/ Hcp)</div>
     </div>
   </div>
 </div>
@@ -36,23 +30,37 @@
   <thead>
     <tr>
       <th>Matchup</th><th>Team</th><th>Bowler</th><th>Blind?</th>
-      <th>G1</th><th>G2</th><th>G3</th><th>G4</th><th>G5</th><th>G6</th><th>Total</th>
+      <th>G1</th><th>G2</th><th>G3</th><th class="text-end">Scratch</th>
+      <th class="text-end">Hcp</th><th class="text-end">Games</th><th class="text-end">Total w/Hcp</th>
     </tr>
   </thead>
   <tbody>
-    {% for e in entries | sort(attribute='matchup_num') %}
+    {% for d in entry_data | sort(attribute='entry.matchup_num') %}
+    {% set e = d.entry %}
     <tr class="{{ 'table-warning' if e.is_blind else '' }}">
       <td>{{ e.matchup_num }}</td>
       <td>{{ e.team.number }}</td>
       <td>{{ e.bowler.last_name if e.bowler else 'BLIND' }}</td>
       <td>{{ '✓' if e.is_blind else '' }}</td>
-      {% for g in [e.game1, e.game2, e.game3, e.game4, e.game5, e.game6] %}
-      <td class="text-end">{{ g if g is not none else '' }}</td>
-      {% endfor %}
-      <td class="text-end fw-bold">{{ e.total_pins }}</td>
+      <td class="text-end">{{ e.game1 if e.game1 is not none else '' }}</td>
+      <td class="text-end">{{ e.game2 if e.game2 is not none else '' }}</td>
+      <td class="text-end">{{ e.game3 if e.game3 is not none else '' }}</td>
+      <td class="text-end">{{ e.total_pins }}</td>
+      <td class="text-end">{{ d.hcp }}</td>
+      <td class="text-end">{{ e.game_count }}</td>
+      <td class="text-end fw-bold">{{ d.hcp_wood }}</td>
     </tr>
     {% endfor %}
   </tbody>
+  <tfoot class="table-light fw-bold">
+    <tr>
+      <td colspan="7">Totals</td>
+      <td class="text-end">{{ entry_data | sum(attribute='entry.total_pins') }}</td>
+      <td></td>
+      <td class="text-end">{{ entry_data | sum(attribute='entry.game_count') }}</td>
+      <td class="text-end">{{ total_wood }}</td>
+    </tr>
+  </tfoot>
 </table>
 
 <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}"

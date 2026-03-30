@@ -5,7 +5,8 @@ Score entry routes: weekly matchup entry, blind management, points calculation.
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
                     TeamPoints, Roster, Bowler)
-from calculations import score_matchup, score_position_night, calculate_handicap
+from calculations import (score_matchup, score_position_night, calculate_handicap,
+                          get_weekly_prizes)
 from snapshots import save_snapshot
 from config import Config
 
@@ -60,10 +61,29 @@ def week_entry(season_id, week_num):
                 'roster': roster,
             })
 
+    # Recon summary (only if week is entered)
+    recon = None
+    if week.is_entered:
+        all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+        player_count = sum(1 for e in all_entries if not e.is_blind)
+        blind_games  = sum(e.game_count for e in all_entries if e.is_blind)
+        total_wood   = sum(
+            e.total_pins + (
+                (season.blind_handicap if e.is_blind
+                 else calculate_handicap(e.bowler_id, season_id, week_num))
+                * e.game_count
+            )
+            for e in all_entries
+        )
+        prizes = get_weekly_prizes(season_id, week_num)
+        recon = {'player_count': player_count, 'blind_games': blind_games,
+                 'total_wood': total_wood, 'prizes': prizes}
+
     return render_template('entry/week_entry.html',
                            season=season, week=week,
                            matchups=matchups,
-                           matchup_data=matchup_data)
+                           matchup_data=matchup_data,
+                           recon=recon)
 
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/matchup/<int:matchup_num>',
@@ -209,15 +229,23 @@ def reconcile(season_id, week_num):
         season_id=season_id, week_num=week_num
     ).all()
 
+    # Build per-entry handicap and handicap wood
+    entry_data = []
+    for e in entries:
+        if e.is_blind:
+            hcp = season.blind_handicap
+        else:
+            hcp = calculate_handicap(e.bowler_id, season_id, week_num) if e.bowler_id else 0
+        hcp_wood = e.total_pins + hcp * e.game_count
+        entry_data.append({'entry': e, 'hcp': hcp, 'hcp_wood': hcp_wood})
+
     player_count = sum(1 for e in entries if not e.is_blind)
-    blind_count = sum(1 for e in entries if e.is_blind)
-    total_wood = sum(e.total_pins for e in entries if not e.is_blind)
-    blind_wood = sum(e.total_pins for e in entries if e.is_blind)
+    blind_games  = sum(e.game_count for e in entries if e.is_blind)
+    total_wood   = sum(d['hcp_wood'] for d in entry_data)
 
     return render_template('entry/reconcile.html',
                            season=season, week=week,
                            player_count=player_count,
-                           blind_count=blind_count,
+                           blind_games=blind_games,
                            total_wood=total_wood,
-                           blind_wood=blind_wood,
-                           entries=entries)
+                           entry_data=entry_data)

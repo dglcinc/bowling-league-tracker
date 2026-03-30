@@ -23,23 +23,44 @@
 
 <div class="row">
   {% for sched in matchups %}
-  <div class="col-md-6 mb-3">
+  <div class="col-12 col-xl-6 mb-3">
     <div class="card">
       <div class="card-header d-flex justify-content-between">
         <strong>Matchup {{ sched.matchup_num }}</strong>
         {% if sched.lane_pair %}<span class="text-muted">Lanes {{ sched.lane_pair }}</span>{% endif %}
       </div>
-      <div class="card-body">
-        <p class="mb-1">
-          <strong>Team {{ sched.team1.number }}</strong> {{ sched.team1.name }}
-          vs
-          <strong>Team {{ sched.team2.number }}</strong> {{ sched.team2.name }}
-        </p>
+      <div class="card-body p-2">
         {% set entries_for_matchup = matchup_data | selectattr('sched.matchup_num', 'equalto', sched.matchup_num) | list %}
         {% set entry_count = namespace(n=0) %}
         {% for md in entries_for_matchup %}{% set entry_count.n = entry_count.n + md.entries|length %}{% endfor %}
         {% if entry_count.n > 0 %}
-        <p class="text-success mb-1">✓ {{ entry_count.n }} entries</p>
+        <div class="row g-2 mb-2">
+          {% for md in entries_for_matchup %}
+          <div class="col-6">
+            <div class="fw-bold small mb-1">Team {{ md.team.number }} — {{ md.team.name }}</div>
+            <table class="table table-sm table-bordered mb-0" style="font-size:0.8rem">
+              <thead><tr>
+                <th>Bowler</th>
+                <th class="text-center">G1</th>
+                <th class="text-center">G2</th>
+                <th class="text-center">G3</th>
+                <th class="text-center">Tot</th>
+              </tr></thead>
+              <tbody>
+              {% for e in md.entries %}
+              <tr class="{{ 'table-warning' if e.is_blind else '' }}">
+                <td>{% if e.is_blind %}BLIND{% elif e.bowler %}{{ e.bowler.last_name }}{% endif %}</td>
+                <td class="text-center">{{ e.game1 if e.game1 is not none else '' }}</td>
+                <td class="text-center">{{ e.game2 if e.game2 is not none else '' }}</td>
+                <td class="text-center">{{ e.game3 if e.game3 is not none else '' }}</td>
+                <td class="text-center fw-bold">{{ (e.game1 or 0) + (e.game2 or 0) + (e.game3 or 0) }}</td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endfor %}
+        </div>
         {% endif %}
         <a href="{{ url_for('entry.matchup_entry', season_id=season.id, week_num=week.week_num, matchup_num=sched.matchup_num) }}"
            class="btn btn-sm btn-primary">
@@ -55,12 +76,57 @@
   {% endfor %}
 </div>
 
-{% if week.is_entered %}
-<div class="mt-2">
-  <a href="{{ url_for('entry.reconcile', season_id=season.id, week_num=week.week_num) }}"
-     class="btn btn-outline-secondary btn-sm">Blinds Reconciliation</a>
+{% if recon %}
+<hr>
+<div class="row g-2 align-items-start mb-3">
+  {# Recon totals #}
+  <div class="col-auto">
+    <div class="card text-center px-3 py-2">
+      <div class="fs-5 fw-bold">{{ recon.player_count }}</div>
+      <div class="text-muted small">Players</div>
+    </div>
+  </div>
+  <div class="col-auto">
+    <div class="card text-center px-3 py-2">
+      <div class="fs-5 fw-bold">{{ recon.blind_games }}</div>
+      <div class="text-muted small">Blind Games</div>
+    </div>
+  </div>
+  <div class="col-auto">
+    <div class="card text-center px-3 py-2">
+      <div class="fs-5 fw-bold">{{ recon.total_wood }}</div>
+      <div class="text-muted small">Total Wood (w/ Hcp)</div>
+    </div>
+  </div>
+
+  {# Weekly prizes #}
+  {% if recon.prizes %}
+  <div class="col">
+    <table class="table table-sm table-bordered mb-0" style="max-width:600px">
+      <thead><tr>
+        <th>Prize</th><th>Winner(s)</th><th class="text-end">Score</th>
+      </tr></thead>
+      <tbody>
+      {% for label, key in [('HG Scratch','hg_scratch'),('HG Handicap','hg_hcp'),
+                             ('HS Scratch','hs_scratch'),('HS Handicap','hs_hcp')] %}
+      {% set cat = recon.prizes[key] %}
+      <tr>
+        <td class="text-nowrap">{{ label }}</td>
+        <td>{{ cat.winners | map(attribute='bowler.last_name') | join(', ') }}</td>
+        <td class="text-end fw-bold">{{ cat.score }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<div class="d-flex gap-2 mb-2">
   <a href="{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=week.week_num) }}"
      class="btn btn-outline-primary btn-sm">View / Print Wkly Alpha</a>
+  <a href="{{ url_for('reports.week_prizes', season_id=season.id, week_num=week.week_num) }}"
+     class="btn btn-outline-secondary btn-sm">Prizes &amp; Standings</a>
 </div>
 {% endif %}
 {% endblock %}

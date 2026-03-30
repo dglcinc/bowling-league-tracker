@@ -3,7 +3,7 @@ Admin routes: season setup, roster management, schedule entry, season rollover.
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry
+from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry
 from datetime import date, timedelta
 
 admin_bp = Blueprint('admin', __name__)
@@ -237,3 +237,113 @@ def edit_weeks(season_id):
         return redirect(url_for('admin.season_detail', season_id=season_id))
 
     return render_template('admin/edit_weeks.html', season=season, weeks=weeks)
+
+
+# ---------------------------------------------------------------------------
+# Matchup assignment (historical data fix)
+# ---------------------------------------------------------------------------
+
+@admin_bp.route('/seasons/<int:season_id>/assign_matchups')
+def assign_matchups_list(season_id):
+    season = Season.query.get_or_404(season_id)
+    weeks = (Week.query
+             .filter_by(season_id=season_id, is_entered=True, is_cancelled=False)
+             .order_by(Week.week_num)
+             .all())
+    return render_template('admin/assign_matchups_list.html', season=season, weeks=weeks)
+
+
+@admin_bp.route('/seasons/<int:season_id>/assign_matchups/<int:week_num>',
+                methods=['GET', 'POST'])
+def assign_matchups(season_id, week_num):
+    season = Season.query.get_or_404(season_id)
+    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
+
+    schedules = (ScheduleEntry.query
+                 .filter_by(season_id=season_id, week_num=week_num)
+                 .order_by(ScheduleEntry.matchup_num)
+                 .all())
+
+    # Build pairings: matchups 1&2 → pairing A, matchups 3&4 → pairing B
+    pairings = []
+    for base in [1, 3]:
+        s1 = next((s for s in schedules if s.matchup_num == base), None)
+        s2 = next((s for s in schedules if s.matchup_num == base + 1), None)
+        if s1:
+            pairings.append({'mnum1': base, 'mnum2': base + 1,
+                             'sched1': s1, 'sched2': s2,
+                             'teams': [s1.team1, s1.team2]})
+
+    if request.method == 'POST':
+        for key, val in request.form.items():
+            if key.startswith('entry_'):
+                entry_id = int(key[6:])
+                entry = MatchupEntry.query.get(entry_id)
+                if entry:
+                    entry.matchup_num = int(val)
+
+        db.session.flush()
+
+        # Remove old blinds, re-add to balance each matchup
+        MatchupEntry.query.filter_by(
+            season_id=season_id, week_num=week_num, is_blind=True
+        ).delete()
+        db.session.flush()
+
+        for pairing in pairings:
+            for mnum in [pairing['mnum1'], pairing['mnum2']]:
+                sched = pairing['sched1'] if mnum == pairing['mnum1'] else pairing['sched2']
+                if not sched:
+                    continue
+                for team, other_team, side in [
+                    (sched.team1, sched.team2, 'A'),
+                    (sched.team2, sched.team1, 'B'),
+                ]:
+                    c_self = MatchupEntry.query.filter_by(
+                        season_id=season_id, week_num=week_num,
+                        matchup_num=mnum, team_id=team.id, is_blind=False
+                    ).count()
+                    c_other = MatchupEntry.query.filter_by(
+                        season_id=season_id, week_num=week_num,
+                        matchup_num=mnum, team_id=other_team.id, is_blind=False
+                    ).count()
+                    for _ in range(max(0, c_other - c_self)):
+                        db.session.add(MatchupEntry(
+                            season_id=season_id, week_num=week_num,
+                            matchup_num=mnum, team_id=team.id,
+                            is_blind=True, lane_side=side,
+                            game1=season.blind_scratch,
+                            game2=season.blind_scratch,
+                            game3=season.blind_scratch,
+                        ))
+
+        db.session.commit()
+        flash(f'Week {week_num} assignments saved.', 'success')
+
+        # Advance to next unentered week
+        next_week = (Week.query
+                     .filter_by(season_id=season_id, is_entered=True, is_cancelled=False)
+                     .filter(Week.week_num > week_num)
+                     .order_by(Week.week_num)
+                     .first())
+        if next_week:
+            return redirect(url_for('admin.assign_matchups',
+                                    season_id=season_id, week_num=next_week.week_num))
+        return redirect(url_for('admin.assign_matchups_list', season_id=season_id))
+
+    # GET — load non-blind entries per team for each pairing
+    pairing_data = []
+    for pairing in pairings:
+        team_entries = {}
+        for team in pairing['teams']:
+            entries = (MatchupEntry.query
+                       .filter_by(season_id=season_id, week_num=week_num,
+                                  team_id=team.id, is_blind=False)
+                       .join(Bowler, MatchupEntry.bowler_id == Bowler.id)
+                       .order_by(Bowler.last_name)
+                       .all())
+            team_entries[team.id] = entries
+        pairing_data.append({**pairing, 'team_entries': team_entries})
+
+    return render_template('admin/assign_matchups.html',
+                           season=season, week=week, pairing_data=pairing_data)
