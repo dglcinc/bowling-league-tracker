@@ -3,7 +3,11 @@
 
 {% block extra_head %}
 <style>
-  .score-input { width: 60px; text-align: center; }
+  .score-input { width: 100%; min-width: 48px; text-align: center; }
+  .col-narrow { width: 1%; white-space: nowrap; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
   .team-header { font-size: 1.1rem; font-weight: bold; }
   .blind-row { background-color: #fff3cd; }
 </style>
@@ -29,7 +33,7 @@
 <form method="post">
 <div class="row">
 {% for team in teams %}
-<div class="col-md-6">
+<div class="col-12 col-xl-6">
   <div class="card mb-3">
     <div class="card-header team-header">
       Team {{ team.number }} — {{ team.name }}
@@ -40,14 +44,14 @@
         <thead>
           <tr>
             <th>Bowler</th>
-            <th class="text-center">Hcp</th>
-            <th class="text-center">G1</th>
-            <th class="text-center">G2</th>
-            <th class="text-center">G3</th>
-            <th class="text-center">G4</th>
-            <th class="text-center">G5</th>
-            <th class="text-center">G6</th>
-            <th class="text-center">Blind</th>
+            <th class="text-center col-narrow">Hcp</th>
+            <th class="text-center" style="min-width:48px">G1</th>
+            <th class="text-center" style="min-width:48px">G2</th>
+            <th class="text-center" style="min-width:48px">G3</th>
+            <th class="text-center" style="min-width:48px">G4</th>
+            <th class="text-center" style="min-width:48px">G5</th>
+            <th class="text-center" style="min-width:48px">G6</th>
+            <th class="text-center col-narrow">Blind</th>
           </tr>
         </thead>
         <tbody id="team-{{ team.number }}-body">
@@ -101,6 +105,31 @@
             </td>
           </tr>
           {% endfor %}
+          {# Always-present blind row — check the box to use it #}
+          {% set blind_exists = team_entries.get(team.id, []) | selectattr('is_blind') | list | length > 0 %}
+          <tr class="{{ 'blind-row' if blind_exists else '' }}" id="blind-row-t{{ team.number }}">
+            <td>
+              <input type="hidden" name="t{{ team.number }}_row_99_bowler_id" value="">
+              <span class="text-warning fw-bold">BLIND</span>
+            </td>
+            <td class="text-center">
+              <span id="hcp-t{{ team.number }}-99">{{ season.blind_handicap if blind_exists else '' }}</span>
+            </td>
+            {% for g in range(1, 7) %}
+            <td>
+              <input type="number" class="form-control form-control-sm score-input"
+                     name="t{{ team.number }}_row_99_game{{ g }}"
+                     min="0" max="300"
+                     value="{{ season.blind_scratch if blind_exists and g <= 3 else '' }}">
+            </td>
+            {% endfor %}
+            <td class="text-center">
+              <input type="checkbox" class="form-check-input blind-check"
+                     name="t{{ team.number }}_row_99_blind"
+                     data-team="{{ team.number }}" data-row="99"
+                     {{ 'checked' if blind_exists else '' }}>
+            </td>
+          </tr>
         </tbody>
       </table>
       <button type="button" class="btn btn-sm btn-outline-secondary mt-1"

@@ -364,10 +364,11 @@ def score_position_night(season_id, week_num):
 # Team standings
 # ---------------------------------------------------------------------------
 
-def get_team_standings(season_id, half=None):
+def get_team_standings(season_id, half=None, through_week=None):
     """
-    Returns list of {team, points, wins, ...} sorted by points desc.
+    Returns list of {team, points} sorted by points desc.
     half=1 → first half weeks, half=2 → second half, None → full season.
+    through_week → cap at that week number (applied on top of half filter).
     """
     season = Season.query.get(season_id)
     query = TeamPoints.query.filter_by(season_id=season_id)
@@ -376,6 +377,9 @@ def get_team_standings(season_id, half=None):
         query = query.filter(TeamPoints.week_num <= season.half_boundary_week)
     elif half == 2:
         query = query.filter(TeamPoints.week_num > season.half_boundary_week)
+
+    if through_week is not None:
+        query = query.filter(TeamPoints.week_num <= through_week)
 
     all_points = query.all()
 
@@ -485,3 +489,116 @@ def get_most_improved(season_id, through_week):
 
     results.sort(key=lambda x: (x['improvement'] or -999), reverse=True)
     return results
+
+
+# ---------------------------------------------------------------------------
+# Weekly prizes
+# ---------------------------------------------------------------------------
+
+def get_weekly_team_points(season_id):
+    """
+    Returns per-week team points breakdown for the scoring grid.
+    Returns (weeks_data, teams) where:
+      weeks_data = [{'week': Week, 'teams': [{'team', 'pts_a', 'pts_b', 'total', 'cumul'}],
+                     'grand_total': float}]
+      teams = [Team] sorted by number
+    cumulative totals accumulate across all weeks.
+    """
+    from models import Team, Week
+
+    teams = (Team.query
+             .filter_by(season_id=season_id)
+             .order_by(Team.number)
+             .all())
+
+    weeks = (Week.query
+             .filter_by(season_id=season_id, is_entered=True, is_cancelled=False)
+             .order_by(Week.week_num)
+             .all())
+
+    cumulative = {t.id: 0.0 for t in teams}
+    weeks_data = []
+
+    for week in weeks:
+        all_pts = (TeamPoints.query
+                   .filter_by(season_id=season_id, week_num=week.week_num)
+                   .order_by(TeamPoints.matchup_num)
+                   .all())
+
+        by_team = {}
+        for tp in all_pts:
+            by_team.setdefault(tp.team_id, []).append(
+                (tp.matchup_num, tp.points_earned)
+            )
+
+        team_rows = []
+        grand = 0.0
+        for team in teams:
+            pts_list = sorted(by_team.get(team.id, []))
+            pts_a = pts_list[0][1] if len(pts_list) > 0 else 0
+            pts_b = pts_list[1][1] if len(pts_list) > 1 else 0
+            total = pts_a + pts_b
+            cumulative[team.id] += total
+            grand += total
+            team_rows.append({
+                'team': team,
+                'pts_a': pts_a,
+                'pts_b': pts_b,
+                'total': total,
+                'cumul': cumulative[team.id],
+            })
+
+        weeks_data.append({
+            'week': week,
+            'teams': team_rows,
+            'grand_total': grand,
+        })
+
+    return weeks_data, teams
+
+
+def get_weekly_prizes(season_id, week_num):
+    """
+    Returns the 4 prize category winners for one week, with tie handling.
+    Each category: {'score': int, 'winners': [{'bowler': Bowler, 'score': int}]}
+    Blinds are excluded. Only games_night1 (games 1-3) are used.
+    Returns None if no entries exist.
+    """
+    entries = MatchupEntry.query.filter_by(
+        season_id=season_id, week_num=week_num, is_blind=False
+    ).all()
+
+    candidates = []
+    for e in entries:
+        if not e.bowler_id or not e.games_night1:
+            continue
+        hcp = calculate_handicap(e.bowler_id, season_id, week_num)
+        n1 = e.games_night1
+        hg_s = max(n1)
+        hs_s = sum(n1)
+        candidates.append({
+            'bowler': e.bowler,
+            'hg_scratch': hg_s,
+            'hg_hcp':     hg_s + hcp,
+            'hs_scratch': hs_s,
+            'hs_hcp':     hs_s + hcp * len(n1),
+        })
+
+    if not candidates:
+        return None
+
+    def winners(key):
+        best = max(c[key] for c in candidates)
+        return {
+            'score': best,
+            'winners': [{'bowler': c['bowler'], 'score': c[key]}
+                        for c in candidates if c[key] == best],
+        }
+
+    return {
+        'hg_scratch': winners('hg_scratch'),
+        'hg_hcp':     winners('hg_hcp'),
+        'hs_scratch': winners('hs_scratch'),
+        'hs_hcp':     winners('hs_hcp'),
+    }
+

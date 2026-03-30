@@ -58,7 +58,7 @@
   </div>
 </nav>
 
-<div class="container mt-3">
+<div class="container-fluid mt-3">
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for cat, msg in messages %}
     <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">

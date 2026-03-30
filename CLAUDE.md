@@ -2,9 +2,9 @@
 
 ## Overview
 
-**Mountain Lakes Men's Bowling League** season tracker. The existing source of truth is an Excel workbook (`scoring 2025-2026 - Week 20.xlsx`) — analyzed but not committed (contains personal info). This project replaces it with a proper web application.
+**Mountain Lakes Men's Bowling League** season tracker. The existing source of truth is an Excel workbook (`scoring 2025-2026 - Week 22.xlsx`) — analyzed but not committed (contains personal info). This project replaces it with a proper web application.
 
-Season: 23 weeks (October – March). Currently in season 2025-2026, Week 20.
+Season: 22 weeks (October – March). Currently in season 2025-2026, Week 22 (position night not yet bowled). Active season in DB is 2026-2027 (next season, roster seeded). Historical 2025-2026 season import in progress.
 Teams: 4 (Team 1 Lewis, Team 2 Ferrante, Team 3 Belyea, Team 4 Mancini).
 Bowlers: ~65 total (mix of active and inactive).
 
@@ -157,6 +157,43 @@ All stats (average, handicap, cumulative totals, high game/series, team standing
 7. Payout tracker
 8. XLS import tool
 9. Season rollover wizard
+
+## Current State (as of March 2026)
+
+### What's been built
+- Full Flask + SQLAlchemy + SQLite app, running on port 5001 (avoids macOS AirPlay conflict on 5000)
+- All models, routes (admin, entry, reports, payout), templates, calculations, snapshots
+- Bootstrap 5 CDN, print-friendly CSS for Wkly Alpha
+- `feature/initial-app` branch open as PR — not yet merged
+
+### Seasons in DB
+- **2026-2027** (active): roster seeded from `seed_from_xls.py` using `wkly alpha` sheet; `prior_handicap` loaded from current season final handicap; schedule seeded from `seed_schedule.py` using the DOCX schedule letter
+- **2025-2026** (inactive, in progress): structure seeded via `seed_historical.py`; per-week scores imported via `seed_week.py` weeks 1–21; week 22 position night entered live through the app after bowling
+
+### Seed scripts (run on Mac, Flask app stopped)
+All scripts live in `~/github/bowling-league-tracker/`. XLS path: `/users/david/OneDrive - DGLC/Claude/scoring 2025-2026 - Week 22.xlsx`
+
+| Script | Purpose |
+|--------|---------|
+| `seed_from_xls.py <xlsx>` | Seeds 2026-2027 roster + prior handicaps from `wkly alpha` sheet |
+| `seed_schedule.py` | Seeds lane-assignment schedule for the active season from DOCX |
+| `seed_historical.py <xlsx>` | Seeds 2025-2026 structure: season, teams, bowlers, roster, weeks, schedule |
+| `seed_week.py <week_num> <xlsx>` | Imports one week's scores + verifies lane assignment; saves JSON snapshot |
+| `seed_all_weeks.py` | Runs `seed_historical.py` then `seed_week.py` for weeks 1–21 in sequence |
+
+### Lane assignment verification (seed_week.py)
+Two teams that compete share exactly 8 points between them each week. `seed_week.py` checks which team-total pairs sum to 8 and compares to the printed schedule. If a week's actual assignment differed from the schedule, it's detected automatically and the ScheduleEntry is updated.
+
+### Known technical notes
+- SQLite writes must run natively on Mac (not from VM) — VirtioFS file locking doesn't support SQLite
+- `TeamPoints.points_earned` is Float (not Integer) to handle 0.5-pt ties from tied games
+- MatchupEntry uses `matchup_num = team_number` as a simplification for historical data; individual stats don't use matchup_num so this is safe
+- TeamPoints for historical seasons come from the spreadsheet directly, not recomputed from scores
+
+### Still to build
+- Season rollover wizard
+- Position night week 22 entry (live, through the app UI)
+- Merge `feature/initial-app` PR once historical import is verified
 
 ## Git Workflow
 

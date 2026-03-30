@@ -5,7 +5,8 @@ Score entry routes: weekly matchup entry, blind management, points calculation.
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
                     TeamPoints, Roster, Bowler)
-from calculations import score_matchup, score_position_night, calculate_handicap
+from calculations import (score_matchup, score_position_night, calculate_handicap,
+                          get_weekly_prizes, get_team_standings)
 from snapshots import save_snapshot
 from config import Config
 
@@ -60,10 +61,61 @@ def week_entry(season_id, week_num):
                 'roster': roster,
             })
 
+    # Recon summary (only if week is entered)
+    recon = None
+    if week.is_entered:
+        all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+        player_count = sum(1 for e in all_entries if not e.is_blind)
+        blind_games  = sum(e.game_count for e in all_entries if e.is_blind)
+        total_wood   = sum(
+            e.total_pins + (
+                (season.blind_handicap if e.is_blind
+                 else calculate_handicap(e.bowler_id, season_id, week_num))
+                * e.game_count
+            )
+            for e in all_entries
+        )
+        prizes = get_weekly_prizes(season_id, week_num)
+        recon = {'player_count': player_count, 'blind_games': blind_games,
+                 'total_wood': total_wood, 'prizes': prizes}
+
     return render_template('entry/week_entry.html',
                            season=season, week=week,
                            matchups=matchups,
-                           matchup_data=matchup_data)
+                           matchup_data=matchup_data,
+                           recon=recon)
+
+
+def _auto_assign_position_night(season_id, position_week_num):
+    """
+    Update ScheduleEntry for a position night based on standings through the prior week.
+    Top 2 teams by points play each other (matchups 1&2), bottom 2 play each other (3&4).
+    """
+    standings = get_team_standings(season_id, through_week=position_week_num - 1)
+    if len(standings) < 4:
+        return
+    top_a, top_b = standings[0]['team'], standings[1]['team']
+    bot_a, bot_b = standings[2]['team'], standings[3]['team']
+
+    assignments = {
+        1: (top_a.id, top_b.id),
+        2: (top_a.id, top_b.id),
+        3: (bot_a.id, bot_b.id),
+        4: (bot_a.id, bot_b.id),
+    }
+    for matchup_num, (t1_id, t2_id) in assignments.items():
+        sched = ScheduleEntry.query.filter_by(
+            season_id=season_id, week_num=position_week_num,
+            matchup_num=matchup_num
+        ).first()
+        if sched:
+            sched.team1_id = t1_id
+            sched.team2_id = t2_id
+        else:
+            db.session.add(ScheduleEntry(
+                season_id=season_id, week_num=position_week_num,
+                matchup_num=matchup_num, team1_id=t1_id, team2_id=t2_id
+            ))
 
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/matchup/<int:matchup_num>',
@@ -150,6 +202,15 @@ def matchup_entry(season_id, week_num, matchup_num):
 
         db.session.commit()
 
+        # If the next week is an un-entered position night, update its lane assignments
+        next_pos = Week.query.filter_by(
+            season_id=season_id, week_num=week_num + 1,
+            is_position_night=True, is_entered=False
+        ).first()
+        if next_pos:
+            _auto_assign_position_night(season_id, week_num + 1)
+            db.session.commit()
+
         # Mark week as entered if all matchups are done
         all_matchups = ScheduleEntry.query.filter_by(
             season_id=season_id, week_num=week_num
@@ -209,15 +270,23 @@ def reconcile(season_id, week_num):
         season_id=season_id, week_num=week_num
     ).all()
 
+    # Build per-entry handicap and handicap wood
+    entry_data = []
+    for e in entries:
+        if e.is_blind:
+            hcp = season.blind_handicap
+        else:
+            hcp = calculate_handicap(e.bowler_id, season_id, week_num) if e.bowler_id else 0
+        hcp_wood = e.total_pins + hcp * e.game_count
+        entry_data.append({'entry': e, 'hcp': hcp, 'hcp_wood': hcp_wood})
+
     player_count = sum(1 for e in entries if not e.is_blind)
-    blind_count = sum(1 for e in entries if e.is_blind)
-    total_wood = sum(e.total_pins for e in entries if not e.is_blind)
-    blind_wood = sum(e.total_pins for e in entries if e.is_blind)
+    blind_games  = sum(e.game_count for e in entries if e.is_blind)
+    total_wood   = sum(d['hcp_wood'] for d in entry_data)
 
     return render_template('entry/reconcile.html',
                            season=season, week=week,
                            player_count=player_count,
-                           blind_count=blind_count,
+                           blind_games=blind_games,
                            total_wood=total_wood,
-                           blind_wood=blind_wood,
-                           entries=entries)
+                           entry_data=entry_data)

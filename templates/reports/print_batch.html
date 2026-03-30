@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Print Batch — Week {{ week_num }} — {{ season.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .batch-section { margin-bottom: 2rem; }
+
+  @media print {
+    @page { size: landscape; margin: 0.35in; }
+    body  { font-size: 7.5pt !important; }
+    .table { font-size: 7.5pt !important; border-collapse: collapse !important; }
+    .table th, .table td { padding: 1px 3px !important; line-height: 1.2 !important; }
+    .no-print { display: none !important; }
+    .navbar   { display: none !important; }
+    .container-fluid { padding: 0 !important; }
+    thead.table-dark { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .batch-section { page-break-after: always; margin-bottom: 0; }
+    .batch-section:last-child { page-break-after: auto; }
+    .batch-label { display: none !important; }
+    h2, h4, h5, h6 { font-size: 9pt !important; margin-bottom: 2px !important; }
+
+    /* Group isolation: hide the other group when printing a specific group */
+    body.print-group-1 [data-group="2"] { display: none !important; }
+    body.print-group-2 [data-group="1"] { display: none !important; }
+  }
+  @media screen {
+    .table th, .table td { white-space: nowrap; }
+    .batch-section { border: 1px dashed #ccc; padding: 1rem; border-radius: 4px; }
+    .batch-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+                   color: #6c757d; margin-bottom: 0.25rem; }
+  }
+</style>
+<script>
+function printGroup(n) {
+  document.body.classList.add('print-group-' + n);
+  window.print();
+  document.body.classList.remove('print-group-' + n);
+}
+</script>
+{% endblock %}
+
+{% macro alpha_table(rows, title) %}
+<div class="text-center mb-1" style="font-size:0.9rem">
+  <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp;
+  {{ season.name }} &nbsp;|&nbsp;
+  {{ title }} — Week {{ week_num }}{% if week and week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
+  {% if week and week.is_position_night %}&nbsp;&#9733; Position Night{% endif %}
+</div>
+<table class="table table-bordered table-sm table-striped mb-0">
+  <thead class="table-dark">
+    <tr>
+      <th>Name</th><th>Nick</th><th>T</th>
+      <th class="text-end">Total</th><th class="text-end">2nd</th><th class="text-end">G</th>
+      <th class="text-end">Ave</th><th class="text-end">Use<br>Hcp</th><th class="text-end">Cur<br>Hcp</th>
+      <th class="text-end">HG<br>Scr</th><th class="text-end">HG<br>Hcp</th>
+      <th class="text-end">HS<br>Scr</th><th class="text-end">HS<br>Hcp</th>
+      <th class="text-end">Lst<br>Hcp</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.bowler.last_name }}</td>
+      <td class="text-muted">{{ row.bowler.nickname or '' }}</td>
+      <td>{{ row.team.number }}</td>
+      <td class="text-end">{{ row.total_pins or '' }}</td>
+      <td class="text-end">{{ row.second_half_pins or '' }}</td>
+      <td class="text-end">{{ row.games or '' }}</td>
+      <td class="text-end">{{ row.average or '' }}</td>
+      <td class="text-end fw-bold">{{ row.display_handicap or '' }}</td>
+      <td class="text-end">{{ row.current_handicap or '' }}</td>
+      <td class="text-end">{{ row.high_game_scratch or '' }}</td>
+      <td class="text-end">{{ row.high_game_hcp or '' }}</td>
+      <td class="text-end">{{ row.high_series_scratch or '' }}</td>
+      <td class="text-end">{{ row.high_series_hcp or '' }}</td>
+      <td class="text-end text-muted">{{ row.prior_handicap or '' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
+{% block content %}
+<div class="no-print d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="mb-0">Print Batch — Week {{ week_num }}</h4>
+    <small class="text-muted">
+      Group 1: 4 × Wkly Alpha &nbsp;|&nbsp;
+      Group 2: Wkly Alpha + YTD Alpha + High Avg + High Games
+    </small>
+  </div>
+  <div class="d-flex gap-2 align-items-center flex-wrap">
+    <select class="form-select form-select-sm w-auto"
+            onchange="location='{{ url_for('reports.print_batch', season_id=season.id, week_num=0) }}'.replace('/0', '/'+this.value)">
+      {% for wk in weeks %}
+      <option value="{{ wk.week_num }}" {% if wk.week_num == week_num %}selected{% endif %}>
+        Week {{ wk.week_num }}{% if wk.date %} — {{ wk.date.strftime('%b %d') }}{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    <button onclick="printGroup(1)" class="btn btn-sm btn-outline-primary">
+      Print Group 1 (4× Alpha)
+    </button>
+    <button onclick="printGroup(2)" class="btn btn-sm btn-outline-primary">
+      Print Group 2 (Alpha + YTD + High Avg + HG)
+    </button>
+    <button onclick="window.print()" class="btn btn-sm btn-secondary">
+      Print All (8 pages)
+    </button>
+  </div>
+</div>
+
+{# ── GROUP 1: Four copies of Weekly Alpha ── #}
+
+{% for copy in range(1, 5) %}
+<div class="batch-section" data-group="1">
+  <div class="batch-label no-print">Group 1 — Wkly Alpha, copy {{ copy }} of 4</div>
+  {{ alpha_table(alpha_rows, 'Wkly Alpha') }}
+</div>
+{% endfor %}
+
+{# ── GROUP 2: Weekly Alpha + YTD Alpha + High Avg + High Games ── #}
+
+<div class="batch-section" data-group="2">
+  <div class="batch-label no-print">Group 2 — Wkly Alpha</div>
+  {{ alpha_table(alpha_rows, 'Wkly Alpha') }}
+</div>
+
+<div class="batch-section" data-group="2">
+  <div class="batch-label no-print">Group 2 — YTD Alpha (sorted by average)</div>
+  <div class="text-center mb-1" style="font-size:0.9rem">
+    <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp;
+    {{ season.name }} &nbsp;|&nbsp;
+    YTD Alpha — Week {{ week_num }}{% if week and week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
+    {% if week and week.is_position_night %}&nbsp;&#9733; Position Night{% endif %}
+  </div>
+  <table class="table table-bordered table-sm table-striped mb-0">
+    <thead class="table-dark">
+      <tr>
+        <th>#</th><th>Name</th><th>T</th>
+        <th class="text-end">Total</th><th class="text-end">G</th><th class="text-end">Ave</th>
+        <th class="text-end">Hcp</th>
+        <th class="text-end">HG<br>Scr</th><th class="text-end">HG<br>Hcp</th>
+        <th class="text-end">HS<br>Scr</th><th class="text-end">HS<br>Hcp</th>
+        <th class="text-end">Lst<br>Yr<br>Hcp</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in ytd_rows %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ row.bowler.last_name }}</td>
+        <td>{{ row.team.number }}</td>
+        <td class="text-end">{{ row.total_pins or '' }}</td>
+        <td class="text-end">{{ row.games or '' }}</td>
+        <td class="text-end">{{ row.average or '' }}</td>
+        <td class="text-end fw-bold">{{ row.display_handicap or '' }}</td>
+        <td class="text-end">{{ row.high_game_scratch or '' }}</td>
+        <td class="text-end">{{ row.high_game_hcp or '' }}</td>
+        <td class="text-end">{{ row.high_series_scratch or '' }}</td>
+        <td class="text-end">{{ row.high_series_hcp or '' }}</td>
+        <td class="text-end text-muted">{{ row.prior_handicap or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="batch-section" data-group="2">
+  <div class="batch-label no-print">Group 2 — Weekly High Avg (sorted by average)</div>
+  {{ alpha_table(high_avg_rows, 'High Avg') }}
+</div>
+
+<div class="batch-section" data-group="2">
+  <div class="batch-label no-print">Group 2 — High Games &amp; Averages (through week {{ hg_through }})</div>
+  <div class="text-center mb-1" style="font-size:0.9rem">
+    <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp;
+    {{ season.name }} &nbsp;|&nbsp;
+    High Games &amp; Averages — through Week {{ hg_through }}
+  </div>
+  <div class="row">
+    <div class="col-6">
+      <strong style="font-size:0.8rem">Average Leaders</strong>
+      <table class="table table-sm table-bordered">
+        <thead><tr><th>#</th><th>Bowler</th><th>T</th><th class="text-end">Avg</th><th class="text-end">Hcp</th><th class="text-end">G</th></tr></thead>
+        <tbody>
+          {% for i, r in enumerate(by_avg[:20]) %}
+          <tr><td>{{ i+1 }}</td><td>{{ r.bowler.last_name }}</td><td>{{ r.team.number }}</td>
+              <td class="text-end">{{ r.average }}</td><td class="text-end">{{ r.handicap }}</td><td class="text-end">{{ r.games }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="col-6">
+      <strong style="font-size:0.8rem">High Game Scratch</strong>
+      <table class="table table-sm table-bordered">
+        <thead><tr><th>#</th><th>Bowler</th><th class="text-end">Score</th></tr></thead>
+        <tbody>{% for i, r in enumerate(by_hgs[:10]) %}<tr><td>{{ i+1 }}</td><td>{{ r.bowler.last_name }}</td><td class="text-end">{{ r.high_game_scratch }}</td></tr>{% endfor %}</tbody>
+      </table>
+      <strong style="font-size:0.8rem">High Game w/ Handicap</strong>
+      <table class="table table-sm table-bordered">
+        <thead><tr><th>#</th><th>Bowler</th><th class="text-end">Score</th></tr></thead>
+        <tbody>{% for i, r in enumerate(by_hgh[:10]) %}<tr><td>{{ i+1 }}</td><td>{{ r.bowler.last_name }}</td><td class="text-end">{{ r.high_game_hcp }}</td></tr>{% endfor %}</tbody>
+      </table>
+      <strong style="font-size:0.8rem">High Series Scratch</strong>
+      <table class="table table-sm table-bordered">
+        <thead><tr><th>#</th><th>Bowler</th><th class="text-end">Score</th></tr></thead>
+        <tbody>{% for i, r in enumerate(by_hss[:10]) %}<tr><td>{{ i+1 }}</td><td>{{ r.bowler.last_name }}</td><td class="text-end">{{ r.high_series_scratch }}</td></tr>{% endfor %}</tbody>
+      </table>
+      <strong style="font-size:0.8rem">High Series w/ Handicap</strong>
+      <table class="table table-sm table-bordered">
+        <thead><tr><th>#</th><th>Bowler</th><th class="text-end">Score</th></tr></thead>
+        <tbody>{% for i, r in enumerate(by_hsh[:10]) %}<tr><td>{{ i+1 }}</td><td>{{ r.bowler.last_name }}</td><td class="text-end">{{ r.high_series_hcp }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

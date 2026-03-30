@@ -16,16 +16,25 @@
   </thead>
   <tbody>
     {% for wk in weeks %}
-    <tr class="{{ 'table-success' if wk.is_entered else '' }}">
+    <tr class="{{ 'table-secondary' if wk.is_cancelled else ('table-success' if wk.is_entered else '') }}">
       <td>{{ wk.week_num }}</td>
       <td>{{ wk.date.strftime('%a %b %d, %Y') if wk.date else '—' }}</td>
-      <td>{% if wk.is_position_night %}<span class="badge bg-warning text-dark">Position Night</span>{% else %}Regular{% endif %}</td>
-      <td>{% if wk.is_entered %}<span class="text-success">✓ Entered</span>{% else %}<span class="text-muted">Pending</span>{% endif %}</td>
       <td>
+        {% if wk.is_position_night %}<span class="badge bg-warning text-dark">Position Night</span>
+        {% else %}Regular{% endif %}
+      </td>
+      <td>
+        {% if wk.is_cancelled %}<span class="badge bg-secondary">Cancelled</span>
+        {% elif wk.is_entered %}<span class="text-success">✓ Entered</span>
+        {% else %}<span class="text-muted">Pending</span>{% endif %}
+      </td>
+      <td>
+        {% if not wk.is_cancelled %}
         <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=wk.week_num) }}"
            class="btn btn-sm {{ 'btn-outline-secondary' if wk.is_entered else 'btn-primary' }}">
           {{ 'Edit' if wk.is_entered else 'Enter' }}
         </a>
+        {% endif %}
       </td>
     </tr>
     {% endfor %}
