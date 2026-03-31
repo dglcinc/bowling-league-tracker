@@ -9,6 +9,45 @@ from config import Config
 from models import db
 
 
+def _migrate_db(db):
+    """Add new columns to existing tables without dropping data."""
+    from sqlalchemy import text
+    migrations = [
+        "ALTER TABLE seasons ADD COLUMN bowling_format VARCHAR(10) DEFAULT 'single'",
+        "ALTER TABLE weeks ADD COLUMN tournament_type VARCHAR(32)",
+    ]
+    with db.engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # column already exists
+
+    # Backfill post-season tournament weeks for seasons that only have regular weeks
+    from models import Season, Week
+    from datetime import timedelta
+    from routes.admin import _POSTSEASON_WEEKS
+    seasons = Season.query.all()
+    for season in seasons:
+        max_wk = db.session.query(db.func.max(Week.week_num)).filter_by(season_id=season.id).scalar() or 0
+        if max_wk == season.num_weeks:
+            # Post-season weeks are missing — add them
+            for offset, (tt, is_pos) in enumerate(_POSTSEASON_WEEKS, start=1):
+                wn = season.num_weeks + offset
+                last = Week.query.filter_by(season_id=season.id, week_num=wn - 1).first()
+                wk = Week(
+                    season_id=season.id,
+                    week_num=wn,
+                    tournament_type=tt,
+                    is_position_night=is_pos,
+                )
+                if last and last.date:
+                    wk.date = last.date + timedelta(weeks=1)
+                db.session.add(wk)
+    db.session.commit()
+
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -19,6 +58,7 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        _migrate_db(db)
 
     # Register blueprints
     from routes.admin import admin_bp

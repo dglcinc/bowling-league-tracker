@@ -9,16 +9,36 @@
   </ol>
 </nav>
 
-<h4>
-  Week {{ week.week_num }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
-  {% if week.is_position_night %}<span class="badge bg-warning text-dark">⭐ Position Night</span>{% endif %}
-  {% if week.is_entered %}<span class="badge bg-success">✓ Entered</span>{% endif %}
-</h4>
+<div class="d-flex align-items-center gap-3 mb-2">
+  <h4 class="mb-0">
+    Week {{ week.week_num }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
+    {% if week.is_position_night %}<span class="badge bg-warning text-dark">⭐ Position Night</span>{% endif %}
+    {% if week.tournament_type %}<span class="badge bg-info text-dark">{{ tournament_labels.get(week.tournament_type, week.tournament_type) }}</span>{% endif %}
+    {% if week.is_cancelled %}<span class="badge bg-danger">Cancelled</span>{% endif %}
+    {% if week.is_entered %}<span class="badge bg-success">✓ Entered</span>{% endif %}
+  </h4>
+  <form method="post" action="{{ url_for('entry.toggle_cancelled', season_id=season.id, week_num=week.week_num) }}" class="mb-0">
+    <button type="submit" class="btn btn-sm btn-outline-{{ 'success' if week.is_cancelled else 'danger' }}">
+      {{ 'Uncancel Week' if week.is_cancelled else 'Cancel Week' }}
+    </button>
+  </form>
+</div>
 
 {% if week.is_position_night %}
 <div class="alert alert-warning">
   <strong>Position Night:</strong> Points are aggregated across all matchups for each team pairing. Score entry is the same — just enter game scores for each bowler as normal.
 </div>
+{% endif %}
+
+{% if week.tournament_type and week.tournament_type != 'club_championship' %}
+<div class="alert alert-info">
+  <strong>{{ tournament_labels.get(week.tournament_type, week.tournament_type) }}:</strong>
+  Individual competition — use the tournament entry form.
+</div>
+<a href="{{ url_for('entry.tournament_entry', season_id=season.id, week_num=week.week_num) }}"
+   class="btn btn-primary mb-3">
+  {{ 'Edit Tournament Scores' if week.is_entered else 'Enter Tournament Scores' }}
+</a>
 {% endif %}
 
 <div class="row">
@@ -70,9 +90,11 @@
     </div>
   </div>
   {% else %}
+  {% if not week.tournament_type or week.tournament_type == 'club_championship' %}
   <div class="col-12">
     <div class="alert alert-warning">No schedule entries found for this week. Set up the schedule in <a href="{{ url_for('admin.schedule', season_id=season.id) }}">Admin → Schedule</a>.</div>
   </div>
+  {% endif %}
   {% endfor %}
 </div>
 

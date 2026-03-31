@@ -20,21 +20,32 @@
       <td>{{ wk.week_num }}</td>
       <td>{{ wk.date.strftime('%a %b %d, %Y') if wk.date else '—' }}</td>
       <td>
-        {% if wk.is_position_night %}<span class="badge bg-warning text-dark">Position Night</span>
-        {% else %}Regular{% endif %}
+        {% if wk.tournament_type %}
+          <span class="badge bg-info text-dark">{{ tournament_labels.get(wk.tournament_type, wk.tournament_type) }}</span>
+        {% elif wk.is_position_night %}
+          <span class="badge bg-warning text-dark">Position Night</span>
+        {% else %}
+          Regular
+        {% endif %}
       </td>
       <td>
         {% if wk.is_cancelled %}<span class="badge bg-secondary">Cancelled</span>
         {% elif wk.is_entered %}<span class="text-success">✓ Entered</span>
         {% else %}<span class="text-muted">Pending</span>{% endif %}
       </td>
-      <td>
-        {% if not wk.is_cancelled %}
+      <td class="d-flex gap-1">
         <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=wk.week_num) }}"
-           class="btn btn-sm {{ 'btn-outline-secondary' if wk.is_entered else 'btn-primary' }}">
-          {{ 'Edit' if wk.is_entered else 'Enter' }}
+           class="btn btn-sm {{ 'btn-outline-danger' if wk.is_cancelled else ('btn-outline-secondary' if wk.is_entered else 'btn-primary') }}">
+          {{ 'Cancelled' if wk.is_cancelled else ('Edit' if wk.is_entered else 'Enter') }}
         </a>
-        {% endif %}
+        <form method="post"
+              action="{{ url_for('entry.toggle_cancelled', season_id=season.id, week_num=wk.week_num) }}"
+              class="mb-0">
+          <button type="submit"
+                  class="btn btn-sm btn-outline-{{ 'success' if wk.is_cancelled else 'secondary' }}">
+            {{ 'Uncancel' if wk.is_cancelled else 'Cancel' }}
+          </button>
+        </form>
       </td>
     </tr>
     {% endfor %}

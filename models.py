@@ -44,6 +44,7 @@ class Season(db.Model):
     blind_scratch = db.Column(db.Integer, default=125)
     blind_handicap = db.Column(db.Integer, default=60)
     is_active = db.Column(db.Boolean, default=True)
+    bowling_format = db.Column(db.String(10), default='single')  # 'single' or 'double'
 
     teams = db.relationship('Team', back_populates='season', lazy='dynamic')
     roster = db.relationship('Roster', back_populates='season', lazy='dynamic')
@@ -108,6 +109,7 @@ class Week(db.Model):
     is_cancelled = db.Column(db.Boolean, default=False)
     notes = db.Column(db.String(256))
     is_entered = db.Column(db.Boolean, default=False)  # scores have been entered
+    tournament_type = db.Column(db.String(32), nullable=True)  # None = regular week; else tournament name
 
     season = db.relationship('Season', back_populates='weeks')
 
@@ -210,6 +212,51 @@ class TeamPoints(db.Model):
 
     def __repr__(self):
         return f'<TeamPoints week={self.week_num} team={self.team_id} pts={self.points_earned}>'
+
+
+class TournamentEntry(db.Model):
+    """
+    One bowler's (or write-in's) scores for a tournament week.
+    Used for Harry Russell (5 games scratch), Chad Harris, Shep Belyea (3 games hcp).
+    write-in participants have bowler_id=None and guest_name set.
+    """
+    __tablename__ = 'tournament_entries'
+
+    id = db.Column(db.Integer, primary_key=True)
+    season_id = db.Column(db.Integer, db.ForeignKey('seasons.id'), nullable=False)
+    week_num = db.Column(db.Integer, nullable=False)
+    bowler_id = db.Column(db.Integer, db.ForeignKey('bowlers.id'), nullable=True)
+    guest_name = db.Column(db.String(128), nullable=True)  # write-in participant
+    game1 = db.Column(db.Integer)
+    game2 = db.Column(db.Integer)
+    game3 = db.Column(db.Integer)
+    game4 = db.Column(db.Integer)
+    game5 = db.Column(db.Integer)
+    handicap = db.Column(db.Integer, default=0)
+
+    bowler = db.relationship('Bowler')
+
+    @property
+    def display_name(self):
+        if self.guest_name:
+            return self.guest_name
+        return self.bowler.display_name if self.bowler else '(unknown)'
+
+    @property
+    def games(self):
+        return [g for g in [self.game1, self.game2, self.game3, self.game4, self.game5]
+                if g is not None]
+
+    @property
+    def total_scratch(self):
+        return sum(self.games)
+
+    @property
+    def total_with_hcp(self):
+        return self.total_scratch + self.handicap * len(self.games)
+
+    def __repr__(self):
+        return f'<TournamentEntry week={self.week_num} bowler={self.bowler_id}>'
 
 
 class Snapshot(db.Model):

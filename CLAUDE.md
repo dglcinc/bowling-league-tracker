@@ -4,18 +4,17 @@
 
 **Mountain Lakes Men's Bowling League** season tracker. The existing source of truth is an Excel workbook — analyzed but not committed (contains personal info). This project replaces it with a proper web application.
 
-Season: 23 weeks (October – March). Currently in season 2025-2026, through week 22.
+Season: 22 regular weeks + 4 post-season tournament weeks = 26 total. Currently in season 2025-2026.
 Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 **Important:** Never put player names, team names (which are player surnames), or any other personal information in the repository, code, comments, or documentation.
 
-## Repo / Branch State (as of 2026-03-29)
+## Repo / Branch State (as of 2026-03-30)
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
-- `feature/initial-app`: all current feature work — PR #2 open against main
-- `docs/readme`: README rewrite — PR #3 open against main
-- Open PRs should be reviewed and merged before starting new feature work
+- Open PRs: `feature/initial-app` (PR #2), `feature/season-format-tournaments-import` (PR #5)
+- Merge PR #2 first, then PR #5
 
 ## League Structure
 
@@ -28,6 +27,7 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 - Two columns: one team per side
 - Teams must have equal player count per lane — if short, add a **blind** (scratch=125, hcp=60 per game, configurable per season)
 - 6 game slots per player per week: games 1–3 = primary session, games 4–6 = legacy second session (only top 3 used now)
+- Blind entry is a dropdown option (`value="BLIND"`) in the bowler selector; auto-fills scratch scores
 
 ### Points per Matchup (regular weeks)
 - 1 point per game: team with higher total handicap pinfall wins (3 games = up to 3 pts)
@@ -42,6 +42,16 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 - Max 8 points per position-night matchup = 16 total weekly (same max as regular)
 - Lane assignments determined by standings: top-2 teams play each other, bottom-2 play each other
 - **Auto-assigned**: whenever prior week's scores are saved, the position night's ScheduleEntry rows update automatically if the position night hasn't been entered yet
+
+### Post-Season Tournaments (weeks 23–26)
+Four tournament weeks are appended after every regular season. The order is the default; can be reordered via Admin → Week Dates without structural changes.
+
+- **Club Championship** (`tournament_type='club_championship'`, `is_position_night=True`): team competition scored as a position night; uses normal matchup entry; auto-assigns lane assignments from standings
+- **Harry E. Russell Championship** (`harry_russell`): individual scratch, 5 games; shows all bowlers (active + inactive) + write-in option for non-league participants
+- **Chad Harris Memorial Bowl** (`chad_harris`): individual handicap, 3 games; active bowlers + write-in
+- **Shep Belyea Open** (`shep_belyea`): individual handicap, 3 games; active bowlers + write-in
+
+Tournament scores stored in `tournament_entries` table. All tournament weeks excluded from `get_bowler_entries` so they never affect season averages/handicaps. Tournament entry form shows live JS rankings.
 
 ## Key Formulas
 
@@ -84,18 +94,21 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 ### Tables
 
 - **bowlers**: id, last_name, first_name, nickname, email. Never deleted.
-- **seasons**: id, name, start_date, num_weeks, half_boundary_week (default 11), handicap_base (200), handicap_factor (0.9), blind_scratch (125), blind_handicap (60), is_active
+- **seasons**: id, name, start_date, num_weeks, half_boundary_week (default 11), handicap_base (200), handicap_factor (0.9), blind_scratch (125), blind_handicap (60), is_active, bowling_format ('single'/'double')
 - **teams**: id, season_id, number (1–4), name
 - **roster**: bowler_id, season_id, team_id, active, prior_handicap, joined_week
 - **schedule**: season_id, week_num, matchup_num (1–4), team1_id, team2_id, lane_pair
-- **weeks**: season_id, week_num, date, is_position_night, is_cancelled, is_entered, notes
+- **weeks**: season_id, week_num, date, is_position_night, is_cancelled, is_entered, notes, tournament_type
 - **matchup_entries**: season_id, week_num, matchup_num, team_id, bowler_id, is_blind, lane_side (A/B), game1–game6
 - **team_points**: season_id, week_num, matchup_num, team_id, points_earned (Float — supports 0.5-pt ties)
+- **tournament_entries**: season_id, week_num, bowler_id (nullable), guest_name (nullable), game1–game5, handicap
 - **snapshots**: season_id, week_num, snapshot_json, created_at
 
 ### Key notes
 - `MatchupEntry.matchup_num` (1–4) identifies which lane pair — critical for correct scoring; historical data required manual assignment via admin Assign Matchups tool
 - `TeamPoints.points_earned` is Float to handle tied games (0.5 pts each)
+- `Season.bowling_format`: `'single'` (G1–G3, 8 lanes) or `'double'` (G1–G6, 4 lanes). Both current seasons are 'single'.
+- DB migration runs on every startup via `_migrate_db()` in `app.py` — safe to re-run (try/except on ALTER TABLE). Also backfills post-season weeks for seasons where `max(week_num) == num_weeks`.
 
 ## Application Structure
 
@@ -107,11 +120,13 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 
 ### Routes / Blueprints
 
-**`entry_bp`** (`/season/<id>/...`)
-- `week_list` — pick a week to enter
-- `week_entry` — week summary with matchup cards, recon totals, prize results
-- `matchup_entry` — score entry form for one lane pair; saves points on POST; triggers position night auto-assignment
+**`entry_bp`** (`/entry/season/<id>/...`)
+- `week_list` — pick a week to enter; shows cancel/uncancel toggle per row
+- `week_entry` — week summary with matchup cards, recon totals, prize results; cancel/uncancel button
+- `matchup_entry` — score entry form for one lane pair; saves points on POST; triggers position night auto-assignment; blind via dropdown; G4–G6 hidden for 'single' format
 - `reconcile` — blind reconciliation view
+- `toggle_cancelled` — POST to cancel/uncancel a week
+- `tournament_entry` — individual tournament score entry (Harry Russell/Chad Harris/Shep Belyea); live JS rankings
 
 **`reports_bp`** (`/reports/season/<id>/...`)
 - `wkly_alpha` — alphabetical roster with YTD stats, printable landscape
@@ -125,6 +140,8 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 
 **`admin_bp`** (`/admin/...`)
 - Season, team, roster, week, and schedule management
+- `edit_weeks` — set dates (with JS cascade +7 days), position night flags, tournament types
+- `import_season` — web UI to upload XLS and seed a full historical season
 - `assign_matchups_list` / `assign_matchups` — per-week tool to assign bowlers to lane pair A or B
 
 **`payout_bp`** (`/payout/season/<id>`)
@@ -138,18 +155,20 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 ### Snapshots
 Written automatically after each week is fully entered. Stored as JSON at OneDrive path next to the DB.
 
-## Current State (as of 2026-03-29)
+## Current State (as of 2026-03-30)
 
 ### Seasons in DB
-- **2026-2027** (active): roster seeded from `seed_from_xls.py`; `prior_handicap` loaded from current season final handicap; schedule seeded from `seed_schedule.py`
-- **2025-2026** (inactive): structure + scores for weeks 1–21 imported via seed scripts; week 22 position night to be entered live through the app
+- **2025-2026** (active): all 22 regular weeks entered; 4 post-season tournament weeks (23–26) added; TeamPoints from spreadsheet
+- **2026-2027** (inactive): roster seeded from `seed_from_xls.py`; schedule seeded from `seed_schedule.py`; 4 post-season tournament weeks (23–26) added
+
+Both seasons have 26 weeks: 22 regular + Club Championship (23), Harry Russell (24), Chad Harris (25), Shep Belyea (26).
 
 ### Seed scripts (run on Mac, Flask app stopped)
 XLS path: `/users/david/OneDrive - DGLC/Claude/scoring 2025-2026 - Week 22.xlsx`
 
 | Script | Purpose |
 |--------|---------|
-| `seed_from_xls.py <xlsx>` | Seeds 2026-2027 roster + prior handicaps from `wkly alpha` sheet |
+| `seed_from_xls.py <xlsx>` | Seeds roster + prior handicaps from `wkly alpha` sheet |
 | `seed_schedule.py` | Seeds lane-assignment schedule for the active season from DOCX |
 | `seed_historical.py <xlsx>` | Seeds 2025-2026 structure: season, teams, bowlers, roster, weeks, schedule |
 | `seed_week.py <week_num> <xlsx>` | Imports one week's scores + verifies lane assignment; saves JSON snapshot |
@@ -159,10 +178,12 @@ XLS path: `/users/david/OneDrive - DGLC/Claude/scoring 2025-2026 - Week 22.xlsx`
 - SQLite writes must run natively on Mac (not from VM) — VirtioFS file locking doesn't support SQLite
 - `TeamPoints.points_earned` is Float to support 0.5-pt ties from tied games
 - Historical data uses `matchup_num = team_number` as a simplification; corrected per-week via Assign Matchups admin tool
+- TeamPoints for historical seasons come from the spreadsheet directly, not recomputed from scores
 
 ### Still to build
 - Season rollover wizard
-- Merge open PRs (#2, #3) once verified
+- Prize money calculation (details TBD)
+- Merge PR #2 (`feature/initial-app`) first, then merge PR #5
 
 ## Git Workflow
 
