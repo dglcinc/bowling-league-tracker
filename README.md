@@ -37,9 +37,9 @@ Four tournament weeks are automatically appended to each season after the regula
 | Tournament | Format | Notes |
 |-----------|--------|-------|
 | Club Team Championship | Team competition, position-night scoring | Uses standard matchup entry |
-| Harry E. Russell Championship | Individual, 5-game scratch | All bowlers (active + inactive) + write-in option |
-| Chad Harris Memorial Bowl | Individual, 3-game handicap | Active bowlers + write-in option |
-| Shep Belyea Open | Individual, 3-game handicap | Active bowlers + write-in option |
+| Harry E. Russell Championship | Individual, 5-game scratch | All bowlers (active + inactive) + write-in option for non-league participants |
+| Chad Harris Memorial Bowl | Individual, 3-game handicap | Active bowlers only |
+| Shep Belyea Open | Individual, 3-game handicap | Active bowlers only |
 
 The individual tournament entry form shows live rankings that update as scores are typed.
 
