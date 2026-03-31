@@ -344,6 +344,7 @@ def tournament_entry(season_id, week_num):
 
     num_games = 5 if tt == 'harry_russell' else 3
     use_handicap = (tt != 'harry_russell')
+    allow_write_in = (tt == 'harry_russell')
 
     if request.method == 'POST':
         # Delete existing entries for this tournament week
@@ -372,7 +373,7 @@ def tournament_entry(season_id, week_num):
                 hcp_val = request.form.get(f'hcp_{row_id}', '').strip()
                 hcp = int(hcp_val) if hcp_val.isdigit() else 0
 
-            if bowler_val == 'WRITE_IN':
+            if bowler_val == 'WRITE_IN' and allow_write_in:
                 guest = request.form.get(f'guest_name_{row_id}', '').strip()
                 if not guest:
                     continue
@@ -423,4 +424,5 @@ def tournament_entry(season_id, week_num):
                            existing=existing,
                            num_games=num_games,
                            use_handicap=use_handicap,
+                           allow_write_in=allow_write_in,
                            bowler_handicaps=bowler_handicaps)

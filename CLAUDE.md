@@ -48,8 +48,8 @@ Four tournament weeks are appended after every regular season. The order is the 
 
 - **Club Championship** (`tournament_type='club_championship'`, `is_position_night=True`): team competition scored as a position night; uses normal matchup entry; auto-assigns lane assignments from standings
 - **Harry E. Russell Championship** (`harry_russell`): individual scratch, 5 games; shows all bowlers (active + inactive) + write-in option for non-league participants
-- **Chad Harris Memorial Bowl** (`chad_harris`): individual handicap, 3 games; active bowlers + write-in
-- **Shep Belyea Open** (`shep_belyea`): individual handicap, 3 games; active bowlers + write-in
+- **Chad Harris Memorial Bowl** (`chad_harris`): individual handicap, 3 games; active bowlers only
+- **Shep Belyea Open** (`shep_belyea`): individual handicap, 3 games; active bowlers only
 
 Tournament scores stored in `tournament_entries` table. All tournament weeks excluded from `get_bowler_entries` so they never affect season averages/handicaps. Tournament entry form shows live JS rankings.
 

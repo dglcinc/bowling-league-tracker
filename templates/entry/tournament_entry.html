@@ -54,7 +54,9 @@
         <select name="bowler_{{ i }}" class="form-select form-select-sm bowler-select"
                 data-row="{{ i }}">
           <option value="">— select —</option>
+          {% if allow_write_in %}
           <option value="WRITE_IN" {% if entry and entry.guest_name %}selected{% endif %}>— Write-in —</option>
+          {% endif %}
           {% for b in all_bowlers %}
           <option value="{{ b.id }}"
                   data-hcp="{{ bowler_handicaps.get(b.id, 0) }}"
@@ -63,10 +65,12 @@
           </option>
           {% endfor %}
         </select>
+        {% if allow_write_in %}
         <input type="text" name="guest_name_{{ i }}" class="form-control form-control-sm mt-1 guest-name"
                placeholder="Guest name"
                value="{{ entry.guest_name if entry and entry.guest_name else '' }}"
                style="{{ '' if entry and entry.guest_name else 'display:none' }}">
+        {% endif %}
       </td>
       {% if use_handicap %}
       <td class="text-center">
@@ -123,6 +127,7 @@
 {% block extra_js %}
 <script>
 const useHandicap = {{ 'true' if use_handicap else 'false' }};
+const allowWriteIn = {{ 'true' if allow_write_in else 'false' }};
 const numGames = {{ num_games }};
 let rowCount = {{ [existing|length + 5, 10]|min }};
 
@@ -241,13 +246,15 @@ function addRow() {
     gameCells += `<td><input type="number" name="game${g}_${i}" class="form-control form-control-sm score-input game-input" min="0" max="300"></td>`;
   }
 
+  const guestField = allowWriteIn
+    ? `<input type="text" name="guest_name_${i}" class="form-control form-control-sm mt-1 guest-name" placeholder="Guest name" style="display:none">`
+    : '';
   row.innerHTML = `
     <td>
       <select name="bowler_${i}" class="form-select form-select-sm bowler-select" data-row="${i}">
         ${firstSelect.innerHTML}
       </select>
-      <input type="text" name="guest_name_${i}" class="form-control form-control-sm mt-1 guest-name"
-             placeholder="Guest name" style="display:none">
+      ${guestField}
     </td>
     ${hcpCell}
     ${gameCells}
