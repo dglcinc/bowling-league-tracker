@@ -121,20 +121,36 @@ def week_entry(season_id, week_num):
 def _auto_assign_position_night(season_id, position_week_num):
     """
     Update ScheduleEntry for a position night based on standings through the prior week.
-    Top 2 teams by points play each other (matchups 1&2), bottom 2 play each other (3&4).
+    Regular position night: top-2 on matchups 1&2, bottom-2 on matchups 3&4.
+    Club Championship: top-2 on all 4 matchups (only those 2 teams bowl).
     """
+    from models import Week
+    pos_week = Week.query.filter_by(season_id=season_id, week_num=position_week_num).first()
+    is_club_championship = (pos_week and pos_week.tournament_type == 'club_championship')
+
     standings = get_team_standings(season_id, through_week=position_week_num - 1)
-    if len(standings) < 4:
+    if len(standings) < 2:
         return
     top_a, top_b = standings[0]['team'], standings[1]['team']
-    bot_a, bot_b = standings[2]['team'], standings[3]['team']
 
-    assignments = {
-        1: (top_a.id, top_b.id),
-        2: (top_a.id, top_b.id),
-        3: (bot_a.id, bot_b.id),
-        4: (bot_a.id, bot_b.id),
-    }
+    if is_club_championship:
+        # Only the top 2 teams bowl, on all 4 lane pairs
+        assignments = {
+            1: (top_a.id, top_b.id),
+            2: (top_a.id, top_b.id),
+            3: (top_a.id, top_b.id),
+            4: (top_a.id, top_b.id),
+        }
+    else:
+        if len(standings) < 4:
+            return
+        bot_a, bot_b = standings[2]['team'], standings[3]['team']
+        assignments = {
+            1: (top_a.id, top_b.id),
+            2: (top_a.id, top_b.id),
+            3: (bot_a.id, bot_b.id),
+            4: (bot_a.id, bot_b.id),
+        }
     for matchup_num, (t1_id, t2_id) in assignments.items():
         sched = ScheduleEntry.query.filter_by(
             season_id=season_id, week_num=position_week_num,
@@ -311,7 +327,13 @@ def position_entry(season_id, week_num, pairing_num):
         flash('This week is not a position night.', 'warning')
         return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
-    matchup_nums = [1, 2] if pairing_num == 1 else [3, 4]
+    is_club_championship = (week.tournament_type == 'club_championship')
+    if is_club_championship:
+        # All 4 matchups, one pairing (top-2 teams only)
+        matchup_nums = [1, 2, 3, 4]
+    else:
+        matchup_nums = [1, 2] if pairing_num == 1 else [3, 4]
+
     scheds = (ScheduleEntry.query
               .filter_by(season_id=season_id, week_num=week_num)
               .filter(ScheduleEntry.matchup_num.in_(matchup_nums))
@@ -321,7 +343,6 @@ def position_entry(season_id, week_num, pairing_num):
         flash('No schedule entries found for this pairing.', 'warning')
         return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
-    # Both schedule entries must have the same team pair
     team1 = scheds[0].team1
     team2 = scheds[0].team2
     teams = [team1, team2]
@@ -377,9 +398,10 @@ def position_entry(season_id, week_num, pairing_num):
 
         db.session.commit()
 
-        # Mark week entered when both pairings have entries
+        # Mark week entered: club championship has only one pairing (done now);
+        # regular position night needs both pairings saved before marking entered.
         other_matchup_nums = [3, 4] if pairing_num == 1 else [1, 2]
-        other_has_entries = MatchupEntry.query.filter(
+        other_has_entries = is_club_championship or MatchupEntry.query.filter(
             MatchupEntry.season_id == season_id,
             MatchupEntry.week_num == week_num,
             MatchupEntry.matchup_num.in_(other_matchup_nums)

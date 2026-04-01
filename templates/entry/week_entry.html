@@ -41,8 +41,37 @@
 </a>
 {% endif %}
 
-{% if week.is_position_night %}
-{# Position night: show 2 pairing cards (one per team matchup across 2 lane pairs) #}
+{% if week.tournament_type == 'club_championship' %}
+{# Club Championship: 1 card — top 2 teams, all 4 lane pairs #}
+<div class="row">
+  {% if matchups %}
+  {% set sched0 = matchups[0] %}
+  {% set cc_entry_count = namespace(n=0) %}
+  {% for md in matchup_data %}{% set cc_entry_count.n = cc_entry_count.n + md.entries|length %}{% endfor %}
+  <div class="col-12 col-xl-6 mb-3">
+    <div class="card">
+      <div class="card-header">
+        <strong>Club Championship: Team {{ sched0.team1.number }} {{ sched0.team1.name }} vs Team {{ sched0.team2.number }} {{ sched0.team2.name }}</strong>
+      </div>
+      <div class="card-body p-2">
+        {% if cc_entry_count.n > 0 %}
+        <p class="text-muted small mb-1">{{ cc_entry_count.n }} bowler entries across all 4 lane pairs.</p>
+        {% endif %}
+        <a href="{{ url_for('entry.position_entry', season_id=season.id, week_num=week.week_num, pairing_num=1) }}"
+           class="btn btn-sm btn-primary">
+          {{ 'Edit Scores' if cc_entry_count.n > 0 else 'Enter Scores' }}
+        </a>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12">
+    <div class="alert alert-warning">No schedule entries found. Set up the schedule in <a href="{{ url_for('admin.schedule', season_id=season.id) }}">Admin → Schedule</a>.</div>
+  </div>
+  {% endif %}
+</div>
+{% elif week.is_position_night %}
+{# Regular position night: 2 pairing cards (one per team matchup across 2 lane pairs) #}
 <div class="row">
   {% set pairings = [(1, matchups[:2]), (2, matchups[2:])] %}
   {% for pairing_num, pair_scheds in pairings %}
