@@ -26,7 +26,7 @@
 
 {% if week.is_position_night %}
 <div class="alert alert-warning">
-  <strong>Position Night:</strong> Points are aggregated across all matchups for each team pairing. Score entry is the same — just enter game scores for each bowler as normal.
+  <strong>Position Night:</strong> Enter scores for each team pairing below. Points are aggregated across both lane pairs for each matchup.
 </div>
 {% endif %}
 
@@ -41,6 +41,50 @@
 </a>
 {% endif %}
 
+{% if week.is_position_night %}
+{# Position night: show 2 pairing cards (one per team matchup across 2 lane pairs) #}
+<div class="row">
+  {% set pairings = [(1, matchups[:2]), (2, matchups[2:])] %}
+  {% for pairing_num, pair_scheds in pairings %}
+  {% if pair_scheds %}
+  {% set sched0 = pair_scheds[0] %}
+  <div class="col-12 col-xl-6 mb-3">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between">
+        <strong>Pairing {{ pairing_num }}: Team {{ sched0.team1.number }} {{ sched0.team1.name }} vs Team {{ sched0.team2.number }} {{ sched0.team2.name }}</strong>
+        <span class="text-muted small">
+          {% for s in pair_scheds %}{% if s.lane_pair %}Lanes {{ s.lane_pair }}{% if not loop.last %} &amp; {% endif %}{% endif %}{% endfor %}
+        </span>
+      </div>
+      <div class="card-body p-2">
+        {% set pairing_entry_count = namespace(n=0) %}
+        {% for s in pair_scheds %}
+          {% for md in matchup_data %}
+            {% if md.sched.matchup_num == s.matchup_num %}
+              {% set pairing_entry_count.n = pairing_entry_count.n + md.entries|length %}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+        {% if pairing_entry_count.n > 0 %}
+        <p class="text-muted small mb-1">{{ pairing_entry_count.n }} bowler entries across both lane pairs.</p>
+        {% endif %}
+        <a href="{{ url_for('entry.position_entry', season_id=season.id, week_num=week.week_num, pairing_num=pairing_num) }}"
+           class="btn btn-sm btn-primary">
+          {{ 'Edit Scores' if pairing_entry_count.n > 0 else 'Enter Scores' }}
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+  {% if not matchups %}
+  <div class="col-12">
+    <div class="alert alert-warning">No schedule entries found for this week. Set up the schedule in <a href="{{ url_for('admin.schedule', season_id=season.id) }}">Admin → Schedule</a>.</div>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+{# Regular week: one card per matchup #}
 <div class="row">
   {% for sched in matchups %}
   <div class="col-12 col-xl-6 mb-3">
@@ -97,6 +141,23 @@
   {% endif %}
   {% endfor %}
 </div>
+{% endif %}
+
+{% if weekly_team_pts and weekly_team_pts | selectattr('points', 'gt', 0) | list %}
+<hr>
+<h6>Week Points</h6>
+<table class="table table-sm table-bordered mb-3" style="max-width:320px">
+  <thead><tr><th>Team</th><th class="text-end">Points</th></tr></thead>
+  <tbody>
+  {% for row in weekly_team_pts %}
+  <tr>
+    <td>Team {{ row.team.number }} — {{ row.team.name }}</td>
+    <td class="text-end fw-bold">{{ row.points | int if row.points == row.points | int else row.points }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
 
 {% if recon %}
 <hr>
