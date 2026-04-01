@@ -3,7 +3,7 @@ Admin routes: season setup, roster management, schedule entry, season rollover.
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry
+from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings
 from datetime import date, timedelta
 import io
 
@@ -171,6 +171,50 @@ def toggle_active(season_id, roster_id):
     r.active = not r.active
     db.session.commit()
     return redirect(url_for('admin.season_detail', season_id=season_id))
+
+
+@admin_bp.route('/settings', methods=['GET', 'POST'])
+def league_settings():
+    settings = LeagueSettings.query.get(1)
+    if not settings:
+        settings = LeagueSettings(id=1)
+        db.session.add(settings)
+        db.session.commit()
+    if request.method == 'POST':
+        league_name = request.form.get('league_name', '').strip()
+        if league_name:
+            settings.league_name = league_name
+        settings.use_nickname = (request.form.get('use_nickname') == 'on')
+        db.session.commit()
+        flash('League settings saved.', 'success')
+        return redirect(url_for('admin.league_settings'))
+    return render_template('admin/league_settings.html', settings=settings)
+
+
+@admin_bp.route('/bowlers/<int:bowler_id>/edit', methods=['GET', 'POST'])
+def edit_bowler(bowler_id):
+    bowler = Bowler.query.get_or_404(bowler_id)
+    if request.method == 'POST':
+        last_name = request.form.get('last_name', '').strip()
+        if last_name:
+            bowler.last_name = last_name
+        bowler.first_name = request.form.get('first_name', '').strip() or None
+        bowler.nickname = request.form.get('nickname', '').strip() or None
+        bowler.email = request.form.get('email', '').strip() or None
+        db.session.commit()
+        flash('Bowler updated.', 'success')
+        season_id = request.form.get('season_id')
+        if season_id:
+            return redirect(url_for('reports.bowler_detail',
+                                    season_id=int(season_id), bowler_id=bowler.id))
+        return redirect(url_for('admin.edit_bowler', bowler_id=bowler_id))
+    roster_entries = (Roster.query
+                      .filter_by(bowler_id=bowler_id)
+                      .join(Season, Roster.season_id == Season.id)
+                      .order_by(Season.name.desc())
+                      .all())
+    return render_template('admin/edit_bowler.html', bowler=bowler,
+                           roster_entries=roster_entries)
 
 
 @admin_bp.route('/seasons/<int:season_id>/roster/<int:roster_id>/edit', methods=['GET', 'POST'])

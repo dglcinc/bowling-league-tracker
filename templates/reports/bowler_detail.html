@@ -2,7 +2,10 @@
 {% block title %}{{ bowler.display_name }} — {{ season.name }}{% endblock %}
 
 {% block content %}
-<h4>{{ bowler.display_name }}{% if bowler.nickname %} <small class="text-muted">"{{ bowler.nickname }}"</small>{% endif %}</h4>
+<div class="d-flex align-items-center gap-3 mb-1">
+  <h4 class="mb-0">{{ bowler.display_name }}{% if bowler.nickname %} <small class="text-muted">"{{ bowler.nickname }}"</small>{% endif %}</h4>
+  <a href="{{ url_for('admin.edit_bowler', bowler_id=bowler.id) }}" class="btn btn-sm btn-outline-secondary no-print">Edit Bowler</a>
+</div>
 <p>Team {{ roster.team.number }} — {{ roster.team.name }} &nbsp;|&nbsp; Prior Hcp: {{ roster.prior_handicap or 0 }}</p>
 
 <div class="row mb-3">

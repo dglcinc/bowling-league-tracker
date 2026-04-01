@@ -32,26 +32,30 @@
     </button>
     <div class="collapse navbar-collapse" id="navMenu">
       <ul class="navbar-nav me-auto">
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Reports</a>
-          <ul class="dropdown-menu">
-              {% if active_season %}
-            <li><a class="dropdown-item" href="{{ url_for('reports.wkly_alpha', season_id=active_season.id, week_num=current_week) }}">Wkly Alpha (Print)</a></li>
-            <li><a class="dropdown-item" href="{{ url_for('reports.standings', season_id=active_season.id) }}">Standings</a></li>
-            <li><a class="dropdown-item" href="{{ url_for('reports.high_games', season_id=active_season.id) }}">High Games / Averages</a></li>
-            {% endif %}
-          </ul>
-        </li>
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('entry.index') }}">Score Entry</a>
         </li>
+        {% if active_season %}
         <li class="nav-item">
-          {% if active_season %}
-          <a class="nav-link" href="{{ url_for('payout.payout_overview', season_id=active_season.id) }}">Payouts</a>
-          {% endif %}
+          <a class="nav-link" href="{{ url_for('reports.wkly_alpha', season_id=active_season.id, week_num=current_week) }}">Wkly Alpha</a>
         </li>
         <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('reports.standings', season_id=active_season.id) }}">Standings</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('reports.high_games', season_id=active_season.id) }}">High Games</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('payout.payout_overview', season_id=active_season.id) }}">Payouts</a>
+        </li>
+        {% endif %}
+        <li class="nav-item">
           <a class="nav-link" href="{{ url_for('admin.seasons') }}">Admin</a>
+        </li>
+      </ul>
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <button onclick="window.print()" class="btn btn-sm btn-outline-light my-1">Print</button>
         </li>
       </ul>
     </div>

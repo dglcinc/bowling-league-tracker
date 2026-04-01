@@ -64,8 +64,10 @@
       <td>
         <a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler_id) }}"
            class="btn btn-sm btn-outline-info">Stats</a>
+        <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id) }}"
+           class="btn btn-sm btn-outline-secondary">Edit Bowler</a>
         <a href="{{ url_for('admin.edit_roster', season_id=season.id, roster_id=r.id) }}"
-           class="btn btn-xs btn-outline-secondary btn-sm">Edit</a>
+           class="btn btn-sm btn-outline-secondary">Edit Roster</a>
         <form method="post"
               action="{{ url_for('admin.toggle_active', season_id=season.id, roster_id=r.id) }}"
               class="d-inline">

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Edit Bowler — {{ bowler.display_name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.seasons') }}">Admin</a></li>
+    <li class="breadcrumb-item active">Edit Bowler</li>
+  </ol>
+</nav>
+
+<h4>Edit Bowler</h4>
+
+<form method="post" style="max-width:480px">
+  {% if roster_entries %}
+  <input type="hidden" name="season_id" value="{{ roster_entries[0].season_id }}">
+  {% endif %}
+
+  <div class="mb-3">
+    <label class="form-label fw-bold">Last Name</label>
+    <input type="text" class="form-control" name="last_name"
+           value="{{ bowler.last_name }}" required>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label fw-bold">First Name</label>
+    <input type="text" class="form-control" name="first_name"
+           value="{{ bowler.first_name or '' }}">
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label fw-bold">Bowling Name <span class="text-muted fw-normal">(nickname shown on score sheets)</span></label>
+    <input type="text" class="form-control" name="nickname"
+           value="{{ bowler.nickname or '' }}">
+    <div class="form-text">Used instead of last name when "Show nickname" is enabled in League Settings.</div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label fw-bold">Email</label>
+    <input type="email" class="form-control" name="email"
+           value="{{ bowler.email or '' }}">
+  </div>
+
+  <button type="submit" class="btn btn-primary">Save</button>
+  {% if roster_entries %}
+  <a href="{{ url_for('reports.bowler_detail', season_id=roster_entries[0].season_id, bowler_id=bowler.id) }}"
+     class="btn btn-outline-secondary ms-2">Cancel</a>
+  {% else %}
+  <a href="{{ url_for('admin.seasons') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+  {% endif %}
+</form>
+
+{% if roster_entries %}
+<div class="mt-4">
+  <h6 class="text-muted">Season History</h6>
+  <ul class="list-unstyled">
+    {% for r in roster_entries %}
+    <li>{{ r.season.name }} — Team {{ r.team.number }} {{ r.team.name }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}
