@@ -197,6 +197,7 @@ def league_settings():
         if league_name:
             settings.league_name = league_name
         settings.use_nickname = (request.form.get('use_nickname') == 'on')
+        settings.show_captain_name = (request.form.get('show_captain_name') == 'on')
         if active_season:
             try:
                 active_season.handicap_base = int(request.form.get('handicap_base', active_season.handicap_base))

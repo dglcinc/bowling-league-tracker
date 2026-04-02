@@ -357,6 +357,68 @@ def get_matchup_breakdown(season_id, week_num, matchup_num):
     }
 
 
+def get_position_night_breakdown(season_id, week_num, pairing_num):
+    """
+    Position night summary breakdown for display. pairing_num 1 = matchups 1&2, 2 = matchups 3&4.
+    Returns same structure as get_matchup_breakdown, or None if no entries.
+    """
+    matchup_nums = [1, 2] if pairing_num == 1 else [3, 4]
+    scheds = (ScheduleEntry.query
+              .filter_by(season_id=season_id, week_num=week_num)
+              .filter(ScheduleEntry.matchup_num.in_(matchup_nums))
+              .order_by(ScheduleEntry.matchup_num)
+              .all())
+    if not scheds:
+        return None
+    entry_count = (MatchupEntry.query
+                   .filter_by(season_id=season_id, week_num=week_num)
+                   .filter(MatchupEntry.matchup_num.in_(matchup_nums))
+                   .count())
+    if not entry_count:
+        return None
+
+    season = Season.query.get(season_id)
+    team1 = scheds[0].team1
+    team2 = scheds[0].team2
+    t1_id, t2_id = team1.id, team2.id
+    agg_t1 = [0, 0, 0]
+    agg_t2 = [0, 0, 0]
+
+    for sched in scheds:
+        mnum = sched.matchup_num
+        for team_id, agg in [(t1_id, agg_t1), (t2_id, agg_t2)]:
+            entries = MatchupEntry.query.filter_by(
+                season_id=season_id, week_num=week_num, matchup_num=mnum, team_id=team_id
+            ).all()
+            for entry in entries:
+                if entry.is_blind:
+                    hcp = season.blind_handicap
+                    games = [season.blind_scratch] * (entry.game_count or 3)
+                else:
+                    hcp = calculate_handicap(entry.bowler_id, season_id, week_num)
+                    games = entry.games_night1 or []
+                for i, score in enumerate(games[:3]):
+                    agg[i] += score + hcp
+
+    def winner(a, b):
+        if a > b: return t1_id
+        if b > a: return t2_id
+        return None
+
+    games = [
+        {'label': f'G{i+1}', 't1': agg_t1[i], 't2': agg_t2[i],
+         'winner': winner(agg_t1[i], agg_t2[i])}
+        for i in range(3)
+    ]
+    t1_ser, t2_ser = sum(agg_t1), sum(agg_t2)
+    return {
+        'team1': team1, 'team2': team2,
+        'games': games,
+        'series': {'t1': t1_ser, 't2': t2_ser, 'winner': winner(t1_ser, t2_ser)},
+        'pts': {},
+    }
+
+
 def score_position_night(season_id, week_num):
     """
     Position night: aggregate all matchup sheets for each team pairing.

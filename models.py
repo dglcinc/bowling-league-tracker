@@ -43,6 +43,7 @@ class LeagueSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     league_name = db.Column(db.String(128), default='Mountain Lakes Men\'s Bowling League')
     use_nickname = db.Column(db.Boolean, default=False)
+    show_captain_name = db.Column(db.Boolean, default=False)
 
 
 class Season(db.Model):

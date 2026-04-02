@@ -30,6 +30,17 @@
     <div class="form-text">When checked, bowlers with a nickname set will show it in place of their last name on score sheets and reports.</div>
   </div>
 
+  <div class="mb-3">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" name="show_captain_name" id="show_captain_name"
+             {{ 'checked' if settings.show_captain_name else '' }}>
+      <label class="form-check-label" for="show_captain_name">
+        Display captain name next to team number throughout the app
+      </label>
+    </div>
+    <div class="form-text">When checked, shows the captain name (if set) in parentheses wherever a team number appears. Set captain names via Admin → Season → team buttons.</div>
+  </div>
+
   {% if active_season %}
   <hr>
   <h6 class="mb-3">Handicap &amp; Blind Settings — {{ active_season.name }}</h6>

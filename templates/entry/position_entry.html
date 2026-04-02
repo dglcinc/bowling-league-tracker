@@ -60,7 +60,7 @@
               </tr>
             </thead>
             <tbody id="m{{ mnum }}-t{{ team.number }}-body">
-              {% for i in range([ex_entries|length + 4, 8]|min) %}
+              {% for i in range([ex_entries|length, 4]|max) %}
               {% set entry = ex_entries[i] if i < ex_entries|length else none %}
               <tr class="{{ 'blind-row' if entry and entry.is_blind else '' }}">
                 <td>
@@ -74,7 +74,7 @@
                     <option value="{{ r.roster.bowler_id }}"
                             data-hcp="{{ r.handicap }}"
                             {% if entry and not entry.is_blind and entry.bowler_id == r.roster.bowler_id %}selected{% endif %}>
-                      {{ r.roster.bowler.last_name }}{% if r.roster.bowler.first_name %}, {{ r.roster.bowler.first_name }}{% endif %}
+                      {{ r.roster.bowler.short_name(league_settings.use_nickname if league_settings else false) }}{% if r.roster.bowler.first_name %}, {{ r.roster.bowler.first_name }}{% endif %}
                     </option>
                     {% endif %}
                     {% endfor %}

@@ -88,7 +88,7 @@ function printGroup(n) {
     <h4 class="mb-0">Print Batch — Week {{ week_num }}</h4>
     <small class="text-muted">
       Group 1: 4 × Wkly Alpha &nbsp;|&nbsp;
-      Group 2: Wkly Alpha + YTD Alpha + High Avg + High Games
+      Group 2: Wkly Alpha + YTD Alpha + High Games
     </small>
   </div>
   <div class="d-flex gap-2 align-items-center flex-wrap">
@@ -104,20 +104,20 @@ function printGroup(n) {
       Print Group 1 (4× Alpha)
     </button>
     <button onclick="printGroup(2)" class="btn btn-sm btn-outline-primary">
-      Print Group 2 (Alpha + YTD + High Avg + HG)
+      Print Group 2 (Alpha + YTD + HG)
     </button>
     <button onclick="window.print()" class="btn btn-sm btn-secondary">
-      Print All (8 pages)
+      Print All (7 pages)
     </button>
     <div class="vr"></div>
     <a href="{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=week_num) }}" target="_blank"
        class="btn btn-sm btn-outline-secondary">Wkly Alpha</a>
     <a href="{{ url_for('reports.ytd_alpha', season_id=season.id, week_num=week_num) }}" target="_blank"
        class="btn btn-sm btn-outline-secondary">YTD Alpha</a>
-    <a href="{{ url_for('reports.wkly_high_avg', season_id=season.id, week_num=week_num) }}" target="_blank"
-       class="btn btn-sm btn-outline-secondary">High Avg</a>
     <a href="{{ url_for('reports.high_games', season_id=season.id) }}" target="_blank"
        class="btn btn-sm btn-outline-secondary">High Games</a>
+    <a href="{{ url_for('reports.week_prizes', season_id=season.id, week_num=week_num) }}" target="_blank"
+       class="btn btn-sm btn-outline-secondary">Prizes &amp; Standings</a>
   </div>
 </div>
 
@@ -138,7 +138,7 @@ function printGroup(n) {
 </div>
 
 <div class="batch-section" data-group="2">
-  <div class="batch-label no-print">Group 2 — YTD Alpha (sorted by average)</div>
+  <div class="batch-label no-print">Group 2 — YTD Alpha (sorted by last name)</div>
   <div class="text-center mb-1" style="font-size:0.9rem">
     <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp;
     {{ season.name }} &nbsp;|&nbsp;
@@ -175,11 +175,6 @@ function printGroup(n) {
       {% endfor %}
     </tbody>
   </table>
-</div>
-
-<div class="batch-section" data-group="2">
-  <div class="batch-label no-print">Group 2 — Weekly High Avg (sorted by average)</div>
-  {{ alpha_table(high_avg_rows, 'High Avg') }}
 </div>
 
 <div class="batch-section" data-group="2">

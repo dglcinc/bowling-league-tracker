@@ -6,7 +6,7 @@ from flask import Blueprint, render_template, request, redirect, url_for
 from models import Season, Week, Roster, Bowler, Team, MatchupEntry, TeamPoints
 from calculations import (get_wkly_alpha, get_team_standings, get_bowler_stats,
                            get_iron_man_status, get_most_improved, get_weekly_prizes,
-                           calculate_handicap, get_weekly_team_points)
+                           calculate_handicap, get_weekly_team_points, get_matchup_breakdown)
 from models import MatchupEntry
 
 reports_bp = Blueprint('reports', __name__)
@@ -22,21 +22,6 @@ def wkly_alpha(season_id, week_num):
                            season=season, week=week, week_num=week_num,
                            rows=rows, weeks=weeks)
 
-
-@reports_bp.route('/season/<int:season_id>/standings')
-def standings(season_id):
-    season = Season.query.get_or_404(season_id)
-    overall = get_team_standings(season_id)
-    first_half = get_team_standings(season_id, half=1)
-    second_half = get_team_standings(season_id, half=2)
-    weeks_data, teams = get_weekly_team_points(season_id)
-    return render_template('reports/standings.html',
-                           season=season,
-                           overall=overall,
-                           first_half=first_half,
-                           second_half=second_half,
-                           weeks_data=weeks_data,
-                           teams=teams)
 
 
 @reports_bp.route('/season/<int:season_id>/bowler/<int:bowler_id>')
@@ -124,6 +109,8 @@ def week_prizes(season_id, week_num):
     blind_games  = sum(e.game_count for e in all_entries if e.is_blind)
 
     # YTD high game/series leaders through this week
+    min_games = request.args.get('min_games', 9, type=int)
+    top10 = request.args.get('top10', 0, type=int)
     roster_entries = (Roster.query
                       .filter_by(season_id=season_id, active=True)
                       .join(Bowler).order_by(Bowler.last_name).all())
@@ -134,20 +121,42 @@ def week_prizes(season_id, week_num):
             continue
         leaders.append({
             'bowler': r.bowler, 'team': r.team,
-            'average':           stats['running_avg'],
-            'high_game_scratch': stats['ytd_high_game_scratch'],
-            'high_game_hcp':     stats['ytd_high_game_hcp'],
+            'average':             stats['running_avg'],
+            'games':               stats['cumulative_games'],
+            'handicap':            stats['display_handicap'],
+            'high_game_scratch':   stats['ytd_high_game_scratch'],
+            'high_game_hcp':       stats['ytd_high_game_hcp'],
             'high_series_scratch': stats['ytd_high_series_scratch'],
-            'high_series_hcp':   stats['ytd_high_series_hcp'],
+            'high_series_hcp':     stats['ytd_high_series_hcp'],
         })
 
-    standings = get_team_standings(season_id, through_week=week_num)
+    # Averages table: filter by min_games, sort by avg desc
+    avg_rows = sorted(
+        [l for l in leaders if l['games'] >= min_games],
+        key=lambda x: (-x['average'], x['bowler'].last_name)
+    )
+    if top10:
+        avg_rows = avg_rows[:10]
+
+    week_standings = get_team_standings(season_id, through_week=week_num)
+    overall = get_team_standings(season_id)
+    first_half = get_team_standings(season_id, half=1)
+    second_half = get_team_standings(season_id, half=2)
+    weeks_data, standing_teams = get_weekly_team_points(season_id)
 
     return render_template('reports/week_prizes.html',
                            season=season, week=week,
                            prizes=prizes,
                            leaders=leaders,
-                           standings=standings,
+                           standings=week_standings,
+                           overall=overall,
+                           first_half=first_half,
+                           second_half=second_half,
+                           weeks_data=weeks_data,
+                           standing_teams=standing_teams,
+                           avg_rows=avg_rows,
+                           min_games=min_games,
+                           top10=top10,
                            total_wood=total_wood,
                            player_count=player_count,
                            blind_games=blind_games)
@@ -158,23 +167,12 @@ def ytd_alpha(season_id, week_num):
     season = Season.query.get_or_404(season_id)
     week = Week.query.filter_by(season_id=season_id, week_num=week_num).first()
     rows = get_wkly_alpha(season_id, week_num)
-    rows = sorted(rows, key=lambda r: (-r['average'], r['bowler'].last_name))
+    rows = sorted(rows, key=lambda r: r['bowler'].last_name)
     weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
     return render_template('reports/ytd_alpha.html',
                            season=season, week=week, week_num=week_num,
                            rows=rows, weeks=weeks)
 
-
-@reports_bp.route('/season/<int:season_id>/high-avg/<int:week_num>')
-def wkly_high_avg(season_id, week_num):
-    season = Season.query.get_or_404(season_id)
-    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first()
-    rows = get_wkly_alpha(season_id, week_num)
-    rows = sorted(rows, key=lambda r: (-r['average'], r['bowler'].last_name))
-    weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
-    return render_template('reports/wkly_high_avg.html',
-                           season=season, week=week, week_num=week_num,
-                           rows=rows, weeks=weeks)
 
 
 @reports_bp.route('/season/<int:season_id>/print-batch/<int:week_num>')
@@ -184,8 +182,7 @@ def print_batch(season_id, week_num):
     weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
 
     alpha_rows = get_wkly_alpha(season_id, week_num)
-    high_avg_rows = sorted(alpha_rows, key=lambda r: (-r['average'], r['bowler'].last_name))
-    ytd_rows = high_avg_rows  # same data, same sort; different columns in template
+    ytd_rows = sorted(alpha_rows, key=lambda r: r['bowler'].last_name)
 
     # High games data
     last_entered = (Week.query
@@ -203,7 +200,6 @@ def print_batch(season_id, week_num):
     return render_template('reports/print_batch.html',
                            season=season, week=week, week_num=week_num, weeks=weeks,
                            alpha_rows=alpha_rows,
-                           high_avg_rows=high_avg_rows,
                            ytd_rows=ytd_rows,
                            by_avg=by_avg, by_hgs=by_hgs, by_hgh=by_hgh,
                            by_hss=by_hss, by_hsh=by_hsh,

@@ -12,6 +12,10 @@
     .navbar   { display: none !important; }
     .container-fluid { padding: 0 !important; }
     thead.table-dark { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .use-hcp-cell { background-color: #c3e6cb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  @media screen {
+    .use-hcp-cell { background-color: #c3e6cb; }
   }
   /* On screen: cap table width so it stays readable */
   @media screen {
@@ -55,7 +59,7 @@
       <th class="text-end">2nd</th>
       <th class="text-end">G</th>
       <th class="text-end">Ave</th>
-      <th class="text-end">Use<br>Hcp</th>
+      <th class="text-end use-hcp-cell">Use<br>Hcp</th>
       <th class="text-end">Cur<br>Hcp</th>
       <th class="text-end">HG<br>Scr</th>
       <th class="text-end">HG<br>Hcp</th>
@@ -75,7 +79,7 @@
       <td class="text-end">{{ row.second_half_pins or '' }}</td>
       <td class="text-end">{{ row.games or '' }}</td>
       <td class="text-end">{{ row.average or '' }}</td>
-      <td class="text-end fw-bold">{{ row.display_handicap or '' }}</td>
+      <td class="text-end fw-bold use-hcp-cell">{{ row.display_handicap or '' }}</td>
       <td class="text-end">{{ row.current_handicap or '' }}</td>
       <td class="text-end">{{ row.high_game_scratch or '' }}</td>
       <td class="text-end">{{ row.high_game_hcp or '' }}</td>
