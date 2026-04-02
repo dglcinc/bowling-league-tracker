@@ -186,6 +186,11 @@ def league_settings():
 @admin_bp.route('/bowlers/<int:bowler_id>/edit', methods=['GET', 'POST'])
 def edit_bowler(bowler_id):
     bowler = Bowler.query.get_or_404(bowler_id)
+    season_id = request.args.get('season_id', type=int) or request.form.get('season_id', type=int)
+    season = Season.query.get(season_id) if season_id else None
+    roster = Roster.query.filter_by(bowler_id=bowler_id, season_id=season_id).first() if season_id else None
+    teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all() if season_id else []
+
     if request.method == 'POST':
         last_name = request.form.get('last_name', '').strip()
         if last_name:
@@ -193,20 +198,18 @@ def edit_bowler(bowler_id):
         bowler.first_name = request.form.get('first_name', '').strip() or None
         bowler.nickname = request.form.get('nickname', '').strip() or None
         bowler.email = request.form.get('email', '').strip() or None
+        if roster:
+            roster.team_id = int(request.form['team_id'])
+            roster.prior_handicap = int(request.form.get('prior_handicap') or 0)
+            roster.joined_week = int(request.form.get('joined_week') or 1)
         db.session.commit()
         flash('Bowler updated.', 'success')
-        season_id = request.form.get('season_id')
         if season_id:
-            return redirect(url_for('reports.bowler_detail',
-                                    season_id=int(season_id), bowler_id=bowler.id))
-        return redirect(url_for('admin.edit_bowler', bowler_id=bowler_id))
-    roster_entries = (Roster.query
-                      .filter_by(bowler_id=bowler_id)
-                      .join(Season, Roster.season_id == Season.id)
-                      .order_by(Season.name.desc())
-                      .all())
+            return redirect(url_for('admin.season_detail', season_id=season_id))
+        return redirect(url_for('admin.seasons'))
+
     return render_template('admin/edit_bowler.html', bowler=bowler,
-                           roster_entries=roster_entries)
+                           season=season, roster=roster, teams=teams)
 
 
 @admin_bp.route('/seasons/<int:season_id>/roster/<int:roster_id>/toggle', methods=['POST'])

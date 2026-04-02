@@ -1,63 +1,83 @@
 {% extends "base.html" %}
-{% block title %}Edit Bowler — {{ bowler.display_name }}{% endblock %}
+{% block title %}Edit — {{ bowler.display_name }}{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb">
+<nav aria-label="breadcrumb" class="no-print">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="{{ url_for('admin.seasons') }}">Admin</a></li>
+    {% if season %}
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.season_detail', season_id=season.id) }}">{{ season.name }}</a></li>
+    {% endif %}
     <li class="breadcrumb-item active">Edit Bowler</li>
   </ol>
 </nav>
 
-<h4>Edit Bowler</h4>
+<h4>Edit: {{ bowler.display_name }}</h4>
 
 <form method="post" style="max-width:480px">
-  {% if roster_entries %}
-  <input type="hidden" name="season_id" value="{{ roster_entries[0].season_id }}">
+  {% if season %}
+  <input type="hidden" name="season_id" value="{{ season.id }}">
   {% endif %}
+
+  <h6 class="text-muted mt-2 mb-2">Bowler Info</h6>
 
   <div class="mb-3">
     <label class="form-label fw-bold">Last Name</label>
     <input type="text" class="form-control" name="last_name"
            value="{{ bowler.last_name }}" required>
   </div>
-
   <div class="mb-3">
     <label class="form-label fw-bold">First Name</label>
     <input type="text" class="form-control" name="first_name"
            value="{{ bowler.first_name or '' }}">
   </div>
-
   <div class="mb-3">
-    <label class="form-label fw-bold">Bowling Name <span class="text-muted fw-normal">(nickname shown on score sheets)</span></label>
+    <label class="form-label fw-bold">Bowling Name <span class="text-muted fw-normal">(nickname)</span></label>
     <input type="text" class="form-control" name="nickname"
            value="{{ bowler.nickname or '' }}">
-    <div class="form-text">Used instead of last name when "Show nickname" is enabled in League Settings.</div>
+    <div class="form-text">Shown instead of last name when "Show nickname" is enabled in League Settings.</div>
   </div>
-
   <div class="mb-3">
     <label class="form-label fw-bold">Email</label>
     <input type="email" class="form-control" name="email"
            value="{{ bowler.email or '' }}">
   </div>
 
-  <button type="submit" class="btn btn-primary">Save</button>
-  {% if roster_entries %}
-  <a href="{{ url_for('reports.bowler_detail', season_id=roster_entries[0].season_id, bowler_id=bowler.id) }}"
-     class="btn btn-outline-secondary ms-2">Cancel</a>
-  {% else %}
-  <a href="{{ url_for('admin.seasons') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
-  {% endif %}
-</form>
+  {% if roster and teams %}
+  <hr>
+  <h6 class="text-muted mb-2">{{ season.name }} Roster</h6>
 
-{% if roster_entries %}
-<div class="mt-4">
-  <h6 class="text-muted">Season History</h6>
-  <ul class="list-unstyled">
-    {% for r in roster_entries %}
-    <li>{{ r.season.name }} — Team {{ r.team.number }} {{ r.team.name }}</li>
-    {% endfor %}
-  </ul>
-</div>
-{% endif %}
+  <div class="mb-3">
+    <label class="form-label fw-bold">Team</label>
+    <select name="team_id" class="form-select" required>
+      {% for team in teams %}
+      <option value="{{ team.id }}" {{ 'selected' if roster.team_id == team.id else '' }}>
+        Team {{ team.number }} — {{ team.name }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="mb-3">
+    <label class="form-label fw-bold">Prior Year Handicap</label>
+    <input type="number" name="prior_handicap" class="form-control" min="0" max="200"
+           value="{{ roster.prior_handicap or 0 }}">
+    <div class="form-text">Leave 0 for new bowlers with no prior average.</div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label fw-bold">Joined Week</label>
+    <input type="number" name="joined_week" class="form-control" min="1" max="27"
+           value="{{ roster.joined_week or 1 }}">
+  </div>
+  {% endif %}
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Save</button>
+    {% if season %}
+    <a href="{{ url_for('admin.season_detail', season_id=season.id) }}"
+       class="btn btn-outline-secondary">Back to Roster</a>
+    {% else %}
+    <a href="{{ url_for('admin.seasons') }}" class="btn btn-outline-secondary">Back</a>
+    {% endif %}
+  </div>
+</form>
 {% endblock %}

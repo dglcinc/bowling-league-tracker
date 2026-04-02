@@ -41,7 +41,7 @@
   <div class="row g-2">
     {% for team in teams %}
     {% set ex_entries = existing.get((mnum, team.id), []) %}
-    <div class="col-12 col-xl-6">
+    <div class="col-6">
       <div class="card">
         <div class="card-header fw-bold py-1">
           Team {{ team.number }} — {{ team.name }}
