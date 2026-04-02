@@ -113,13 +113,21 @@ def week_prizes(season_id, week_num):
         top10_hcps = set(sorted({r['handicap'] for r in avg_rows})[:10])
         avg_rows = [r for r in avg_rows if r['handicap'] in top10_hcps]
 
-    week_standings = get_team_standings(season_id, through_week=week_num)
+    full_year = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s.team.number)
+    first_half_s = sorted(get_team_standings(season_id, half=1), key=lambda s: s.team.number)
+    second_half_s = sorted(get_team_standings(season_id, half=2), key=lambda s: s.team.number)
+    fh_max = max((s.points for s in first_half_s), default=0)
+    sh_max = max((s.points for s in second_half_s), default=0)
+    fy_max = max((s.points for s in full_year), default=0)
 
     return render_template('reports/week_prizes.html',
                            season=season, week=week,
                            prizes=prizes,
                            leaders=leaders,
-                           standings=week_standings,
+                           standings=full_year,
+                           first_half_s=first_half_s,
+                           second_half_s=second_half_s,
+                           fh_max=fh_max, sh_max=sh_max, fy_max=fy_max,
                            avg_rows=avg_rows,
                            min_games=min_games,
                            top10=top10,
@@ -192,7 +200,12 @@ def print_batch(season_id, week_num):
     )
     player_count = sum(1 for e in all_entries if not e.is_blind)
     blind_games = sum(e.game_count for e in all_entries if e.is_blind)
-    week_standings = get_team_standings(season_id, through_week=week_num)
+    pb_full_year   = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s.team.number)
+    pb_first_half  = sorted(get_team_standings(season_id, half=1), key=lambda s: s.team.number)
+    pb_second_half = sorted(get_team_standings(season_id, half=2), key=lambda s: s.team.number)
+    pb_fh_max = max((s.points for s in pb_first_half),  default=0)
+    pb_sh_max = max((s.points for s in pb_second_half), default=0)
+    pb_fy_max = max((s.points for s in pb_full_year),   default=0)
 
     return render_template('reports/print_batch.html',
                            season=season, week=week, week_num=week_num, weeks=weeks,
@@ -203,7 +216,10 @@ def print_batch(season_id, week_num):
                            hg_through=hg_through,
                            prizes=prizes,
                            pb_leaders=hg_leaders,
-                           week_standings=week_standings,
+                           week_standings=pb_full_year,
+                           pb_first_half=pb_first_half,
+                           pb_second_half=pb_second_half,
+                           pb_fh_max=pb_fh_max, pb_sh_max=pb_sh_max, pb_fy_max=pb_fy_max,
                            total_wood=total_wood,
                            player_count=player_count,
                            blind_games=blind_games)

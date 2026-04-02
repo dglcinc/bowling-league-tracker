@@ -168,16 +168,25 @@ function printGroup(n) {
     </div>
 
     {# Middle: team standings #}
-    <div class="col-3">
+    <div class="col-4">
       <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px">Standings — Week {{ week_num }}</div>
       <table class="table table-sm table-bordered mb-0">
-        <thead><tr><th>#</th><th>Team</th><th class="text-end">Pts</th></tr></thead>
+        <thead><tr>
+          <th>Team</th>
+          <th class="text-end">1st<br>Half</th>
+          <th class="text-end">2nd<br>Half</th>
+          <th class="text-end">Full<br>Year</th>
+        </tr></thead>
         <tbody>
-        {% for i, s in enumerate(week_standings) %}
+        {% for i in range(week_standings | length) %}
+        {% set s1 = pb_first_half[i] %}
+        {% set s2 = pb_second_half[i] %}
+        {% set sy = week_standings[i] %}
         <tr>
-          <td>{{ i + 1 }}</td>
-          <td>{{ s.team.number }} — {{ s.team.name }}</td>
-          <td class="text-end fw-bold">{{ s.points }}</td>
+          <td>{{ sy.team.number }} — {{ sy.team.name }}</td>
+          <td class="text-end fw-bold"{% if s1.points == pb_fh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s1.points }}</td>
+          <td class="text-end fw-bold"{% if s2.points == pb_sh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s2.points }}</td>
+          <td class="text-end fw-bold"{% if sy.points == pb_fy_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ sy.points }}</td>
         </tr>
         {% endfor %}
         </tbody>
@@ -185,7 +194,7 @@ function printGroup(n) {
     </div>
 
     {# Right: YTD leaders #}
-    <div class="col-4">
+    <div class="col-3">
       <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px">YTD Leaders — Through Week {{ week_num }}</div>
       {% set ytd_cats = [
         ('high_game_hcp',      'YTD High Game — Handicap'),

@@ -85,28 +85,33 @@
   </div>
 
   {# Middle: team standings #}
-  <div class="col-12 col-xl-3">
+  <div class="col-12 col-xl-4">
     <div class="section-head">Team Standings — Week {{ week.week_num }}</div>
     <table class="table table-sm table-bordered mb-0">
-      <thead><tr><th>#</th><th>Team</th><th class="text-end">Pts</th></tr></thead>
+      <thead><tr>
+        <th>Team</th>
+        <th class="text-end">1st<br>Half</th>
+        <th class="text-end">2nd<br>Half</th>
+        <th class="text-end">Full<br>Year</th>
+      </tr></thead>
       <tbody>
-      {% for i, s in enumerate(standings) %}
-      <tr class="{{ 'table-warning' if i == 0 else '' }}">
-        <td>{{ i + 1 }}</td>
-        <td>{{ s.team.number }} — {{ s.team.name }}</td>
-        <td class="text-end fw-bold">{{ s.points }}</td>
+      {% for i in range(standings | length) %}
+      {% set s1 = first_half_s[i] %}
+      {% set s2 = second_half_s[i] %}
+      {% set sy = standings[i] %}
+      <tr>
+        <td>{{ sy.team.number }} — {{ sy.team.name }}</td>
+        <td class="text-end fw-bold"{% if s1.points == fh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s1.points }}</td>
+        <td class="text-end fw-bold"{% if s2.points == sh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s2.points }}</td>
+        <td class="text-end fw-bold"{% if sy.points == fy_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ sy.points }}</td>
       </tr>
       {% endfor %}
-      <tr class="table-light fw-bold">
-        <td colspan="2">Total</td>
-        <td class="text-end">{{ standings | sum(attribute='points') }}</td>
-      </tr>
       </tbody>
     </table>
   </div>
 
   {# Right: YTD leaders #}
-  <div class="col-12 col-xl-4">
+  <div class="col-12 col-xl-3">
     <div class="section-head">YTD Leaders Through Week {{ week.week_num }}</div>
     <div class="row g-2">
       {% set ytd_cats = [
