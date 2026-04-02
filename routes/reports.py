@@ -110,8 +110,8 @@ def week_prizes(season_id, week_num):
         key=lambda x: (-x['average'], x['bowler'].last_name)
     )
     if top10:
-        top10_avgs = set(sorted({r['average'] for r in avg_rows}, reverse=True)[:10])
-        avg_rows = [r for r in avg_rows if r['average'] in top10_avgs]
+        top10_hcps = set(sorted({r['handicap'] for r in avg_rows})[:10])
+        avg_rows = [r for r in avg_rows if r['handicap'] in top10_hcps]
 
     week_standings = get_team_standings(season_id, through_week=week_num)
 

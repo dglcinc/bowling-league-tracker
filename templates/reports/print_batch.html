@@ -239,7 +239,7 @@ function printGroup(n) {
       <div style="border:1px solid #dee2e6;border-radius:3px;padding:2px 6px;margin-bottom:3px">
         <div style="font-size:0.65rem;text-transform:uppercase;color:#6c757d">{{ label }}</div>
         {% if cat %}
-        <div style="font-weight:700;background-color:#fff3cd;display:inline-block;padding:1px 4px;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact">{% for w in cat.winners %}<a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=w.bowler.id) }}" class="text-decoration-none text-body">{{ w.bowler.last_name }}{% if w.bowler.nickname %} ({{ w.bowler.nickname }}){% endif %}</a>{% if not loop.last %} / {% endif %}{% endfor %}{% if cat.winners|length > 1 %} <span style="font-size:0.7rem;color:#6c757d">(tie)</span>{% endif %}</div>
+        <div style="font-weight:700;background-color:#ffff99;display:inline-block;padding:1px 4px;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact">{% for w in cat.winners %}<a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=w.bowler.id) }}" class="text-decoration-none text-body">{{ w.bowler.last_name }}{% if w.bowler.nickname %} ({{ w.bowler.nickname }}){% endif %}</a>{% if not loop.last %} / {% endif %}{% endfor %}{% if cat.winners|length > 1 %} <span style="font-size:0.7rem;color:#6c757d">(tie)</span>{% endif %}</div>
         <div style="font-weight:700;color:#0d6efd">{{ cat.score }}</div>
         {% else %}<div class="text-muted">—</div>{% endif %}
       </div>
@@ -290,7 +290,7 @@ function printGroup(n) {
         <div style="border:1px solid #dee2e6;border-radius:3px;padding:2px 6px">
           <div style="font-size:0.65rem;text-transform:uppercase;color:#6c757d">{{ label }}</div>
           {% if top %}
-          <div style="font-weight:700;background-color:#fff3cd;display:inline-block;padding:1px 4px;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact"><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=top.bowler.id) }}" class="text-decoration-none text-body">{{ top.bowler.last_name }}{% if top.bowler.nickname %} ({{ top.bowler.nickname }}){% endif %}</a></div>
+          <div style="font-weight:700;background-color:#ffff99;display:inline-block;padding:1px 4px;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact"><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=top.bowler.id) }}" class="text-decoration-none text-body">{{ top.bowler.last_name }}{% if top.bowler.nickname %} ({{ top.bowler.nickname }}){% endif %}</a></div>
           <div style="font-weight:700;color:#0d6efd">{{ top[attr] }}</div>
           {% else %}<div class="text-muted">—</div>{% endif %}
         </div>
