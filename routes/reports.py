@@ -110,9 +110,8 @@ def week_prizes(season_id, week_num):
         key=lambda x: (-x['average'], x['bowler'].last_name)
     )
     if top10:
-        top10_avgs = sorted({r['average'] for r in avg_rows}, reverse=True)[:10]
-        cutoff = top10_avgs[-1] if top10_avgs else None
-        avg_rows = [r for r in avg_rows if cutoff is None or r['average'] >= cutoff]
+        top10_avgs = set(sorted({r['average'] for r in avg_rows}, reverse=True)[:10])
+        avg_rows = [r for r in avg_rows if r['average'] in top10_avgs]
 
     week_standings = get_team_standings(season_id, through_week=week_num)
 
@@ -180,10 +179,31 @@ def print_batch(season_id, week_num):
     by_hss  = sorted(hg_leaders, key=lambda x: x['high_series_scratch'], reverse=True)
     by_hsh  = sorted(hg_leaders, key=lambda x: x['high_series_hcp'], reverse=True)
 
+    # Prizes & Standings data for Group 2 page 4
+    prizes = get_weekly_prizes(season_id, week_num)
+    all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+    total_wood = sum(
+        e.total_pins + (
+            (season.blind_handicap if e.is_blind
+             else calculate_handicap(e.bowler_id, season_id, week_num))
+            * e.game_count
+        )
+        for e in all_entries
+    )
+    player_count = sum(1 for e in all_entries if not e.is_blind)
+    blind_games = sum(e.game_count for e in all_entries if e.is_blind)
+    week_standings = get_team_standings(season_id, through_week=week_num)
+
     return render_template('reports/print_batch.html',
                            season=season, week=week, week_num=week_num, weeks=weeks,
                            alpha_rows=alpha_rows,
                            ytd_rows=ytd_rows,
                            by_avg=by_avg, by_hgs=by_hgs, by_hgh=by_hgh,
                            by_hss=by_hss, by_hsh=by_hsh,
-                           hg_through=hg_through)
+                           hg_through=hg_through,
+                           prizes=prizes,
+                           pb_leaders=hg_leaders,
+                           week_standings=week_standings,
+                           total_wood=total_wood,
+                           player_count=player_count,
+                           blind_games=blind_games)

@@ -104,10 +104,10 @@ function printGroup(n) {
       Print Group 1 (4× Alpha)
     </button>
     <button onclick="printGroup(2)" class="btn btn-sm btn-outline-primary">
-      Print Group 2 (Alpha + YTD + HG)
+      Print Group 2 (Alpha + YTD + HG + Prizes)
     </button>
     <button onclick="window.print()" class="btn btn-sm btn-secondary">
-      Print All (7 pages)
+      Print All (8 pages)
     </button>
     <div class="vr"></div>
     <a href="{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=week_num) }}" target="_blank"
@@ -217,6 +217,86 @@ function printGroup(n) {
         <tbody>{% for i, r in enumerate(by_hsh[:10]) %}<tr><td>{{ i+1 }}</td><td>{{ r.bowler.last_name }}</td><td class="text-end">{{ r.high_series_hcp }}</td></tr>{% endfor %}</tbody>
       </table>
     </div>
+  </div>
+</div>
+
+<div class="batch-section" data-group="2">
+  <div class="batch-label no-print">Group 2 — Prizes &amp; Standings</div>
+  <div class="text-center mb-1" style="font-size:0.9rem">
+    <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp;
+    {{ season.name }} &nbsp;|&nbsp;
+    Week {{ week_num }}{% if week and week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
+    {% if week and week.is_position_night %}&nbsp;&#9733; Position Night{% endif %}
+  </div>
+  <div class="row g-2">
+
+    {# Left: weekly prize boxes #}
+    <div class="col-5">
+      <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px">Week {{ week_num }} Prizes</div>
+      {% macro pb_prize(cat, label) %}
+      <div style="border:1px solid #dee2e6;border-radius:3px;padding:2px 6px;margin-bottom:3px">
+        <div style="font-size:0.65rem;text-transform:uppercase;color:#6c757d">{{ label }}</div>
+        {% if cat %}
+        <div style="font-weight:700">{% for w in cat.winners %}{{ w.bowler.last_name }}{% if w.bowler.nickname %} ({{ w.bowler.nickname }}){% endif %}{% if not loop.last %} / {% endif %}{% endfor %}{% if cat.winners|length > 1 %} <span style="font-size:0.7rem;color:#6c757d">(tie)</span>{% endif %}</div>
+        <div style="font-weight:700;color:#0d6efd">{{ cat.score }}</div>
+        {% else %}<div class="text-muted">—</div>{% endif %}
+      </div>
+      {% endmacro %}
+      <div class="row g-1">
+        <div class="col-6">{{ pb_prize(prizes.hg_hcp if prizes else none, 'High Game — Handicap') }}</div>
+        <div class="col-6">{{ pb_prize(prizes.hg_scratch if prizes else none, 'High Game — Scratch') }}</div>
+        <div class="col-6">{{ pb_prize(prizes.hs_hcp if prizes else none, 'High Series — Handicap') }}</div>
+        <div class="col-6">{{ pb_prize(prizes.hs_scratch if prizes else none, 'High Series — Scratch') }}</div>
+      </div>
+      <div style="font-size:0.75rem;margin-top:4px">
+        <span class="text-muted">Total Wood:</span> <strong>{{ total_wood }}</strong>
+        &nbsp; <span class="text-muted">Players:</span> <strong>{{ player_count }}</strong>
+        &nbsp; <span class="text-muted">Blind:</span> <strong>{{ blind_games }}</strong>
+      </div>
+    </div>
+
+    {# Middle: team standings #}
+    <div class="col-3">
+      <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px">Standings — Week {{ week_num }}</div>
+      <table class="table table-sm table-bordered mb-0">
+        <thead><tr><th>#</th><th>Team</th><th class="text-end">Pts</th></tr></thead>
+        <tbody>
+        {% for i, s in enumerate(week_standings) %}
+        <tr>
+          <td>{{ i + 1 }}</td>
+          <td>{{ s.team.number }} — {{ s.team.name }}</td>
+          <td class="text-end fw-bold">{{ s.points }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Right: YTD leaders #}
+    <div class="col-4">
+      <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px">YTD Leaders — Through Week {{ week_num }}</div>
+      {% set ytd_cats = [
+        ('high_game_hcp',      'YTD High Game — Handicap'),
+        ('high_game_scratch',  'YTD High Game — Scratch'),
+        ('high_series_hcp',    'YTD High Series — Handicap'),
+        ('high_series_scratch','YTD High Series — Scratch'),
+      ] %}
+      <div class="row g-1">
+      {% for attr, label in ytd_cats %}
+      {% set top = pb_leaders | sort(attribute=attr, reverse=True) | first %}
+      <div class="col-6">
+        <div style="border:1px solid #dee2e6;border-radius:3px;padding:2px 6px">
+          <div style="font-size:0.65rem;text-transform:uppercase;color:#6c757d">{{ label }}</div>
+          {% if top %}
+          <div style="font-weight:700">{{ top.bowler.last_name }}{% if top.bowler.nickname %} ({{ top.bowler.nickname }}){% endif %}</div>
+          <div style="font-weight:700;color:#0d6efd">{{ top[attr] }}</div>
+          {% else %}<div class="text-muted">—</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      </div>
+    </div>
+
   </div>
 </div>
 {% endblock %}

@@ -117,7 +117,7 @@
         <div class="prize-box">
           <div class="prize-label">{{ label }}</div>
           {% if top %}
-          <div class="prize-name">{{ top.bowler.last_name }}</div>
+          <div class="prize-name">{{ top.bowler.last_name }}{% if top.bowler.nickname %} ({{ top.bowler.nickname }}){% endif %}</div>
           <div class="prize-score">{{ top[attr] }}</div>
           {% else %}<div class="text-muted">—</div>{% endif %}
         </div>
