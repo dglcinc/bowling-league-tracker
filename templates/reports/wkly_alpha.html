@@ -67,7 +67,7 @@
   <tbody>
     {% for row in rows %}
     <tr>
-      <td>{{ row.bowler.last_name }}</td>
+      <td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=row.bowler.id) }}" class="text-decoration-none text-body">{{ row.bowler.last_name }}</a></td>
       <td class="no-print text-muted">{{ row.bowler.first_name or '' }}</td>
       <td class="text-muted">{{ row.bowler.nickname or '' }}</td>
       <td>{{ row.team.number }}</td>
@@ -92,9 +92,6 @@
 <div class="no-print mt-2">
   <a href="{{ url_for('reports.ytd_alpha', season_id=season.id, week_num=week_num) }}" class="btn btn-sm btn-outline-primary">YTD Alpha</a>
   <a href="{{ url_for('reports.wkly_high_avg', season_id=season.id, week_num=week_num) }}" class="btn btn-sm btn-outline-primary">High Avg</a>
-  <a href="{{ url_for('reports.standings', season_id=season.id) }}" class="btn btn-sm btn-outline-primary">Standings</a>
-  <a href="{{ url_for('reports.high_games', season_id=season.id) }}" class="btn btn-sm btn-outline-primary">High Games</a>
   <a href="{{ url_for('reports.print_batch', season_id=season.id, week_num=week_num) }}" class="btn btn-sm btn-outline-success">Print Batch</a>
-  <a href="{{ url_for('entry.week_list', season_id=season.id) }}" class="btn btn-sm btn-outline-secondary">Enter Scores</a>
 </div>
 {% endblock %}

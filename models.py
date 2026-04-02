@@ -26,8 +26,23 @@ class Bowler(db.Model):
     def display_name(self):
         return f"{self.last_name}, {self.first_name}" if self.first_name else self.last_name
 
+    def short_name(self, use_nickname=False):
+        """Last name only, or nickname if available and use_nickname is True."""
+        if use_nickname and self.nickname:
+            return self.nickname
+        return self.last_name
+
     def __repr__(self):
         return f'<Bowler {self.last_name}>'
+
+
+class LeagueSettings(db.Model):
+    """Global league-level settings (single row, id=1)."""
+    __tablename__ = 'league_settings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    league_name = db.Column(db.String(128), default='Mountain Lakes Men\'s Bowling League')
+    use_nickname = db.Column(db.Boolean, default=False)
 
 
 class Season(db.Model):

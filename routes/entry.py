@@ -91,6 +91,18 @@ def week_entry(season_id, week_num):
         key=lambda x: x['points'], reverse=True
     )
 
+    # Points per matchup: {matchup_num: {team_id: points}}
+    pts_by_matchup = {}
+    for tp in wk_pts_raw:
+        pts_by_matchup.setdefault(tp.matchup_num, {})[tp.team_id] = tp.points_earned
+
+    # Prev / next week navigation
+    all_week_nums = [w.week_num for w in
+                     Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()]
+    wk_idx = all_week_nums.index(week_num) if week_num in all_week_nums else -1
+    prev_week_num = all_week_nums[wk_idx - 1] if wk_idx > 0 else None
+    next_week_num = all_week_nums[wk_idx + 1] if wk_idx >= 0 and wk_idx < len(all_week_nums) - 1 else None
+
     # Recon summary (only if week is entered)
     recon = None
     if week.is_entered:
@@ -115,6 +127,9 @@ def week_entry(season_id, week_num):
                            matchup_data=matchup_data,
                            recon=recon,
                            weekly_team_pts=weekly_team_pts,
+                           pts_by_matchup=pts_by_matchup,
+                           prev_week_num=prev_week_num,
+                           next_week_num=next_week_num,
                            tournament_labels=_TOURNAMENT_LABELS)
 
 

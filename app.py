@@ -15,6 +15,8 @@ def _migrate_db(db):
     migrations = [
         "ALTER TABLE seasons ADD COLUMN bowling_format VARCHAR(10) DEFAULT 'single'",
         "ALTER TABLE weeks ADD COLUMN tournament_type VARCHAR(32)",
+        "CREATE TABLE IF NOT EXISTS league_settings (id INTEGER PRIMARY KEY, league_name VARCHAR(128) DEFAULT 'Mountain Lakes Men''s Bowling League', use_nickname BOOLEAN DEFAULT 0)",
+        "INSERT OR IGNORE INTO league_settings (id, league_name, use_nickname) VALUES (1, 'Mountain Lakes Men''s Bowling League', 0)",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:
@@ -73,7 +75,7 @@ def create_app():
 
     @app.context_processor
     def inject_globals():
-        from models import Season, Week
+        from models import Season, Week, LeagueSettings
         active = Season.query.filter_by(is_active=True).first()
         current_week = 0
         if active:
@@ -82,7 +84,8 @@ def create_app():
                     .order_by(Week.week_num.desc())
                     .first())
             current_week = last.week_num if last else 0
-        return {'active_season': active, 'current_week': current_week}
+        settings = LeagueSettings.query.get(1)
+        return {'active_season': active, 'current_week': current_week, 'league_settings': settings}
 
     @app.route('/')
     def index():

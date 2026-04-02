@@ -2,12 +2,24 @@
 {% block title %}Week {{ week.week_num }} — Score Entry{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb">
-  <ol class="breadcrumb">
-    <li class="breadcrumb-item"><a href="{{ url_for('entry.week_list', season_id=season.id) }}">Weeks</a></li>
-    <li class="breadcrumb-item active">Week {{ week.week_num }}</li>
-  </ol>
-</nav>
+<div class="d-flex align-items-center gap-2 mb-2 no-print">
+  <nav aria-label="breadcrumb" class="mb-0">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{{ url_for('entry.week_list', season_id=season.id) }}">Weeks</a></li>
+      <li class="breadcrumb-item active">Week {{ week.week_num }}</li>
+    </ol>
+  </nav>
+  <div class="ms-auto d-flex gap-1">
+    {% if prev_week_num %}
+    <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=prev_week_num) }}"
+       class="btn btn-sm btn-outline-secondary">&laquo; Wk {{ prev_week_num }}</a>
+    {% endif %}
+    {% if next_week_num %}
+    <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=next_week_num) }}"
+       class="btn btn-sm btn-outline-secondary">Wk {{ next_week_num }} &raquo;</a>
+    {% endif %}
+  </div>
+</div>
 
 <div class="d-flex align-items-center gap-3 mb-2">
   <h4 class="mb-0">
@@ -117,20 +129,35 @@
 <div class="row">
   {% for sched in matchups %}
   <div class="col-12 col-xl-6 mb-3">
+    {% set entries_for_matchup = matchup_data | selectattr('sched.matchup_num', 'equalto', sched.matchup_num) | list %}
+    {% set entry_count = namespace(n=0) %}
+    {% for md in entries_for_matchup %}{% set entry_count.n = entry_count.n + md.entries|length %}{% endfor %}
     <div class="card">
-      <div class="card-header d-flex justify-content-between">
-        <strong>Matchup {{ sched.matchup_num }}</strong>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <a href="{{ url_for('entry.matchup_entry', season_id=season.id, week_num=week.week_num, matchup_num=sched.matchup_num) }}"
+             class="btn btn-sm btn-primary">
+            {{ 'Edit Scores' if entry_count.n > 0 else 'Enter Scores' }}
+          </a>
+          <strong>Matchup {{ sched.matchup_num }}</strong>
+        </div>
         {% if sched.lane_pair %}<span class="text-muted">Lanes {{ sched.lane_pair }}</span>{% endif %}
       </div>
       <div class="card-body p-2">
-        {% set entries_for_matchup = matchup_data | selectattr('sched.matchup_num', 'equalto', sched.matchup_num) | list %}
-        {% set entry_count = namespace(n=0) %}
-        {% for md in entries_for_matchup %}{% set entry_count.n = entry_count.n + md.entries|length %}{% endfor %}
         {% if entry_count.n > 0 %}
-        <div class="row g-2 mb-2">
+        {% set mpts = pts_by_matchup.get(sched.matchup_num, {}) %}
+        <div class="row g-2">
           {% for md in entries_for_matchup %}
           <div class="col-6">
-            <div class="fw-bold small mb-1">Team {{ md.team.number }} — {{ md.team.name }}</div>
+            <div class="fw-bold small mb-1">
+              Team {{ md.team.number }} — {{ md.team.name }}
+              {% set tpts = mpts.get(md.team.id) %}
+              {% if tpts is not none %}
+              <span class="badge bg-{{ 'success' if tpts > 2 else 'secondary' }} float-end">
+                {{ tpts | int if tpts == tpts | int else tpts }} pts
+              </span>
+              {% endif %}
+            </div>
             <table class="table table-sm table-bordered mb-0" style="font-size:0.8rem">
               <thead><tr>
                 <th>Bowler</th>
@@ -142,7 +169,7 @@
               <tbody>
               {% for e in md.entries %}
               <tr class="{{ 'table-warning' if e.is_blind else '' }}">
-                <td>{% if e.is_blind %}BLIND{% elif e.bowler %}{{ e.bowler.last_name }}{% endif %}</td>
+                <td>{% if e.is_blind %}BLIND{% elif e.bowler %}<a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=e.bowler.id) }}" class="text-decoration-none">{{ e.bowler.last_name }}</a>{% endif %}</td>
                 <td class="text-center">{{ e.game1 if e.game1 is not none else '' }}</td>
                 <td class="text-center">{{ e.game2 if e.game2 is not none else '' }}</td>
                 <td class="text-center">{{ e.game3 if e.game3 is not none else '' }}</td>
@@ -155,10 +182,6 @@
           {% endfor %}
         </div>
         {% endif %}
-        <a href="{{ url_for('entry.matchup_entry', season_id=season.id, week_num=week.week_num, matchup_num=sched.matchup_num) }}"
-           class="btn btn-sm btn-primary">
-          {{ 'Edit Scores' if entry_count.n > 0 else 'Enter Scores' }}
-        </a>
       </div>
     </div>
   </div>
@@ -224,7 +247,7 @@
       {% set cat = recon.prizes[key] %}
       <tr>
         <td class="text-nowrap">{{ label }}</td>
-        <td>{{ cat.winners | map(attribute='bowler.last_name') | join(', ') }}</td>
+        <td>{% for w in cat.winners %}{{ w.bowler.last_name }}{% if not loop.last %} / {% endif %}{% endfor %}</td>
         <td class="text-end fw-bold">{{ cat.score }}</td>
       </tr>
       {% endfor %}
