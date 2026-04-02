@@ -136,30 +136,39 @@ def week_prizes(season_id, week_num):
         key=lambda x: (-x['average'], x['bowler'].last_name)
     )
     if top10:
-        avg_rows = avg_rows[:10]
+        top10_avgs = sorted({r['average'] for r in avg_rows}, reverse=True)[:10]
+        cutoff = top10_avgs[-1] if top10_avgs else None
+        avg_rows = [r for r in avg_rows if cutoff is None or r['average'] >= cutoff]
 
     week_standings = get_team_standings(season_id, through_week=week_num)
-    overall = get_team_standings(season_id)
-    first_half = get_team_standings(season_id, half=1)
-    second_half = get_team_standings(season_id, half=2)
-    weeks_data, standing_teams = get_weekly_team_points(season_id)
 
     return render_template('reports/week_prizes.html',
                            season=season, week=week,
                            prizes=prizes,
                            leaders=leaders,
                            standings=week_standings,
-                           overall=overall,
-                           first_half=first_half,
-                           second_half=second_half,
-                           weeks_data=weeks_data,
-                           standing_teams=standing_teams,
                            avg_rows=avg_rows,
                            min_games=min_games,
                            top10=top10,
                            total_wood=total_wood,
                            player_count=player_count,
                            blind_games=blind_games)
+
+
+@reports_bp.route('/season/<int:season_id>/points')
+def team_points(season_id):
+    season = Season.query.get_or_404(season_id)
+    overall = get_team_standings(season_id)
+    first_half = get_team_standings(season_id, half=1)
+    second_half = get_team_standings(season_id, half=2)
+    weeks_data, standing_teams = get_weekly_team_points(season_id)
+    return render_template('reports/team_points.html',
+                           season=season,
+                           overall=overall,
+                           first_half=first_half,
+                           second_half=second_half,
+                           weeks_data=weeks_data,
+                           standing_teams=standing_teams)
 
 
 @reports_bp.route('/season/<int:season_id>/ytd-alpha/<int:week_num>')

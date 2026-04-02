@@ -57,9 +57,9 @@
 {% endif %}
 
 {% if week.is_position_night %}
-{# Position night (incl. Club Championship): 2 pairing cards #}
+{# Position night: 2 pairing cards; Club Championship: 1 pairing card (matchups 1&2 only) #}
 <div class="row">
-  {% set pairings = [(1, matchups[:2]), (2, matchups[2:])] %}
+  {% set pairings = [(1, matchups[:2])] if week.tournament_type == 'club_championship' else [(1, matchups[:2]), (2, matchups[2:])] %}
   {% for pairing_num, pair_scheds in pairings %}
   {% if pair_scheds %}
   {% set sched0 = pair_scheds[0] %}
