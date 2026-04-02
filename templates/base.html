@@ -33,12 +33,9 @@
     <div class="collapse navbar-collapse" id="navMenu">
       <ul class="navbar-nav me-auto">
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('entry.index') }}">Score Entry</a>
+          <a class="nav-link" href="{{ url_for('entry.index') }}">Scores</a>
         </li>
         {% if active_season %}
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports.standings', season_id=active_season.id) }}">Standings</a>
-        </li>
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('reports.high_games', season_id=active_season.id) }}">High Games</a>
         </li>
@@ -47,13 +44,10 @@
           <a class="nav-link" href="{{ url_for('reports.ytd_alpha', season_id=active_season.id, week_num=current_week) }}">YTD Alpha</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports.wkly_high_avg', season_id=active_season.id, week_num=current_week) }}">High Avg</a>
+          <a class="nav-link" href="{{ url_for('reports.week_prizes', season_id=active_season.id, week_num=current_week) }}">Prizes &amp; Standings</a>
         </li>
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('reports.print_batch', season_id=active_season.id, week_num=current_week) }}">Print Batch</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports.week_prizes', season_id=active_season.id, week_num=current_week) }}">Prizes &amp; Standings</a>
         </li>
         {% endif %}
         <li class="nav-item">

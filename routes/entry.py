@@ -6,7 +6,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
                     TeamPoints, Roster, Bowler, TournamentEntry)
 from calculations import (score_matchup, score_position_night, calculate_handicap,
-                          get_weekly_prizes, get_team_standings, get_matchup_breakdown)
+                          get_weekly_prizes, get_team_standings, get_matchup_breakdown,
+                          get_position_night_breakdown)
 from snapshots import save_snapshot
 from config import Config
 
@@ -98,7 +99,13 @@ def week_entry(season_id, week_num):
 
     # Per-matchup game breakdown for display
     breakdown_by_matchup = {}
-    if not week.is_position_night:
+    breakdown_by_pairing = {}
+    if week.is_position_night:
+        for pnum in [1, 2]:
+            bd = get_position_night_breakdown(season_id, week_num, pnum)
+            if bd:
+                breakdown_by_pairing[pnum] = bd
+    else:
         for sched in matchups:
             bd = get_matchup_breakdown(season_id, week_num, sched.matchup_num)
             if bd:
@@ -137,6 +144,7 @@ def week_entry(season_id, week_num):
                            weekly_team_pts=weekly_team_pts,
                            pts_by_matchup=pts_by_matchup,
                            breakdown_by_matchup=breakdown_by_matchup,
+                           breakdown_by_pairing=breakdown_by_pairing,
                            prev_week_num=prev_week_num,
                            next_week_num=next_week_num,
                            tournament_labels=_TOURNAMENT_LABELS)
@@ -352,12 +360,7 @@ def position_entry(season_id, week_num, pairing_num):
         flash('This week is not a position night.', 'warning')
         return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
-    is_club_championship = (week.tournament_type == 'club_championship')
-    if is_club_championship:
-        # All 4 matchups, one pairing (top-2 teams only)
-        matchup_nums = [1, 2, 3, 4]
-    else:
-        matchup_nums = [1, 2] if pairing_num == 1 else [3, 4]
+    matchup_nums = [1, 2] if pairing_num == 1 else [3, 4]
 
     scheds = (ScheduleEntry.query
               .filter_by(season_id=season_id, week_num=week_num)
@@ -423,10 +426,9 @@ def position_entry(season_id, week_num, pairing_num):
 
         db.session.commit()
 
-        # Mark week entered: club championship has only one pairing (done now);
-        # regular position night needs both pairings saved before marking entered.
+        # Mark week entered once both pairings have been saved.
         other_matchup_nums = [3, 4] if pairing_num == 1 else [1, 2]
-        other_has_entries = is_club_championship or MatchupEntry.query.filter(
+        other_has_entries = MatchupEntry.query.filter(
             MatchupEntry.season_id == season_id,
             MatchupEntry.week_num == week_num,
             MatchupEntry.matchup_num.in_(other_matchup_nums)
