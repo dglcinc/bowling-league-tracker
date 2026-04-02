@@ -302,6 +302,61 @@ def score_matchup(season_id, week_num, matchup_num):
     }
 
 
+def get_matchup_breakdown(season_id, week_num, matchup_num):
+    """
+    Returns a structured breakdown of one matchup suitable for display.
+    {
+      'team1': Team, 'team2': Team,
+      'games': [{'label':'G1','t1':X,'t2':Y,'winner':team_id_or_None}, ...],  # 3 game rows
+      'series': {'t1': X, 't2': Y, 'winner': team_id_or_None},
+      'pts': {team1_id: n, team2_id: n},
+    }
+    Returns None if no entries exist yet.
+    """
+    sched = ScheduleEntry.query.filter_by(
+        season_id=season_id, week_num=week_num, matchup_num=matchup_num
+    ).first()
+    if not sched:
+        return None
+    entries_exist = MatchupEntry.query.filter_by(
+        season_id=season_id, week_num=week_num, matchup_num=matchup_num
+    ).count()
+    if not entries_exist:
+        return None
+
+    result = score_matchup(season_id, week_num, matchup_num)
+    if not result or result.get('forfeit') == 'both':
+        return None
+
+    gd = result.get('game_detail', [])
+    t1_id, t2_id = sched.team1_id, sched.team2_id
+
+    def winner(t1_val, t2_val):
+        if t1_val > t2_val:
+            return t1_id
+        if t2_val > t1_val:
+            return t2_id
+        return None  # tie
+
+    games = [
+        {'label': f'G{i+1}',
+         't1': gd[i]['team1_total'] if i < len(gd) else 0,
+         't2': gd[i]['team2_total'] if i < len(gd) else 0,
+         'winner': winner(gd[i]['team1_total'], gd[i]['team2_total']) if i < len(gd) else None}
+        for i in range(3)
+    ]
+    t1_ser = result.get('team1_series', 0)
+    t2_ser = result.get('team2_series', 0)
+
+    return {
+        'team1': sched.team1,
+        'team2': sched.team2,
+        'games': games,
+        'series': {'t1': t1_ser, 't2': t2_ser, 'winner': winner(t1_ser, t2_ser)},
+        'pts': {t1_id: result.get(t1_id, 0), t2_id: result.get(t2_id, 0)},
+    }
+
+
 def score_position_night(season_id, week_num):
     """
     Position night: aggregate all matchup sheets for each team pairing.

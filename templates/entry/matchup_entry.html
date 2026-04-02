@@ -115,6 +115,51 @@
      class="btn btn-outline-secondary">Cancel</a>
 </div>
 </form>
+
+{% if breakdown %}
+<hr>
+<h6>Points Breakdown — Matchup {{ sched.matchup_num }}</h6>
+<table class="table table-sm table-bordered" style="max-width:420px">
+  <thead>
+    <tr>
+      <th></th>
+      <th class="text-center">{{ breakdown.team1.name }}</th>
+      <th class="text-center">{{ breakdown.team2.name }}</th>
+      <th class="text-center">Pt</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for g in breakdown.games %}
+  <tr>
+    <td class="text-muted">{{ g.label }}</td>
+    <td class="text-center {{ 'fw-bold' if g.winner == breakdown.team1.id else '' }}">{{ g.t1 }}</td>
+    <td class="text-center {{ 'fw-bold' if g.winner == breakdown.team2.id else '' }}">{{ g.t2 }}</td>
+    <td class="text-center">
+      {% if g.winner == breakdown.team1.id %}{{ breakdown.team1.name[:4] }}
+      {% elif g.winner == breakdown.team2.id %}{{ breakdown.team2.name[:4] }}
+      {% else %}—{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  <tr class="table-light">
+    <td class="text-muted">Total</td>
+    <td class="text-center {{ 'fw-bold' if breakdown.series.winner == breakdown.team1.id else '' }}">{{ breakdown.series.t1 }}</td>
+    <td class="text-center {{ 'fw-bold' if breakdown.series.winner == breakdown.team2.id else '' }}">{{ breakdown.series.t2 }}</td>
+    <td class="text-center">
+      {% if breakdown.series.winner == breakdown.team1.id %}{{ breakdown.team1.name[:4] }}
+      {% elif breakdown.series.winner == breakdown.team2.id %}{{ breakdown.team2.name[:4] }}
+      {% else %}—{% endif %}
+    </td>
+  </tr>
+  <tr class="table-secondary fw-bold">
+    <td>Points</td>
+    <td class="text-center">{{ breakdown.pts[breakdown.team1.id] }}</td>
+    <td class="text-center">{{ breakdown.pts[breakdown.team2.id] }}</td>
+    <td></td>
+  </tr>
+  </tbody>
+</table>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}

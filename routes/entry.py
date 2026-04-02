@@ -6,7 +6,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
                     TeamPoints, Roster, Bowler, TournamentEntry)
 from calculations import (score_matchup, score_position_night, calculate_handicap,
-                          get_weekly_prizes, get_team_standings)
+                          get_weekly_prizes, get_team_standings, get_matchup_breakdown)
 from snapshots import save_snapshot
 from config import Config
 
@@ -96,6 +96,14 @@ def week_entry(season_id, week_num):
     for tp in wk_pts_raw:
         pts_by_matchup.setdefault(tp.matchup_num, {})[tp.team_id] = tp.points_earned
 
+    # Per-matchup game breakdown for display
+    breakdown_by_matchup = {}
+    if not week.is_position_night:
+        for sched in matchups:
+            bd = get_matchup_breakdown(season_id, week_num, sched.matchup_num)
+            if bd:
+                breakdown_by_matchup[sched.matchup_num] = bd
+
     # Prev / next week navigation
     all_week_nums = [w.week_num for w in
                      Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()]
@@ -128,6 +136,7 @@ def week_entry(season_id, week_num):
                            recon=recon,
                            weekly_team_pts=weekly_team_pts,
                            pts_by_matchup=pts_by_matchup,
+                           breakdown_by_matchup=breakdown_by_matchup,
                            prev_week_num=prev_week_num,
                            next_week_num=next_week_num,
                            tournament_labels=_TOURNAMENT_LABELS)
@@ -322,10 +331,11 @@ def matchup_entry(season_id, week_num, matchup_num):
             hcp = calculate_handicap(r.bowler_id, season_id, week_num)
             roster_data[r.bowler_id] = {'handicap': hcp, 'roster': r}
 
+    breakdown = get_matchup_breakdown(season_id, week_num, matchup_num)
     return render_template('entry/matchup_entry.html',
                            season=season, week=week, sched=sched,
                            teams=teams, team_entries=team_entries,
-                           roster_data=roster_data)
+                           roster_data=roster_data, breakdown=breakdown)
 
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/position/<int:pairing_num>',

@@ -181,6 +181,41 @@
           </div>
           {% endfor %}
         </div>
+        {% set bd = breakdown_by_matchup.get(sched.matchup_num) %}
+        {% if bd %}
+        <table class="table table-sm table-bordered mt-2 mb-0" style="font-size:0.8rem">
+          <thead class="table-light"><tr>
+            <th></th>
+            <th class="text-center">{{ bd.team1.name }}</th>
+            <th class="text-center">{{ bd.team2.name }}</th>
+            <th class="text-center">Pt</th>
+          </tr></thead>
+          <tbody>
+          {% for g in bd.games %}
+          <tr>
+            <td class="text-muted">{{ g.label }}</td>
+            <td class="text-center {{ 'fw-bold' if g.winner == bd.team1.id else '' }}">{{ g.t1 }}</td>
+            <td class="text-center {{ 'fw-bold' if g.winner == bd.team2.id else '' }}">{{ g.t2 }}</td>
+            <td class="text-center small">
+              {% if g.winner == bd.team1.id %}{{ bd.team1.name[:4] }}
+              {% elif g.winner == bd.team2.id %}{{ bd.team2.name[:4] }}
+              {% else %}&mdash;{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          <tr class="table-light">
+            <td class="text-muted">Total</td>
+            <td class="text-center {{ 'fw-bold' if bd.series.winner == bd.team1.id else '' }}">{{ bd.series.t1 }}</td>
+            <td class="text-center {{ 'fw-bold' if bd.series.winner == bd.team2.id else '' }}">{{ bd.series.t2 }}</td>
+            <td class="text-center small">
+              {% if bd.series.winner == bd.team1.id %}{{ bd.team1.name[:4] }}
+              {% elif bd.series.winner == bd.team2.id %}{{ bd.team2.name[:4] }}
+              {% else %}&mdash;{% endif %}
+            </td>
+          </tr>
+          </tbody>
+        </table>
+        {% endif %}
         {% endif %}
       </div>
     </div>
