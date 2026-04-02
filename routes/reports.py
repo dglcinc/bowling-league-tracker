@@ -62,32 +62,6 @@ def _build_high_games_leaders(season_id, through_week, min_games=0):
     return leaders
 
 
-@reports_bp.route('/season/<int:season_id>/high-games')
-def high_games(season_id):
-    season = Season.query.get_or_404(season_id)
-    through_week = request.args.get('week', type=int)
-    min_games = request.args.get('min_games', 0, type=int)
-    if not through_week:
-        last = (Week.query
-                .filter_by(season_id=season_id, is_entered=True)
-                .order_by(Week.week_num.desc())
-                .first())
-        through_week = last.week_num if last else 0
-
-    leaders = _build_high_games_leaders(season_id, through_week, min_games)
-
-    by_avg = sorted(leaders, key=lambda x: x['average'], reverse=True)
-    by_hgs = sorted(leaders, key=lambda x: x['high_game_scratch'], reverse=True)
-    by_hgh = sorted(leaders, key=lambda x: x['high_game_hcp'], reverse=True)
-    by_hss = sorted(leaders, key=lambda x: x['high_series_scratch'], reverse=True)
-    by_hsh = sorted(leaders, key=lambda x: x['high_series_hcp'], reverse=True)
-
-    return render_template('reports/high_games.html',
-                           season=season, through_week=through_week,
-                           min_games=min_games,
-                           by_avg=by_avg, by_hgs=by_hgs, by_hgh=by_hgh,
-                           by_hss=by_hss, by_hsh=by_hsh)
-
 
 @reports_bp.route('/season/<int:season_id>/week/<int:week_num>/prizes')
 def week_prizes(season_id, week_num):

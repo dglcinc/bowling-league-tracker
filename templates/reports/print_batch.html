@@ -114,8 +114,6 @@ function printGroup(n) {
        class="btn btn-sm btn-outline-secondary">Wkly Alpha</a>
     <a href="{{ url_for('reports.ytd_alpha', season_id=season.id, week_num=week_num) }}" target="_blank"
        class="btn btn-sm btn-outline-secondary">YTD Alpha</a>
-    <a href="{{ url_for('reports.high_games', season_id=season.id) }}" target="_blank"
-       class="btn btn-sm btn-outline-secondary">High Games</a>
     <a href="{{ url_for('reports.week_prizes', season_id=season.id, week_num=week_num) }}" target="_blank"
        class="btn btn-sm btn-outline-secondary">Prizes &amp; Standings</a>
   </div>

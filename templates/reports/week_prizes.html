@@ -30,14 +30,13 @@
 {% endblock %}
 
 {% block content %}
-<div class="no-print d-flex justify-content-between align-items-center mb-2">
+<div class="no-print mb-2">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb mb-0">
       <li class="breadcrumb-item"><a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}">Week {{ week.week_num }}</a></li>
       <li class="breadcrumb-item active">Prizes &amp; Standings</li>
     </ol>
   </nav>
-  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">Print</button>
 </div>
 
 <div class="text-center mb-2" style="font-size:0.9rem">
@@ -51,7 +50,7 @@
   <div class="prize-label">{{ label }}</div>
   {% if cat %}
   <div class="prize-name">
-    {% for w in cat.winners %}{{ w.bowler.last_name }}{% if not loop.last %} / {% endif %}{% endfor %}
+    {% for w in cat.winners %}{{ w.bowler.last_name }}{% if w.bowler.nickname %} ({{ w.bowler.nickname }}){% endif %}{% if not loop.last %} / {% endif %}{% endfor %}
     {% if cat.winners|length > 1 %}<span class="prize-tie text-secondary">(tie)</span>{% endif %}
   </div>
   <div class="prize-score">{{ cat.score }}</div>
@@ -140,7 +139,7 @@
     <div class="form-check mb-0">
       <input class="form-check-input" type="checkbox" name="top10" value="1" id="top10chk"
              {{ 'checked' if top10 else '' }} onchange="this.form.submit()">
-      <label class="form-check-label small" for="top10chk">Top 10 only</label>
+      <label class="form-check-label small" for="top10chk">Top 10 averages</label>
     </div>
     <button type="submit" class="btn btn-sm btn-outline-secondary">Apply</button>
   </form>

@@ -27,18 +27,15 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-2 no-print">
   <h2>Wkly Alpha — {{ season.name }}</h2>
-  <div>
-    <select class="form-select form-select-sm d-inline-block w-auto me-2"
-            onchange="location='{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=0) }}'.replace('/0', '/'+this.value)">
-      {% for wk in weeks %}
-      <option value="{{ wk.week_num }}" {% if wk.week_num == week_num %}selected{% endif %}>
-        Week {{ wk.week_num }}{% if wk.date %} — {{ wk.date.strftime('%b %d') }}{% endif %}
-        {% if wk.is_position_night %}★{% endif %}
-      </option>
-      {% endfor %}
-    </select>
-    <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">Print</button>
-  </div>
+  <select class="form-select form-select-sm d-inline-block w-auto"
+          onchange="location='{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=0) }}'.replace('/0', '/'+this.value)">
+    {% for wk in weeks %}
+    <option value="{{ wk.week_num }}" {% if wk.week_num == week_num %}selected{% endif %}>
+      Week {{ wk.week_num }}{% if wk.date %} — {{ wk.date.strftime('%b %d') }}{% endif %}
+      {% if wk.is_position_night %}★{% endif %}
+    </option>
+    {% endfor %}
+  </select>
 </div>
 
 <div class="text-center mb-1" style="font-size:0.9rem">
@@ -59,7 +56,7 @@
       <th class="text-end">2nd</th>
       <th class="text-end">G</th>
       <th class="text-end">Ave</th>
-      <th class="text-end use-hcp-cell">Use<br>Hcp</th>
+      <th class="text-center use-hcp-cell">Use<br>Hcp</th>
       <th class="text-end">Cur<br>Hcp</th>
       <th class="text-end">HG<br>Scr</th>
       <th class="text-end">HG<br>Hcp</th>
@@ -79,7 +76,7 @@
       <td class="text-end">{{ row.second_half_pins or '' }}</td>
       <td class="text-end">{{ row.games or '' }}</td>
       <td class="text-end">{{ row.average or '' }}</td>
-      <td class="text-end fw-bold use-hcp-cell">{{ row.display_handicap or '' }}</td>
+      <td class="text-center fw-bold use-hcp-cell">{{ row.display_handicap or '' }}</td>
       <td class="text-end">{{ row.current_handicap or '' }}</td>
       <td class="text-end">{{ row.high_game_scratch or '' }}</td>
       <td class="text-end">{{ row.high_game_hcp or '' }}</td>
