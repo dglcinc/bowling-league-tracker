@@ -82,9 +82,4 @@
   </tbody>
 </table>
 
-<div class="no-print mt-2">
-  <a href="{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=week_num) }}" class="btn btn-sm btn-outline-primary">Wkly Alpha</a>
-  <a href="{{ url_for('reports.wkly_high_avg', season_id=season.id, week_num=week_num) }}" class="btn btn-sm btn-outline-primary">High Avg</a>
-  <a href="{{ url_for('reports.standings', season_id=season.id) }}" class="btn btn-sm btn-outline-primary">Standings</a>
-</div>
 {% endblock %}

@@ -114,6 +114,25 @@ def season_detail(season_id):
 
 
 # ---------------------------------------------------------------------------
+# Team editing
+# ---------------------------------------------------------------------------
+
+@admin_bp.route('/seasons/<int:season_id>/teams/<int:team_id>/edit', methods=['GET', 'POST'])
+def edit_team(season_id, team_id):
+    season = Season.query.get_or_404(season_id)
+    team = Team.query.get_or_404(team_id)
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        if name:
+            team.name = name
+        team.captain_name = request.form.get('captain_name', '').strip() or None
+        db.session.commit()
+        flash(f'Team {team.number} updated.', 'success')
+        return redirect(url_for('admin.season_detail', season_id=season_id))
+    return render_template('admin/edit_team.html', season=season, team=team)
+
+
+# ---------------------------------------------------------------------------
 # Roster management
 # ---------------------------------------------------------------------------
 
