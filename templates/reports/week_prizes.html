@@ -100,10 +100,10 @@
       {% set s2 = second_half_s[i] %}
       {% set sy = standings[i] %}
       <tr>
-        <td>{{ sy.team.number }} — {{ sy.team.name }}</td>
-        <td class="text-end fw-bold"{% if s1.points == fh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s1.points }}</td>
-        <td class="text-end fw-bold"{% if s2.points == sh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s2.points }}</td>
-        <td class="text-end fw-bold"{% if sy.points == fy_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ sy.points }}</td>
+        <td>{{ sy['team'].number }} — {{ sy['team'].name }}</td>
+        <td class="text-end fw-bold"{% if s1['points'] == fh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s1['points'] }}</td>
+        <td class="text-end fw-bold"{% if s2['points'] == sh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s2['points'] }}</td>
+        <td class="text-end fw-bold"{% if sy['points'] == fy_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ sy['points'] }}</td>
       </tr>
       {% endfor %}
       </tbody>
