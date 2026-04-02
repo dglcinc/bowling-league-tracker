@@ -2,6 +2,27 @@
 {% block title %}Prizes & Standings — Week {{ week.week_num }}{% endblock %}
 
 {% block extra_head %}
+<script>
+(function() {
+  var LS_MG  = 'bowling_prizes_min_games';
+  var LS_T10 = 'bowling_prizes_top10';
+  var params = new URLSearchParams(window.location.search);
+  if (params.has('min_games') || params.has('top10')) {
+    // Form was submitted — save these settings for next time
+    localStorage.setItem(LS_MG,  params.get('min_games') || '9');
+    localStorage.setItem(LS_T10, params.has('top10') ? '1' : '0');
+  } else {
+    // Fresh page load — restore saved settings if any
+    var mg  = localStorage.getItem(LS_MG);
+    var t10 = localStorage.getItem(LS_T10);
+    if (mg !== null) {
+      params.set('min_games', mg);
+      if (t10 === '1') params.set('top10', '1');
+      window.location.search = params.toString();
+    }
+  }
+})();
+</script>
 <style>
   .prize-box { border: 1px solid #dee2e6; border-radius: 4px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; }
   .prize-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6c757d; }
