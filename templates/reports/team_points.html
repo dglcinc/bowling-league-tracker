@@ -19,40 +19,42 @@
 {% block content %}
 <h4 class="mb-3 no-print">Team Points — {{ season.name }}</h4>
 
-<div class="row mb-4">
-  <div class="col-md-3">
-    <h6>Overall</h6>
-    <table class="table table-sm table-bordered">
-      <thead><tr><th>Team</th><th class="text-end">Points</th></tr></thead>
-      <tbody>
-        {% for s in overall %}
-        <tr><td>{{ s.team.number }} — {{ s.team.name }}</td><td class="text-end fw-bold">{{ s.points }}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="col-md-3">
-    <h6>First Half (Weeks 1–{{ season.half_boundary_week }})</h6>
-    <table class="table table-sm table-bordered">
-      <thead><tr><th>Team</th><th class="text-end">Points</th></tr></thead>
-      <tbody>
-        {% for s in first_half %}
-        <tr><td>{{ s.team.number }} — {{ s.team.name }}</td><td class="text-end fw-bold">{{ s.points }}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="col-md-3">
-    <h6>Second Half (Weeks {{ season.half_boundary_week + 1 }}–{{ season.num_weeks }})</h6>
-    <table class="table table-sm table-bordered">
-      <thead><tr><th>Team</th><th class="text-end">Points</th></tr></thead>
-      <tbody>
-        {% for s in second_half %}
-        <tr><td>{{ s.team.number }} — {{ s.team.name }}</td><td class="text-end fw-bold">{{ s.points }}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+<div class="mb-4">
+  <table class="table table-sm table-bordered" style="max-width:700px">
+    <thead class="table-dark">
+      <tr>
+        <th colspan="3" class="text-center">1st Half (Wks 1–{{ season.half_boundary_week }})</th>
+        <th class="table-secondary"></th>
+        <th colspan="3" class="text-center">2nd Half (Wks {{ season.half_boundary_week + 1 }}–{{ season.num_weeks }})</th>
+        <th class="table-secondary"></th>
+        <th colspan="3" class="text-center">Full Year</th>
+      </tr>
+      <tr>
+        <th>#</th><th>Team</th><th class="text-end">Pts</th>
+        <th class="table-secondary"></th>
+        <th>#</th><th>Team</th><th class="text-end">Pts</th>
+        <th class="table-secondary"></th>
+        <th>#</th><th>Team</th><th class="text-end">Pts</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in range(overall | length) %}
+      <tr>
+        <td>{{ i + 1 }}</td>
+        <td>{{ first_half[i].team.number }} — {{ first_half[i].team.name }}</td>
+        <td class="text-end fw-bold">{{ first_half[i].points }}</td>
+        <td class="table-secondary"></td>
+        <td>{{ i + 1 }}</td>
+        <td>{{ second_half[i].team.number }} — {{ second_half[i].team.name }}</td>
+        <td class="text-end fw-bold">{{ second_half[i].points }}</td>
+        <td class="table-secondary"></td>
+        <td>{{ i + 1 }}</td>
+        <td>{{ overall[i].team.number }} — {{ overall[i].team.name }}</td>
+        <td class="text-end fw-bold">{{ overall[i].points }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 
 {% if weeks_data %}
