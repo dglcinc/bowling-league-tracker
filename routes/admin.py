@@ -172,15 +172,23 @@ def league_settings():
         settings = LeagueSettings(id=1)
         db.session.add(settings)
         db.session.commit()
+    active_season = Season.query.filter_by(is_active=True).order_by(Season.id.desc()).first()
     if request.method == 'POST':
         league_name = request.form.get('league_name', '').strip()
         if league_name:
             settings.league_name = league_name
         settings.use_nickname = (request.form.get('use_nickname') == 'on')
+        if active_season:
+            try:
+                active_season.handicap_base = int(request.form.get('handicap_base', active_season.handicap_base))
+                active_season.blind_scratch = int(request.form.get('blind_scratch', active_season.blind_scratch))
+                active_season.blind_handicap = int(request.form.get('blind_handicap', active_season.blind_handicap))
+            except (ValueError, TypeError):
+                pass
         db.session.commit()
         flash('League settings saved.', 'success')
         return redirect(url_for('admin.league_settings'))
-    return render_template('admin/league_settings.html', settings=settings)
+    return render_template('admin/league_settings.html', settings=settings, active_season=active_season)
 
 
 @admin_bp.route('/bowlers/<int:bowler_id>/edit', methods=['GET', 'POST'])

@@ -30,6 +30,31 @@
     <div class="form-text">When checked, bowlers with a nickname set will show it in place of their last name on score sheets and reports.</div>
   </div>
 
+  {% if active_season %}
+  <hr>
+  <h6 class="mb-3">Handicap &amp; Blind Settings — {{ active_season.name }}</h6>
+  <div class="mb-3">
+    <label class="form-label fw-bold">Handicap Base</label>
+    <input type="number" class="form-control" name="handicap_base" min="0" max="300"
+           value="{{ active_season.handicap_base }}" style="max-width:120px">
+    <div class="form-text">Score used to calculate per-game handicap (default 200).</div>
+  </div>
+  <div class="row g-3 mb-3">
+    <div class="col-auto">
+      <label class="form-label fw-bold">Blind Scratch Score</label>
+      <input type="number" class="form-control" name="blind_scratch" min="0" max="300"
+             value="{{ active_season.blind_scratch }}" style="max-width:120px">
+      <div class="form-text">Per-game scratch score for a blind bowler.</div>
+    </div>
+    <div class="col-auto">
+      <label class="form-label fw-bold">Blind Handicap</label>
+      <input type="number" class="form-control" name="blind_handicap" min="0" max="200"
+             value="{{ active_season.blind_handicap }}" style="max-width:120px">
+      <div class="form-text">Per-game handicap for a blind bowler.</div>
+    </div>
+  </div>
+  {% endif %}
+
   <button type="submit" class="btn btn-primary">Save Settings</button>
   <a href="{{ url_for('admin.seasons') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
 </form>
