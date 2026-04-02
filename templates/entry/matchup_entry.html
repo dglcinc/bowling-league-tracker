@@ -52,6 +52,7 @@
             <th class="text-center night2-col" style="min-width:48px">G4</th>
             <th class="text-center night2-col" style="min-width:48px">G5</th>
             <th class="text-center night2-col" style="min-width:48px">G6</th>
+            <th class="col-narrow no-print"></th>
           </tr>
         </thead>
         <tbody id="team-{{ team.number }}-body">
@@ -65,7 +66,7 @@
                       class="form-select form-select-sm bowler-select"
                       data-team="{{ team.number }}" data-row="{{ i }}">
                 <option value="">— select —</option>
-                <option value="BLIND" {{ 'selected' if entry and entry.is_blind else '' }}>— Blind —</option>
+                <option value="BLIND" {{ 'selected' if entry and entry.is_blind else '' }}>Blind</option>
                 {% for r in roster_data.values() %}
                 {% if r.roster.team_id == team.id %}
                 <option value="{{ r.roster.bowler_id }}"
@@ -93,6 +94,9 @@
                      placeholder="">
             </td>
             {% endfor %}
+            <td class="no-print">
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">×</button>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -147,6 +151,7 @@ function addRow(teamNum) {
       <td${g > 3 ? night2style : ''}><input type="number" class="form-control form-control-sm score-input"
                  name="t${teamNum}_row_${i}_game${g}" min="0" max="300" placeholder=""></td>
     `).join('')}
+    <td class="no-print"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">×</button></td>
   `;
   tbody.appendChild(row);
   const sel = row.querySelector('.bowler-select');
@@ -182,6 +187,10 @@ function onBowlerChange(e) {
     });
     if (span && !bowlerId) span.textContent = '';
   }
+}
+
+function removeRow(btn) {
+  btn.closest('tr').remove();
 }
 
 // Attach listeners

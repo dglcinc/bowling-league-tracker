@@ -79,6 +79,18 @@ def week_entry(season_id, week_num):
                 'roster': roster,
             })
 
+    # Weekly team points (shown whether entered or partially entered)
+    from models import Team
+    teams_all = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
+    wk_pts_raw = TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).all()
+    wk_pts_by_team = {}
+    for tp in wk_pts_raw:
+        wk_pts_by_team[tp.team_id] = wk_pts_by_team.get(tp.team_id, 0) + tp.points_earned
+    weekly_team_pts = sorted(
+        [{'team': t, 'points': wk_pts_by_team.get(t.id, 0)} for t in teams_all],
+        key=lambda x: x['points'], reverse=True
+    )
+
     # Recon summary (only if week is entered)
     recon = None
     if week.is_entered:
@@ -102,26 +114,43 @@ def week_entry(season_id, week_num):
                            matchups=matchups,
                            matchup_data=matchup_data,
                            recon=recon,
+                           weekly_team_pts=weekly_team_pts,
                            tournament_labels=_TOURNAMENT_LABELS)
 
 
 def _auto_assign_position_night(season_id, position_week_num):
     """
     Update ScheduleEntry for a position night based on standings through the prior week.
-    Top 2 teams by points play each other (matchups 1&2), bottom 2 play each other (3&4).
+    Regular position night: top-2 on matchups 1&2, bottom-2 on matchups 3&4.
+    Club Championship: top-2 on all 4 matchups (only those 2 teams bowl).
     """
+    from models import Week
+    pos_week = Week.query.filter_by(season_id=season_id, week_num=position_week_num).first()
+    is_club_championship = (pos_week and pos_week.tournament_type == 'club_championship')
+
     standings = get_team_standings(season_id, through_week=position_week_num - 1)
-    if len(standings) < 4:
+    if len(standings) < 2:
         return
     top_a, top_b = standings[0]['team'], standings[1]['team']
-    bot_a, bot_b = standings[2]['team'], standings[3]['team']
 
-    assignments = {
-        1: (top_a.id, top_b.id),
-        2: (top_a.id, top_b.id),
-        3: (bot_a.id, bot_b.id),
-        4: (bot_a.id, bot_b.id),
-    }
+    if is_club_championship:
+        # Only the top 2 teams bowl, on all 4 lane pairs
+        assignments = {
+            1: (top_a.id, top_b.id),
+            2: (top_a.id, top_b.id),
+            3: (top_a.id, top_b.id),
+            4: (top_a.id, top_b.id),
+        }
+    else:
+        if len(standings) < 4:
+            return
+        bot_a, bot_b = standings[2]['team'], standings[3]['team']
+        assignments = {
+            1: (top_a.id, top_b.id),
+            2: (top_a.id, top_b.id),
+            3: (bot_a.id, bot_b.id),
+            4: (bot_a.id, bot_b.id),
+        }
     for matchup_num, (t1_id, t2_id) in assignments.items():
         sched = ScheduleEntry.query.filter_by(
             season_id=season_id, week_num=position_week_num,
@@ -199,6 +228,10 @@ def matchup_entry(season_id, week_num, matchup_num):
 
         # Calculate and save points
         if week.is_position_night:
+            # Delete ALL TeamPoints for the week before re-inserting — position night
+            # points are calculated from all matchups together, so saving any single
+            # matchup must replace the full set to avoid double-counting.
+            TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).delete()
             pts = score_position_night(season_id, week_num)
             for team_id, points in pts.items():
                 tp = TeamPoints(
@@ -277,6 +310,142 @@ def matchup_entry(season_id, week_num, matchup_num):
     return render_template('entry/matchup_entry.html',
                            season=season, week=week, sched=sched,
                            teams=teams, team_entries=team_entries,
+                           roster_data=roster_data)
+
+
+@entry_bp.route('/season/<int:season_id>/week/<int:week_num>/position/<int:pairing_num>',
+                methods=['GET', 'POST'])
+def position_entry(season_id, week_num, pairing_num):
+    """
+    Combined score entry for one position-night team pairing.
+    pairing_num=1 → matchup_nums 1 & 2 (top-2 teams)
+    pairing_num=2 → matchup_nums 3 & 4 (bottom-2 teams)
+    """
+    season = Season.query.get_or_404(season_id)
+    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
+    if not week.is_position_night:
+        flash('This week is not a position night.', 'warning')
+        return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+    is_club_championship = (week.tournament_type == 'club_championship')
+    if is_club_championship:
+        # All 4 matchups, one pairing (top-2 teams only)
+        matchup_nums = [1, 2, 3, 4]
+    else:
+        matchup_nums = [1, 2] if pairing_num == 1 else [3, 4]
+
+    scheds = (ScheduleEntry.query
+              .filter_by(season_id=season_id, week_num=week_num)
+              .filter(ScheduleEntry.matchup_num.in_(matchup_nums))
+              .order_by(ScheduleEntry.matchup_num)
+              .all())
+    if not scheds:
+        flash('No schedule entries found for this pairing.', 'warning')
+        return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+    team1 = scheds[0].team1
+    team2 = scheds[0].team2
+    teams = [team1, team2]
+
+    if request.method == 'POST':
+        # Delete existing entries for both matchups in this pairing
+        MatchupEntry.query.filter(
+            MatchupEntry.season_id == season_id,
+            MatchupEntry.week_num == week_num,
+            MatchupEntry.matchup_num.in_(matchup_nums)
+        ).delete(synchronize_session=False)
+
+        for sched in scheds:
+            mnum = sched.matchup_num
+            for team in teams:
+                side = 'A' if team.id == sched.team1_id else 'B'
+                prefix_base = f'm{mnum}_t{team.number}_row_'
+                row_keys = [k for k in request.form if k.startswith(prefix_base)]
+                row_indices = sorted(set(
+                    int(k[len(prefix_base):].split('_')[0]) for k in row_keys
+                ))
+                for i in row_indices:
+                    prefix = f'm{mnum}_t{team.number}_row_{i}_'
+                    bowler_id_str = request.form.get(f'{prefix}bowler_id', '').strip()
+                    is_blind = (bowler_id_str == 'BLIND')
+                    bowler_id = int(bowler_id_str) if (bowler_id_str and not is_blind
+                                                        and bowler_id_str.isdigit()) else None
+                    games = []
+                    for g in range(1, 7):
+                        val = request.form.get(f'{prefix}game{g}', '').strip()
+                        games.append(int(val) if val.isdigit() else None)
+                    if not is_blind and bowler_id is None:
+                        continue
+                    db.session.add(MatchupEntry(
+                        season_id=season_id, week_num=week_num,
+                        matchup_num=mnum, team_id=team.id,
+                        bowler_id=bowler_id, is_blind=is_blind, lane_side=side,
+                        game1=games[0], game2=games[1], game3=games[2],
+                        game4=games[3], game5=games[4], game6=games[5],
+                    ))
+
+        db.session.flush()
+
+        # Recalculate position night points (delete all week's points, re-insert once)
+        TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).delete()
+        pts = score_position_night(season_id, week_num)
+        for team_id, points in pts.items():
+            db.session.add(TeamPoints(
+                season_id=season_id, week_num=week_num,
+                matchup_num=matchup_nums[0], team_id=team_id,
+                points_earned=points
+            ))
+
+        db.session.commit()
+
+        # Mark week entered: club championship has only one pairing (done now);
+        # regular position night needs both pairings saved before marking entered.
+        other_matchup_nums = [3, 4] if pairing_num == 1 else [1, 2]
+        other_has_entries = is_club_championship or MatchupEntry.query.filter(
+            MatchupEntry.season_id == season_id,
+            MatchupEntry.week_num == week_num,
+            MatchupEntry.matchup_num.in_(other_matchup_nums)
+        ).count() > 0
+        if other_has_entries:
+            week.is_entered = True
+            db.session.commit()
+            try:
+                save_snapshot(season_id, week_num, Config.SNAPSHOT_DIR)
+            except Exception as e:
+                flash(f'Snapshot error (scores saved): {e}', 'warning')
+
+        flash(f'Position night pairing {pairing_num} scores saved.', 'success')
+        return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+    # GET: load existing entries for both matchups
+    existing = {}
+    for sched in scheds:
+        for team in teams:
+            key = (sched.matchup_num, team.id)
+            existing[key] = (MatchupEntry.query
+                             .filter_by(season_id=season_id, week_num=week_num,
+                                        matchup_num=sched.matchup_num, team_id=team.id)
+                             .all())
+
+    # Handicaps for all bowlers on these teams
+    roster_data = {}
+    for team in teams:
+        roster = (Roster.query
+                  .filter_by(season_id=season_id, team_id=team.id, active=True)
+                  .join(Bowler)
+                  .order_by(Bowler.last_name)
+                  .all())
+        for r in roster:
+            roster_data[r.bowler_id] = {
+                'handicap': calculate_handicap(r.bowler_id, season_id, week_num),
+                'roster': r,
+            }
+
+    return render_template('entry/position_entry.html',
+                           season=season, week=week,
+                           pairing_num=pairing_num,
+                           scheds=scheds, teams=teams,
+                           existing=existing,
                            roster_data=roster_data)
 
 
