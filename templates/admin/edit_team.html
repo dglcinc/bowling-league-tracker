@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Edit Team {{ team.number }} — {{ season.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="no-print">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.seasons') }}">Admin</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.season_detail', season_id=season.id) }}">{{ season.name }}</a></li>
+    <li class="breadcrumb-item active">Edit Team {{ team.number }}</li>
+  </ol>
+</nav>
+
+<h4>Edit Team {{ team.number }} — {{ season.name }}</h4>
+
+<form method="post" style="max-width:400px">
+  <div class="mb-3">
+    <label class="form-label fw-bold">Team Name</label>
+    <input type="text" class="form-control" name="name"
+           value="{{ team.name }}" required>
+    <div class="form-text">The name displayed for this team (e.g. "Team 1" or a chosen name).</div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label fw-bold">Captain Name</label>
+    <input type="text" class="form-control" name="captain_name"
+           value="{{ team.captain_name or '' }}">
+    <div class="form-text">Optional. Shown next to the team number where relevant.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{{ url_for('admin.season_detail', season_id=season.id) }}"
+       class="btn btn-outline-secondary">Back to Roster</a>
+  </div>
+</form>
+{% endblock %}

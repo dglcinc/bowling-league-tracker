@@ -17,6 +17,7 @@ def _migrate_db(db):
         "ALTER TABLE weeks ADD COLUMN tournament_type VARCHAR(32)",
         "CREATE TABLE IF NOT EXISTS league_settings (id INTEGER PRIMARY KEY, league_name VARCHAR(128) DEFAULT 'Mountain Lakes Men''s Bowling League', use_nickname BOOLEAN DEFAULT 0)",
         "INSERT OR IGNORE INTO league_settings (id, league_name, use_nickname) VALUES (1, 'Mountain Lakes Men''s Bowling League', 0)",
+        "ALTER TABLE teams ADD COLUMN captain_name VARCHAR(64)",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:

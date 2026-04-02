@@ -22,11 +22,14 @@
   </div>
 </div>
 
-<h5>Teams</h5>
+<h5>Teams <small class="text-muted fw-normal" style="font-size:0.75rem">Click a team to edit name &amp; captain</small></h5>
 <div class="row mb-4">
   {% for team in teams %}
   <div class="col-auto">
-    <span class="badge bg-primary fs-6">Team {{ team.number }}: {{ team.name }}</span>
+    <a href="{{ url_for('admin.edit_team', season_id=season.id, team_id=team.id) }}"
+       class="btn btn-primary">
+      Team {{ team.number }}: {{ team.name }}{% if team.captain_name %} ({{ team.captain_name }}){% endif %}
+    </a>
   </div>
   {% endfor %}
 </div>
@@ -65,7 +68,9 @@
         <a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler_id) }}"
            class="btn btn-sm btn-outline-info">Stats</a>
         <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id, season_id=season.id) }}"
-           class="btn btn-sm btn-outline-secondary">Edit</a>
+           class="btn btn-sm btn-outline-secondary">Edit Bowler</a>
+        <a href="{{ url_for('admin.edit_roster', season_id=season.id, roster_id=r.id) }}"
+           class="btn btn-sm btn-outline-secondary">Edit Roster</a>
         <form method="post"
               action="{{ url_for('admin.toggle_active', season_id=season.id, roster_id=r.id) }}"
               class="d-inline">

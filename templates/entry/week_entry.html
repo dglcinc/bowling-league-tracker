@@ -67,12 +67,51 @@
       </div>
       <div class="card-body p-2">
         {% if cc_entry_count.n > 0 %}
-        <p class="text-muted small mb-1">{{ cc_entry_count.n }} bowler entries across all 4 lane pairs.</p>
+        {% for sched in matchups %}
+        {% set mdata = matchup_data | selectattr('sched.matchup_num', 'equalto', sched.matchup_num) | list %}
+        {% set has_m_entries = namespace(v=false) %}
+        {% for md in mdata %}{% if md.entries %}{% set has_m_entries.v = true %}{% endif %}{% endfor %}
+        {% if has_m_entries.v %}
+        <div class="mb-2">
+          <div class="text-muted small mb-1 fw-bold">Matchup {{ sched.matchup_num }}{% if sched.lane_pair %} — Lanes {{ sched.lane_pair }}{% endif %}</div>
+          <div class="row g-1">
+          {% for md in mdata %}
+          <div class="col-6">
+            <div class="fw-bold small mb-1">Team {{ md.team.number }}</div>
+            <table class="table table-sm table-bordered mb-0" style="font-size:0.75rem">
+              <thead><tr><th>Bowler</th><th class="text-center">G1</th><th class="text-center">G2</th><th class="text-center">G3</th><th class="text-center">Tot</th></tr></thead>
+              <tbody>
+              {% for e in md.entries %}
+              <tr class="{{ 'table-warning' if e.is_blind else '' }}">
+                <td>{% if e.is_blind %}BLIND{% elif e.bowler %}{{ e.bowler.last_name }}{% endif %}</td>
+                <td class="text-center">{{ e.game1 if e.game1 is not none else '' }}</td>
+                <td class="text-center">{{ e.game2 if e.game2 is not none else '' }}</td>
+                <td class="text-center">{{ e.game3 if e.game3 is not none else '' }}</td>
+                <td class="text-center fw-bold">{{ (e.game1 or 0) + (e.game2 or 0) + (e.game3 or 0) }}</td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endfor %}
+          </div>
+        </div>
         {% endif %}
+        {% endfor %}
+        {% for row in weekly_team_pts %}
+        {% if row.team.id == sched0.team1.id or row.team.id == sched0.team2.id %}
+        <span class="badge bg-{{ 'success' if row.points > 8 else 'secondary' }} me-1">
+          Team {{ row.team.number }}: {{ row.points | int if row.points == row.points | int else row.points }} pts
+        </span>
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+        <div class="mt-2">
         <a href="{{ url_for('entry.position_entry', season_id=season.id, week_num=week.week_num, pairing_num=1) }}"
            class="btn btn-sm btn-primary">
           {{ 'Edit Scores' if cc_entry_count.n > 0 else 'Enter Scores' }}
         </a>
+        </div>
       </div>
     </div>
   </div>
@@ -107,12 +146,51 @@
           {% endfor %}
         {% endfor %}
         {% if pairing_entry_count.n > 0 %}
-        <p class="text-muted small mb-1">{{ pairing_entry_count.n }} bowler entries across both lane pairs.</p>
+        {% for s in pair_scheds %}
+        {% set mdata = matchup_data | selectattr('sched.matchup_num', 'equalto', s.matchup_num) | list %}
+        {% set has_m_entries = namespace(v=false) %}
+        {% for md in mdata %}{% if md.entries %}{% set has_m_entries.v = true %}{% endif %}{% endfor %}
+        {% if has_m_entries.v %}
+        <div class="mb-2">
+          <div class="text-muted small mb-1 fw-bold">Matchup {{ s.matchup_num }}{% if s.lane_pair %} — Lanes {{ s.lane_pair }}{% endif %}</div>
+          <div class="row g-1">
+          {% for md in mdata %}
+          <div class="col-6">
+            <div class="fw-bold small mb-1">Team {{ md.team.number }}</div>
+            <table class="table table-sm table-bordered mb-0" style="font-size:0.75rem">
+              <thead><tr><th>Bowler</th><th class="text-center">G1</th><th class="text-center">G2</th><th class="text-center">G3</th><th class="text-center">Tot</th></tr></thead>
+              <tbody>
+              {% for e in md.entries %}
+              <tr class="{{ 'table-warning' if e.is_blind else '' }}">
+                <td>{% if e.is_blind %}BLIND{% elif e.bowler %}{{ e.bowler.last_name }}{% endif %}</td>
+                <td class="text-center">{{ e.game1 if e.game1 is not none else '' }}</td>
+                <td class="text-center">{{ e.game2 if e.game2 is not none else '' }}</td>
+                <td class="text-center">{{ e.game3 if e.game3 is not none else '' }}</td>
+                <td class="text-center fw-bold">{{ (e.game1 or 0) + (e.game2 or 0) + (e.game3 or 0) }}</td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endfor %}
+          </div>
+        </div>
         {% endif %}
+        {% endfor %}
+        {% for row in weekly_team_pts %}
+        {% if row.team.id == sched0.team1.id or row.team.id == sched0.team2.id %}
+        <span class="badge bg-{{ 'success' if row.points > 8 else 'secondary' }} me-1">
+          Team {{ row.team.number }}: {{ row.points | int if row.points == row.points | int else row.points }} pts
+        </span>
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+        <div class="mt-2">
         <a href="{{ url_for('entry.position_entry', season_id=season.id, week_num=week.week_num, pairing_num=pairing_num) }}"
            class="btn btn-sm btn-primary">
           {{ 'Edit Scores' if pairing_entry_count.n > 0 else 'Enter Scores' }}
         </a>
+        </div>
       </div>
     </div>
   </div>
@@ -186,8 +264,8 @@
         <table class="table table-sm table-bordered mt-2 mb-0" style="font-size:0.8rem">
           <thead class="table-light"><tr>
             <th></th>
-            <th class="text-center">{{ bd.team1.name }}</th>
-            <th class="text-center">{{ bd.team2.name }}</th>
+            <th class="text-center">Team {{ bd.team1.number }}</th>
+            <th class="text-center">Team {{ bd.team2.number }}</th>
             <th class="text-center">Pt</th>
           </tr></thead>
           <tbody>
@@ -197,8 +275,8 @@
             <td class="text-center {{ 'fw-bold' if g.winner == bd.team1.id else '' }}">{{ g.t1 }}</td>
             <td class="text-center {{ 'fw-bold' if g.winner == bd.team2.id else '' }}">{{ g.t2 }}</td>
             <td class="text-center small">
-              {% if g.winner == bd.team1.id %}{{ bd.team1.name[:4] }}
-              {% elif g.winner == bd.team2.id %}{{ bd.team2.name[:4] }}
+              {% if g.winner == bd.team1.id %}T{{ bd.team1.number }}
+              {% elif g.winner == bd.team2.id %}T{{ bd.team2.number }}
               {% else %}&mdash;{% endif %}
             </td>
           </tr>
@@ -208,8 +286,8 @@
             <td class="text-center {{ 'fw-bold' if bd.series.winner == bd.team1.id else '' }}">{{ bd.series.t1 }}</td>
             <td class="text-center {{ 'fw-bold' if bd.series.winner == bd.team2.id else '' }}">{{ bd.series.t2 }}</td>
             <td class="text-center small">
-              {% if bd.series.winner == bd.team1.id %}{{ bd.team1.name[:4] }}
-              {% elif bd.series.winner == bd.team2.id %}{{ bd.team2.name[:4] }}
+              {% if bd.series.winner == bd.team1.id %}T{{ bd.team1.number }}
+              {% elif bd.series.winner == bd.team2.id %}T{{ bd.team2.number }}
               {% else %}&mdash;{% endif %}
             </td>
           </tr>
@@ -293,8 +371,6 @@
 </div>
 
 <div class="d-flex gap-2 mb-2">
-  <a href="{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=week.week_num) }}"
-     class="btn btn-outline-primary btn-sm">View / Print Wkly Alpha</a>
   <a href="{{ url_for('reports.week_prizes', season_id=season.id, week_num=week.week_num) }}"
      class="btn btn-outline-secondary btn-sm">Prizes &amp; Standings</a>
 </div>

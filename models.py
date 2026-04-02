@@ -77,7 +77,8 @@ class Team(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     season_id = db.Column(db.Integer, db.ForeignKey('seasons.id'), nullable=False)
     number = db.Column(db.Integer, nullable=False)   # 1–4
-    name = db.Column(db.String(64), nullable=False)  # e.g. "Lewis"
+    name = db.Column(db.String(64), nullable=False)   # e.g. "Team 1" or a chosen team name
+    captain_name = db.Column(db.String(64))           # e.g. "Lewis"
 
     season = db.relationship('Season', back_populates='teams')
     roster = db.relationship('Roster', back_populates='team', lazy='dynamic')

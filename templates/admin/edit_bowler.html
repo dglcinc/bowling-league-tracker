@@ -43,33 +43,6 @@
            value="{{ bowler.email or '' }}">
   </div>
 
-  {% if roster and teams %}
-  <hr>
-  <h6 class="text-muted mb-2">{{ season.name }} Roster</h6>
-
-  <div class="mb-3">
-    <label class="form-label fw-bold">Team</label>
-    <select name="team_id" class="form-select" required>
-      {% for team in teams %}
-      <option value="{{ team.id }}" {{ 'selected' if roster.team_id == team.id else '' }}>
-        Team {{ team.number }} — {{ team.name }}
-      </option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="mb-3">
-    <label class="form-label fw-bold">Prior Year Handicap</label>
-    <input type="number" name="prior_handicap" class="form-control" min="0" max="200"
-           value="{{ roster.prior_handicap or 0 }}">
-    <div class="form-text">Leave 0 for new bowlers with no prior average.</div>
-  </div>
-  <div class="mb-3">
-    <label class="form-label fw-bold">Joined Week</label>
-    <input type="number" name="joined_week" class="form-control" min="1" max="27"
-           value="{{ roster.joined_week or 1 }}">
-  </div>
-  {% endif %}
-
   <div class="d-flex gap-2">
     <button type="submit" class="btn btn-primary">Save</button>
     {% if season %}
