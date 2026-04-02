@@ -5,7 +5,7 @@
 <style>
   .prize-box { border: 1px solid #dee2e6; border-radius: 4px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; }
   .prize-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6c757d; }
-  .prize-name  { font-size: 1.1rem; font-weight: 700; }
+  .prize-name  { font-size: 1.1rem; font-weight: 700; background-color: #fff3cd; padding: 1px 4px; border-radius: 2px; display: inline-block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .prize-score { font-size: 1.4rem; font-weight: 700; color: #0d6efd; }
   .prize-tie   { font-size: 0.75rem; }
   .section-head { font-weight: 700; font-size: 0.8rem; text-transform: uppercase;
@@ -50,7 +50,7 @@
   <div class="prize-label">{{ label }}</div>
   {% if cat %}
   <div class="prize-name">
-    {% for w in cat.winners %}{{ w.bowler.last_name }}{% if w.bowler.nickname %} ({{ w.bowler.nickname }}){% endif %}{% if not loop.last %} / {% endif %}{% endfor %}
+    {% for w in cat.winners %}<a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=w.bowler.id) }}" class="text-decoration-none text-body">{{ w.bowler.last_name }}{% if w.bowler.nickname %} ({{ w.bowler.nickname }}){% endif %}</a>{% if not loop.last %} / {% endif %}{% endfor %}
     {% if cat.winners|length > 1 %}<span class="prize-tie text-secondary">(tie)</span>{% endif %}
   </div>
   <div class="prize-score">{{ cat.score }}</div>
@@ -117,7 +117,7 @@
         <div class="prize-box">
           <div class="prize-label">{{ label }}</div>
           {% if top %}
-          <div class="prize-name">{{ top.bowler.last_name }}{% if top.bowler.nickname %} ({{ top.bowler.nickname }}){% endif %}</div>
+          <div class="prize-name"><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=top.bowler.id) }}" class="text-decoration-none text-body">{{ top.bowler.last_name }}{% if top.bowler.nickname %} ({{ top.bowler.nickname }}){% endif %}</a></div>
           <div class="prize-score">{{ top[attr] }}</div>
           {% else %}<div class="text-muted">—</div>{% endif %}
         </div>
@@ -154,7 +154,7 @@
   {% for i, r in enumerate(avg_rows) %}
   <tr>
     <td>{{ i + 1 }}</td>
-    <td>{{ r.bowler.last_name }}</td>
+    <td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler.id) }}" class="text-decoration-none text-body">{{ r.bowler.last_name }}</a></td>
     <td>{{ r.team.number }}</td>
     <td class="text-end">{{ r.games }}</td>
     <td class="text-end fw-bold">{{ r.average }}</td>
@@ -177,7 +177,7 @@
       <tbody>
       {% for i, r in enumerate(leaders | sort(attribute=attr, reverse=True)) %}
       {% if i < 10 %}
-      <tr><td>{{ i+1 }}</td><td>{{ r.bowler.last_name }}</td><td>{{ r.team.number }}</td>
+      <tr><td>{{ i+1 }}</td><td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler.id) }}" class="text-decoration-none text-body">{{ r.bowler.last_name }}</a></td><td>{{ r.team.number }}</td>
           <td class="text-end">{{ r[attr] }}</td></tr>
       {% endif %}
       {% endfor %}
