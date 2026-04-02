@@ -51,7 +51,7 @@
   <tbody>
     {% for r in roster %}
     <tr class="{{ '' if r.active else 'text-muted' }}">
-      <td>{{ r.bowler.last_name }}</td>
+      <td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler_id) }}">{{ r.bowler.last_name }}</a></td>
       <td>{{ r.bowler.first_name or '' }}</td>
       <td>{{ r.bowler.nickname or '' }}</td>
       <td>{{ r.team.number }} — {{ r.team.name }}</td>
@@ -65,8 +65,6 @@
         {% endif %}
       </td>
       <td>
-        <a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler_id) }}"
-           class="btn btn-sm btn-outline-info">Stats</a>
         <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id, season_id=season.id) }}"
            class="btn btn-sm btn-outline-secondary">Edit Bowler</a>
         <a href="{{ url_for('admin.edit_roster', season_id=season.id, roster_id=r.id) }}"
