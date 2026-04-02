@@ -62,32 +62,6 @@ def _build_high_games_leaders(season_id, through_week, min_games=0):
     return leaders
 
 
-@reports_bp.route('/season/<int:season_id>/high-games')
-def high_games(season_id):
-    season = Season.query.get_or_404(season_id)
-    through_week = request.args.get('week', type=int)
-    min_games = request.args.get('min_games', 0, type=int)
-    if not through_week:
-        last = (Week.query
-                .filter_by(season_id=season_id, is_entered=True)
-                .order_by(Week.week_num.desc())
-                .first())
-        through_week = last.week_num if last else 0
-
-    leaders = _build_high_games_leaders(season_id, through_week, min_games)
-
-    by_avg = sorted(leaders, key=lambda x: x['average'], reverse=True)
-    by_hgs = sorted(leaders, key=lambda x: x['high_game_scratch'], reverse=True)
-    by_hgh = sorted(leaders, key=lambda x: x['high_game_hcp'], reverse=True)
-    by_hss = sorted(leaders, key=lambda x: x['high_series_scratch'], reverse=True)
-    by_hsh = sorted(leaders, key=lambda x: x['high_series_hcp'], reverse=True)
-
-    return render_template('reports/high_games.html',
-                           season=season, through_week=through_week,
-                           min_games=min_games,
-                           by_avg=by_avg, by_hgs=by_hgs, by_hgh=by_hgh,
-                           by_hss=by_hss, by_hsh=by_hsh)
-
 
 @reports_bp.route('/season/<int:season_id>/week/<int:week_num>/prizes')
 def week_prizes(season_id, week_num):
@@ -136,30 +110,38 @@ def week_prizes(season_id, week_num):
         key=lambda x: (-x['average'], x['bowler'].last_name)
     )
     if top10:
-        avg_rows = avg_rows[:10]
+        top10_avgs = set(sorted({r['average'] for r in avg_rows}, reverse=True)[:10])
+        avg_rows = [r for r in avg_rows if r['average'] in top10_avgs]
 
     week_standings = get_team_standings(season_id, through_week=week_num)
-    overall = get_team_standings(season_id)
-    first_half = get_team_standings(season_id, half=1)
-    second_half = get_team_standings(season_id, half=2)
-    weeks_data, standing_teams = get_weekly_team_points(season_id)
 
     return render_template('reports/week_prizes.html',
                            season=season, week=week,
                            prizes=prizes,
                            leaders=leaders,
                            standings=week_standings,
-                           overall=overall,
-                           first_half=first_half,
-                           second_half=second_half,
-                           weeks_data=weeks_data,
-                           standing_teams=standing_teams,
                            avg_rows=avg_rows,
                            min_games=min_games,
                            top10=top10,
                            total_wood=total_wood,
                            player_count=player_count,
                            blind_games=blind_games)
+
+
+@reports_bp.route('/season/<int:season_id>/points')
+def team_points(season_id):
+    season = Season.query.get_or_404(season_id)
+    overall = get_team_standings(season_id)
+    first_half = get_team_standings(season_id, half=1)
+    second_half = get_team_standings(season_id, half=2)
+    weeks_data, standing_teams = get_weekly_team_points(season_id)
+    return render_template('reports/team_points.html',
+                           season=season,
+                           overall=overall,
+                           first_half=first_half,
+                           second_half=second_half,
+                           weeks_data=weeks_data,
+                           standing_teams=standing_teams)
 
 
 @reports_bp.route('/season/<int:season_id>/ytd-alpha/<int:week_num>')
@@ -197,10 +179,31 @@ def print_batch(season_id, week_num):
     by_hss  = sorted(hg_leaders, key=lambda x: x['high_series_scratch'], reverse=True)
     by_hsh  = sorted(hg_leaders, key=lambda x: x['high_series_hcp'], reverse=True)
 
+    # Prizes & Standings data for Group 2 page 4
+    prizes = get_weekly_prizes(season_id, week_num)
+    all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+    total_wood = sum(
+        e.total_pins + (
+            (season.blind_handicap if e.is_blind
+             else calculate_handicap(e.bowler_id, season_id, week_num))
+            * e.game_count
+        )
+        for e in all_entries
+    )
+    player_count = sum(1 for e in all_entries if not e.is_blind)
+    blind_games = sum(e.game_count for e in all_entries if e.is_blind)
+    week_standings = get_team_standings(season_id, through_week=week_num)
+
     return render_template('reports/print_batch.html',
                            season=season, week=week, week_num=week_num, weeks=weeks,
                            alpha_rows=alpha_rows,
                            ytd_rows=ytd_rows,
                            by_avg=by_avg, by_hgs=by_hgs, by_hgh=by_hgh,
                            by_hss=by_hss, by_hsh=by_hsh,
-                           hg_through=hg_through)
+                           hg_through=hg_through,
+                           prizes=prizes,
+                           pb_leaders=hg_leaders,
+                           week_standings=week_standings,
+                           total_wood=total_wood,
+                           player_count=player_count,
+                           blind_games=blind_games)

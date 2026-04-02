@@ -30,14 +30,13 @@
 {% endblock %}
 
 {% block content %}
-<div class="no-print d-flex justify-content-between align-items-center mb-2">
+<div class="no-print mb-2">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb mb-0">
       <li class="breadcrumb-item"><a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}">Week {{ week.week_num }}</a></li>
       <li class="breadcrumb-item active">Prizes &amp; Standings</li>
     </ol>
   </nav>
-  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">Print</button>
 </div>
 
 <div class="text-center mb-2" style="font-size:0.9rem">
@@ -51,7 +50,7 @@
   <div class="prize-label">{{ label }}</div>
   {% if cat %}
   <div class="prize-name">
-    {% for w in cat.winners %}{{ w.bowler.last_name }}{% if not loop.last %} / {% endif %}{% endfor %}
+    {% for w in cat.winners %}{{ w.bowler.last_name }}{% if w.bowler.nickname %} ({{ w.bowler.nickname }}){% endif %}{% if not loop.last %} / {% endif %}{% endfor %}
     {% if cat.winners|length > 1 %}<span class="prize-tie text-secondary">(tie)</span>{% endif %}
   </div>
   <div class="prize-score">{{ cat.score }}</div>
@@ -118,7 +117,7 @@
         <div class="prize-box">
           <div class="prize-label">{{ label }}</div>
           {% if top %}
-          <div class="prize-name">{{ top.bowler.last_name }}</div>
+          <div class="prize-name">{{ top.bowler.last_name }}{% if top.bowler.nickname %} ({{ top.bowler.nickname }}){% endif %}</div>
           <div class="prize-score">{{ top[attr] }}</div>
           {% else %}<div class="text-muted">—</div>{% endif %}
         </div>
@@ -128,91 +127,6 @@
   </div>
 
 </div>
-
-{# Full team standings + week-by-week grid #}
-<hr>
-<div class="row mb-3">
-  <div class="col-md-3">
-    <h6>Overall</h6>
-    <table class="table table-sm table-bordered">
-      <thead><tr><th>Team</th><th class="text-end">Pts</th></tr></thead>
-      <tbody>
-      {% for s in overall %}
-      <tr><td>{{ s.team.number }} — {{ s.team.name }}</td><td class="text-end fw-bold">{{ s.points }}</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="col-md-3">
-    <h6>First Half (Wks 1–{{ season.half_boundary_week }})</h6>
-    <table class="table table-sm table-bordered">
-      <thead><tr><th>Team</th><th class="text-end">Pts</th></tr></thead>
-      <tbody>
-      {% for s in first_half %}
-      <tr><td>{{ s.team.number }} — {{ s.team.name }}</td><td class="text-end fw-bold">{{ s.points }}</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="col-md-3">
-    <h6>Second Half (Wks {{ season.half_boundary_week + 1 }}–{{ season.num_weeks }})</h6>
-    <table class="table table-sm table-bordered">
-      <thead><tr><th>Team</th><th class="text-end">Pts</th></tr></thead>
-      <tbody>
-      {% for s in second_half %}
-      <tr><td>{{ s.team.number }} — {{ s.team.name }}</td><td class="text-end fw-bold">{{ s.points }}</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-{% if weeks_data %}
-<div class="table-responsive">
-<table class="table table-sm table-bordered table-striped" style="font-size:0.82rem">
-  <thead class="table-dark">
-    <tr>
-      <th>Wk</th><th>Date</th>
-      {% for team in standing_teams %}
-      <th class="text-center" colspan="3">{{ team.number }} — {{ team.name }}</th>
-      {% endfor %}
-      <th class="text-center">Grand</th>
-    </tr>
-    <tr class="table-secondary" style="font-size:0.75rem">
-      <th colspan="2"></th>
-      {% for team in standing_teams %}
-      <th class="text-center">A</th><th class="text-center">B</th><th class="text-center fw-bold">Tot</th>
-      {% endfor %}
-      <th class="text-center">Total</th>
-    </tr>
-  </thead>
-  <tbody>
-  {% for wd in weeks_data %}
-  <tr {% if wd.week.is_position_night %}class="table-warning"{% endif %}>
-    <td>{{ wd.week.week_num }}{% if wd.week.is_position_night %} &#9733;{% endif %}</td>
-    <td class="text-nowrap">{{ wd.week.date.strftime('%b %d') if wd.week.date else '' }}</td>
-    {% for row in wd.teams %}
-    <td class="text-center">{{ row.pts_a | int if row.pts_a == row.pts_a | int else row.pts_a }}</td>
-    <td class="text-center">{{ row.pts_b | int if row.pts_b == row.pts_b | int else row.pts_b }}</td>
-    <td class="text-center fw-bold">{{ row.total | int if row.total == row.total | int else row.total }}</td>
-    {% endfor %}
-    <td class="text-center fw-bold">{{ wd.grand_total | int if wd.grand_total == wd.grand_total | int else wd.grand_total }}</td>
-  </tr>
-  {% endfor %}
-  </tbody>
-  <tfoot class="table-dark">
-    <tr>
-      <td colspan="2" class="fw-bold">Totals</td>
-      {% for row in weeks_data[-1].teams %}
-      <td colspan="2"></td>
-      <td class="text-center fw-bold">{{ row.cumul | int if row.cumul == row.cumul | int else row.cumul }}</td>
-      {% endfor %}
-      <td></td>
-    </tr>
-  </tfoot>
-</table>
-</div>
-{% endif %}
 
 {# High averages section #}
 <hr>
@@ -225,7 +139,7 @@
     <div class="form-check mb-0">
       <input class="form-check-input" type="checkbox" name="top10" value="1" id="top10chk"
              {{ 'checked' if top10 else '' }} onchange="this.form.submit()">
-      <label class="form-check-label small" for="top10chk">Top 10 only</label>
+      <label class="form-check-label small" for="top10chk">Top 10 averages</label>
     </div>
     <button type="submit" class="btn btn-sm btn-outline-secondary">Apply</button>
   </form>

@@ -360,7 +360,11 @@ def position_entry(season_id, week_num, pairing_num):
         flash('This week is not a position night.', 'warning')
         return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
-    matchup_nums = [1, 2] if pairing_num == 1 else [3, 4]
+    is_club_championship = (week.tournament_type == 'club_championship')
+    if is_club_championship:
+        matchup_nums = [1, 2]   # one pairing covers both lane pairs
+    else:
+        matchup_nums = [1, 2] if pairing_num == 1 else [3, 4]
 
     scheds = (ScheduleEntry.query
               .filter_by(season_id=season_id, week_num=week_num)
@@ -426,9 +430,9 @@ def position_entry(season_id, week_num, pairing_num):
 
         db.session.commit()
 
-        # Mark week entered once both pairings have been saved.
+        # Club championship has only one pairing; regular position night needs both saved.
         other_matchup_nums = [3, 4] if pairing_num == 1 else [1, 2]
-        other_has_entries = MatchupEntry.query.filter(
+        other_has_entries = is_club_championship or MatchupEntry.query.filter(
             MatchupEntry.season_id == season_id,
             MatchupEntry.week_num == week_num,
             MatchupEntry.matchup_num.in_(other_matchup_nums)

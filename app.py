@@ -19,6 +19,10 @@ def _migrate_db(db):
         "INSERT OR IGNORE INTO league_settings (id, league_name, use_nickname) VALUES (1, 'Mountain Lakes Men''s Bowling League', 0)",
         "ALTER TABLE teams ADD COLUMN captain_name VARCHAR(64)",
         "ALTER TABLE league_settings ADD COLUMN show_captain_name BOOLEAN DEFAULT 0",
+        # One-time: move existing team names into captain_name, then standardize team names
+        "UPDATE teams SET captain_name = name WHERE captain_name IS NULL AND name NOT LIKE 'Team %'",
+        "UPDATE teams SET name = 'Team ' || CAST(number AS TEXT) WHERE name NOT LIKE 'Team %' AND name != 'Pinheads'",
+        "UPDATE teams SET name = 'Pinheads' WHERE number = 2 AND season_id IN (SELECT id FROM seasons WHERE is_active = 1)",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:
@@ -111,4 +115,4 @@ def create_app():
 if __name__ == '__main__':
     app = create_app()
     print("\n  Bowling League Tracker running at http://localhost:5001\n")
-    app.run(debug=True, port=5001)
+    app.run(debug=True, host='0.0.0.0', port=5001)

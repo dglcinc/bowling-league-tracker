@@ -37,7 +37,7 @@
         </li>
         {% if active_season %}
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports.high_games', season_id=active_season.id) }}">High Games</a>
+          <a class="nav-link" href="{{ url_for('reports.team_points', season_id=active_season.id) }}">Points</a>
         </li>
         {% if current_week %}
         <li class="nav-item">

@@ -28,7 +28,7 @@
   <div class="col-auto">
     <a href="{{ url_for('admin.edit_team', season_id=season.id, team_id=team.id) }}"
        class="btn btn-primary">
-      Team {{ team.number }}: {{ team.name }}{% if team.captain_name %} ({{ team.captain_name }}){% endif %}
+      Team {{ team.number }}{% if team.captain_name %} ({{ team.captain_name }}){% endif %}
     </a>
   </div>
   {% endfor %}
