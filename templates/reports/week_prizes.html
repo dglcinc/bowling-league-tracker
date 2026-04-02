@@ -13,18 +13,22 @@
                   padding: 3px 6px; margin-bottom: 4px; }
   @media print {
     @page { size: landscape; margin: 0.35in; }
-    body  { font-size: 8pt !important; }
+    body  { font-size: 7.5pt !important; }
     .no-print { display: none !important; }
     .navbar   { display: none !important; }
     .container-fluid { padding: 0 !important; }
-    .prize-score { font-size: 11pt !important; }
-    .prize-name  { font-size: 9pt !important; }
-    .table { font-size: 8pt !important; }
-    .table th, .table td { padding: 1px 4px !important; }
-    .prize-box { padding: 3px 6px !important; margin-bottom: 3px !important; }
-    h4, h5 { font-size: 10pt !important; margin-bottom: 4px !important; }
-    .section-head { font-size: 7pt !important; }
+    .prize-score { font-size: 9pt !important; }
+    .prize-name  { font-size: 8pt !important; }
+    .table { font-size: 7.5pt !important; border-collapse: collapse !important; }
+    .table th, .table td { padding: 1px 3px !important; line-height: 1.2 !important; }
+    .prize-box { padding: 2px 4px !important; margin-bottom: 2px !important; border-radius: 2px !important; }
+    .prize-label { font-size: 6pt !important; }
+    h4, h5, h6 { font-size: 8pt !important; margin-bottom: 1px !important; margin-top: 0 !important; }
+    .section-head { font-size: 6.5pt !important; padding: 1px 4px !important; margin-bottom: 2px !important; }
+    hr { margin: 3px 0 !important; }
+    .row { --bs-gutter-y: 0.25rem !important; }
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    a { color: inherit !important; text-decoration: none !important; }
   }
 </style>
 {% endblock %}
