@@ -9,12 +9,11 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 **Important:** Never put player names, team names (which are player surnames), or any other personal information in the repository, code, comments, or documentation.
 
-## Repo / Branch State (as of 2026-03-30)
+## Repo / Branch State (as of 2026-04-02)
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
-- Open PRs: `feature/initial-app` (PR #2), `feature/season-format-tournaments-import` (PR #5)
-- Merge PR #2 first, then PR #5
+- No open PRs — PRs #2, #5, #7, #9 all merged to main
 
 ## League Structure
 
@@ -143,6 +142,8 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 - `edit_weeks` — set dates (with JS cascade +7 days), position night flags, tournament types
 - `import_season` — web UI to upload XLS and seed a full historical season
 - `assign_matchups_list` / `assign_matchups` — per-week tool to assign bowlers to lane pair A or B
+- `edit_team` — edit team name and captain name (`Team.captain_name` column); team badges on season_detail are clickable links to this page
+- Edit Bowler and Edit Roster are separate buttons on the roster list; edit_bowler no longer includes roster fields
 
 **`payout_bp`** (`/payout/season/<id>`)
 - YTD prize counts per bowler, weekly prize history, Iron Man candidates, Most Improved
@@ -155,7 +156,7 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 ### Snapshots
 Written automatically after each week is fully entered. Stored as JSON at OneDrive path next to the DB.
 
-## Current State (as of 2026-03-30)
+## Current State (as of 2026-04-02)
 
 ### Seasons in DB
 - **2025-2026** (active): all 22 regular weeks entered; 4 post-season tournament weeks (23–26) added; TeamPoints from spreadsheet
@@ -183,7 +184,6 @@ XLS path: `/users/david/OneDrive - DGLC/Claude/scoring 2025-2026 - Week 22.xlsx`
 ### Still to build
 - Season rollover wizard
 - Prize money calculation (details TBD)
-- Merge PR #2 (`feature/initial-app`) first, then merge PR #5
 
 ## Git Workflow
 
