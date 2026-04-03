@@ -180,40 +180,42 @@
     <defs>
 
       {# ── 3-wave horizontal guilloche (24 × 24 tile) ─────────
-         Double frequency: 2 full waves per 24-unit tile.
-         Amplitude ±15 from centre y=12 (peaks clip to strip edges
-         for a dramatic filled look).
-         Wave 1: navy outer  (amplitude ±15)
-         Wave 2: orange counter-phase (amplitude ±15)
-         Wave 3: navy inner ripple (amplitude ±7.5)             #}
+         One wave per tile.  Wave paths use local x ∈ [0,24],
+         y centre=12, amplitude ±10 (outer), ±5 (inner ripple). #}
       <pattern id="hg{{ loop.index }}" patternUnits="userSpaceOnUse" width="24" height="24">
-        <path d="M 0,12 C 3,-3  3,-3  6,12 C 9,27  9,27  12,12 C 15,-3 15,-3 18,12 C 21,27 21,27 24,12"
+        <path d="M 0,12 C 6,2  6,2  12,12 C 18,22 18,22 24,12"
               fill="none" stroke="#1b3a6b" stroke-width="2"   stroke-linecap="round"/>
-        <path d="M 0,12 C 3,27  3,27  6,12 C 9,-3  9,-3  12,12 C 15,27 15,27 18,12 C 21,-3 21,-3 24,12"
+        <path d="M 0,12 C 6,22 6,22 12,12 C 18,2  18,2  24,12"
               fill="none" stroke="#f47920" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M 0,12 C 3,4.5 3,4.5 6,12 C 9,19.5 9,19.5 12,12 C 15,4.5 15,4.5 18,12 C 21,19.5 21,19.5 24,12"
+        <path d="M 0,12 C 6,7  6,7  12,12 C 18,17 18,17 24,12"
               fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
       </pattern>
 
-      {# ── Vertical guilloche — LEFT strip (x=22–46, centre x=34)
-         Double frequency: 2 waves per 24-unit tile, amplitude ±15.
-         Arcs reach x=19 and x=49 — clipped to strip edges.    #}
-      <pattern id="vgl{{ loop.index }}" patternUnits="userSpaceOnUse" width="24" height="24">
-        <path d="M 34,0 C 19,3  19,3  34,6  C 49,9  49,9  34,12 C 19,15 19,15 34,18 C 49,21 49,21 34,24"
+      {# ── Vertical guilloche — LEFT strip (x=22–46) ───────────
+         x="22" anchors tile origin at the strip's left edge, so
+         the single 24-unit tile covers exactly x=22–46 with no
+         horizontal tiling and no phase offset.
+         Wave paths in local coords: centre x=12, arcs x=2 & x=22,
+         both within the 0–24 tile — nothing clips.             #}
+      <pattern id="vgl{{ loop.index }}" patternUnits="userSpaceOnUse"
+               width="24" height="24" x="22" y="0">
+        <path d="M 12,0 C 2,6  2,6  12,12 C 22,18 22,18 12,24"
               fill="none" stroke="#1b3a6b" stroke-width="2"   stroke-linecap="round"/>
-        <path d="M 34,0 C 49,3  49,3  34,6  C 19,9  19,9  34,12 C 49,15 49,15 34,18 C 19,21 19,21 34,24"
+        <path d="M 12,0 C 22,6 22,6 12,12 C 2,18  2,18  12,24"
               fill="none" stroke="#f47920" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M 34,0 C 26.5,3 26.5,3 34,6  C 41.5,9 41.5,9 34,12 C 26.5,15 26.5,15 34,18 C 41.5,21 41.5,21 34,24"
+        <path d="M 12,0 C 7,6  7,6  12,12 C 17,18 17,18 12,24"
               fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
       </pattern>
-      {# ── Vertical guilloche — RIGHT strip (x=804–828, centre x=816)
-         Same double-freq / ±15 amplitude treatment.            #}
-      <pattern id="vgr{{ loop.index }}" patternUnits="userSpaceOnUse" width="24" height="24">
-        <path d="M 816,0 C 801,3  801,3  816,6  C 831,9  831,9  816,12 C 801,15 801,15 816,18 C 831,21 831,21 816,24"
+      {# ── Vertical guilloche — RIGHT strip (x=804–828) ────────
+         x="804" anchors tile origin at the strip's left edge.
+         Identical local-coord wave paths as vgl.               #}
+      <pattern id="vgr{{ loop.index }}" patternUnits="userSpaceOnUse"
+               width="24" height="24" x="804" y="0">
+        <path d="M 12,0 C 2,6  2,6  12,12 C 22,18 22,18 12,24"
               fill="none" stroke="#1b3a6b" stroke-width="2"   stroke-linecap="round"/>
-        <path d="M 816,0 C 831,3  831,3  816,6  C 801,9  801,9  816,12 C 831,15 831,15 816,18 C 801,21 801,21 816,24"
+        <path d="M 12,0 C 22,6 22,6 12,12 C 2,18  2,18  12,24"
               fill="none" stroke="#f47920" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M 816,0 C 808.5,3 808.5,3 816,6  C 823.5,9 823.5,9 816,12 C 808.5,15 808.5,15 816,18 C 823.5,21 823.5,21 816,24"
+        <path d="M 12,0 C 7,6  7,6  12,12 C 17,18 17,18 12,24"
               fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
       </pattern>
 
