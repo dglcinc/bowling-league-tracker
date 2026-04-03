@@ -180,40 +180,40 @@
     <defs>
 
       {# ── 3-wave horizontal guilloche (24 × 24 tile) ─────────
-         Wave 1: navy, large outer arc  (amplitude ±10 from centre)
-         Wave 2: orange, large counter-arc (opposite phase)
-         Wave 3: navy, subtle inner ripple (amplitude ±5)        #}
+         Double frequency: 2 full waves per 24-unit tile.
+         Amplitude ±15 from centre y=12 (peaks clip to strip edges
+         for a dramatic filled look).
+         Wave 1: navy outer  (amplitude ±15)
+         Wave 2: orange counter-phase (amplitude ±15)
+         Wave 3: navy inner ripple (amplitude ±7.5)             #}
       <pattern id="hg{{ loop.index }}" patternUnits="userSpaceOnUse" width="24" height="24">
-        <path d="M 0,12 C 6,2 6,2 12,12 C 18,22 18,22 24,12"
+        <path d="M 0,12 C 3,-3  3,-3  6,12 C 9,27  9,27  12,12 C 15,-3 15,-3 18,12 C 21,27 21,27 24,12"
               fill="none" stroke="#1b3a6b" stroke-width="2"   stroke-linecap="round"/>
-        <path d="M 0,12 C 6,22 6,22 12,12 C 18,2  18,2  24,12"
+        <path d="M 0,12 C 3,27  3,27  6,12 C 9,-3  9,-3  12,12 C 15,27 15,27 18,12 C 21,-3 21,-3 24,12"
               fill="none" stroke="#f47920" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M 0,12 C 6,7  6,7  12,12 C 18,17 18,17 24,12"
+        <path d="M 0,12 C 3,4.5 3,4.5 6,12 C 9,19.5 9,19.5 12,12 C 15,4.5 15,4.5 18,12 C 21,19.5 21,19.5 24,12"
               fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
       </pattern>
 
-      {# ── Vertical guilloche — LEFT strip (x=22–46, centre x=34) ─
-         Waves anchored to x=34 so arcs reach x=24 and x=44,
-         both fully inside the 24-unit-wide strip.              #}
+      {# ── Vertical guilloche — LEFT strip (x=22–46, centre x=34)
+         Double frequency: 2 waves per 24-unit tile, amplitude ±15.
+         Arcs reach x=19 and x=49 — clipped to strip edges.    #}
       <pattern id="vgl{{ loop.index }}" patternUnits="userSpaceOnUse" width="24" height="24">
-        <path d="M 34,0 C 24,6  24,6  34,12 C 44,18 44,18 34,24"
+        <path d="M 34,0 C 19,3  19,3  34,6  C 49,9  49,9  34,12 C 19,15 19,15 34,18 C 49,21 49,21 34,24"
               fill="none" stroke="#1b3a6b" stroke-width="2"   stroke-linecap="round"/>
-        <path d="M 34,0 C 44,6  44,6  34,12 C 24,18 24,18 34,24"
+        <path d="M 34,0 C 49,3  49,3  34,6  C 19,9  19,9  34,12 C 49,15 49,15 34,18 C 19,21 19,21 34,24"
               fill="none" stroke="#f47920" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M 34,0 C 29,6  29,6  34,12 C 39,18 39,18 34,24"
+        <path d="M 34,0 C 26.5,3 26.5,3 34,6  C 41.5,9 41.5,9 34,12 C 26.5,15 26.5,15 34,18 C 41.5,21 41.5,21 34,24"
               fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
       </pattern>
       {# ── Vertical guilloche — RIGHT strip (x=804–828, centre x=816)
-         804 mod 24 = 12, so without this correction the leftward
-         arc (→x=794) is clipped outside the strip and the lines
-         appear to never cross.  Anchoring at x=816 keeps both
-         arcs (→806 and →826) fully inside the strip.           #}
+         Same double-freq / ±15 amplitude treatment.            #}
       <pattern id="vgr{{ loop.index }}" patternUnits="userSpaceOnUse" width="24" height="24">
-        <path d="M 816,0 C 806,6  806,6  816,12 C 826,18 826,18 816,24"
+        <path d="M 816,0 C 801,3  801,3  816,6  C 831,9  831,9  816,12 C 801,15 801,15 816,18 C 831,21 831,21 816,24"
               fill="none" stroke="#1b3a6b" stroke-width="2"   stroke-linecap="round"/>
-        <path d="M 816,0 C 826,6  826,6  816,12 C 806,18 806,18 816,24"
+        <path d="M 816,0 C 831,3  831,3  816,6  C 801,9  801,9  816,12 C 831,15 831,15 816,18 C 801,21 801,21 816,24"
               fill="none" stroke="#f47920" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M 816,0 C 811,6  811,6  816,12 C 821,18 821,18 816,24"
+        <path d="M 816,0 C 808.5,3 808.5,3 816,6  C 823.5,9 823.5,9 816,12 C 808.5,15 808.5,15 816,18 C 823.5,21 823.5,21 816,24"
               fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
       </pattern>
 
@@ -236,9 +236,9 @@
     {# Bottom: symmetric                                                         #}
     <rect x="95"  y="1054" width="660" height="24" fill="url(#hg{{ loop.index }})"/>
     {# Left: from y=95 (below TL triangle) to y=1005 (above BL triangle)        #}
-    <rect x="22"  y="95"   width="24"  height="910" fill="url(#vg{{ loop.index }})"/>
+    <rect x="22"  y="95"   width="24"  height="910" fill="url(#vgl{{ loop.index }})"/>
     {# Right: symmetric                                                           #}
-    <rect x="804" y="95"   width="24"  height="910" fill="url(#vg{{ loop.index }})"/>
+    <rect x="804" y="95"   width="24"  height="910" fill="url(#vgr{{ loop.index }})"/>
 
     {# ── Inner orange border — well inside the guilloche ────  #}
     {# x=60: (60/850)*8.5in ≈ 0.60in from edge; corner (60,60): 60+60=120 > 115  #}
@@ -309,9 +309,9 @@
     {% else %}
       <div class="cert-name">{{ rec.name }}</div>
       {% if rec.captain %}<div class="cert-captain">Captain: {{ rec.captain }}</div>{% endif %}
-      <div class="team-finish-badge">
-        {% if rec.place == '1st' %}&#9733; Season Champions &#9733;{% else %}{{ rec.place }} Place{% endif %}
-      </div>
+      {% if rec.prizes | selectattr('label', 'equalto', 'Championship \u2014 1st Place') | list %}
+      <div class="team-finish-badge">&#9733; Champions &#9733;</div>
+      {% endif %}
     {% endif %}
 
     <hr class="orange-rule">

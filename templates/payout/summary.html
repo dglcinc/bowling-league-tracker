@@ -151,29 +151,52 @@
   {# ─── Column 2: Team payouts + currency breakdown ─── #}
   <div class="col-12 col-xl-6">
     <div class="section-head">Team Payouts</div>
-    <table class="table table-sm table-bordered mb-3" style="max-width:400px">
+
+    {# One mini-table per award #}
+    {% for award in payout.team_awards %}
+    <div class="small fw-semibold mb-1">{{ award.name }}
+      <span class="text-muted fw-normal">({{ award.pool_pct | int }}% = ${{ "%.0f"|format(award.pool_amount) }})</span>
+    </div>
+    <table class="table table-sm table-bordered mb-3" style="max-width:380px">
       <thead class="table-dark">
-        <tr><th>Place</th><th>Team</th><th class="text-end">Pts</th>
-            <th class="text-end">%</th><th class="text-end">Amount</th></tr>
+        <tr><th>Place</th><th>Team</th><th class="text-end">Pts</th><th class="text-end">Amt</th></tr>
       </thead>
       <tbody>
-      {% for tp in payout.team_payouts %}
+      {% for row in award.rows %}
       <tr>
-        <td>{{ tp.place }}</td>
+        <td>{{ row.place }}</td>
+        <td>Team {{ row.team.number }}</td>
+        <td class="text-end">{{ row.points }}</td>
+        <td class="text-end fw-bold">${{ row.amount | int }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-muted text-center">No data.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endfor %}
+
+    {# Consolidated totals per team #}
+    <div class="small fw-semibold mb-1">Team Totals</div>
+    <table class="table table-sm table-bordered mb-3" style="max-width:380px">
+      <thead class="table-dark">
+        <tr><th>Team</th><th class="text-end">Total</th></tr>
+      </thead>
+      <tbody>
+      {% for tt in payout.team_payouts %}
+      <tr>
         <td>
-          <a href="{{ url_for('payout.award_team', season_id=season.id, team_id=tp.team.id) }}"
+          <a href="{{ url_for('payout.award_team', season_id=season.id, team_id=tt.team.id) }}"
              class="text-decoration-none text-body" target="_blank">
-            {{ tp.team.number }} — {{ tp.team.name }}
+            Team {{ tt.team.number }}{% if tt.team.name and tt.team.name != 'Team ' ~ tt.team.number %} — {{ tt.team.name }}{% endif %}
           </a>
-          {% if tp.captain %}<span class="text-muted small"> ({{ tp.captain }})</span>{% endif %}
+          {% if tt.captain %}<span class="text-muted small"> ({{ tt.captain }})</span>{% endif %}
         </td>
-        <td class="text-end">{{ tp.points }}</td>
-        <td class="text-end">{{ tp.pct | int }}%</td>
-        <td class="text-end fw-bold">${{ "%.2f"|format(tp.amount) }}</td>
+        <td class="text-end fw-bold">${{ "%.2f"|format(tt.total) }}</td>
       </tr>
       {% endfor %}
       <tr class="table-light">
-        <td colspan="4" class="text-end fst-italic small">Total</td>
+        <td class="text-end fst-italic small">Total</td>
         <td class="text-end fw-bold">${{ "%.2f"|format(payout.team_total) }}</td>
       </tr>
       </tbody>
@@ -213,11 +236,11 @@
       </tr>
       {% endfor %}
       {# Team payees #}
-      {% for tp in payout.team_payouts %}
-      {% set bd = team_breakdowns[tp.team.id] %}
+      {% for tt in payout.team_payouts %}
+      {% set bd = team_breakdowns[tt.team.id] %}
       <tr>
-        <td>{{ tp.team.number }} — {{ tp.team.name }}</td>
-        <td class="text-end fw-bold">${{ "%.2f"|format(tp.amount) }}</td>
+        <td>Team {{ tt.team.number }}{% if tt.team.name and tt.team.name != 'Team ' ~ tt.team.number %} — {{ tt.team.name }}{% endif %}</td>
+        <td class="text-end fw-bold">${{ "%.2f"|format(tt.total) }}</td>
         {% for d in denoms %}
         <td class="text-end {{ 'text-muted' if bd[d] == 0 else '' }}">{{ bd[d] if bd[d] else '—' }}</td>
         {% endfor %}

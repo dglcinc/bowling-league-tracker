@@ -4,7 +4,7 @@ Payout routes: weekly prize overview, season payout config, summary, and award p
 
 import json
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from models import db, Season, Week, Roster, Bowler, Team, TournamentEntry, PayoutConfig
+from models import db, Season, Week, Roster, Bowler, Team, TournamentEntry, PayoutConfig, TeamPoints
 from calculations import (get_iron_man_status, get_most_improved, get_bowler_stats,
                           get_weekly_prizes, get_team_standings)
 
@@ -178,55 +178,112 @@ def _calculate_payout(season_id, config):
 
     individual_total = sum(p['total'] for p in ind_map.values())
 
-    # ---- 5. TEAM REMAINDER ----
+    # ---- 5. TEAM AWARDS ----
     remainder = (config.total_available
                  - tournament_total
                  - individual_total
                  - config.trophy_cost)
 
     try:
-        team_pcts = json.loads(config.team_pct_json)
+        award_pcts = json.loads(config.team_award_pcts_json)
     except (ValueError, TypeError):
-        team_pcts = [40, 30, 20, 10]
+        award_pcts = [40, 40, 20]
 
-    standings = get_team_standings(season_id)
-    team_payouts = []
-    for i, standing in enumerate(standings):
-        pct = team_pcts[i] if i < len(team_pcts) else 0
-        amount = round(remainder * pct / 100, 2)
-        # Find team captain from roster
-        captain = None
-        for r in Roster.query.filter_by(
-                season_id=season_id, team_id=standing['team'].id, active=True).all():
-            if r.team.captain_name:
-                captain = r.team.captain_name
-                break
-        team_payouts.append({
-            'team':      standing['team'],
-            'captain':   captain or standing['team'].captain_name,
-            'place':     PLACE_LABELS[i] if i < len(PLACE_LABELS) else f'{i+1}th',
-            'place_num': i + 1,
-            'points':    standing['points'],
-            'pct':       pct,
-            'amount':    amount,
+    try:
+        place_pcts_all = json.loads(config.team_place_pcts_json)
+    except (ValueError, TypeError):
+        place_pcts_all = [[35, 25, 20, 20], [35, 25, 20, 20], [60, 40]]
+
+    champ_start = (config.championship_start_week
+                   if config.championship_start_week else 20)
+
+    first_half_standings  = get_team_standings(season_id, half=1)
+    second_half_standings = get_team_standings(season_id, half=2)
+
+    # Championship: TeamPoints for weeks >= champ_start
+    champ_pts_rows = (TeamPoints.query
+                      .filter_by(season_id=season_id)
+                      .filter(TeamPoints.week_num >= champ_start)
+                      .all())
+    champ_map = {}
+    for tp_row in champ_pts_rows:
+        if tp_row.team_id not in champ_map:
+            champ_map[tp_row.team_id] = {'team': tp_row.team, 'points': 0}
+        champ_map[tp_row.team_id]['points'] += tp_row.points_earned
+    champ_standings = sorted(champ_map.values(), key=lambda x: x['points'], reverse=True)
+
+    award_defs = [
+        ('First Half',   first_half_standings,  award_pcts[0] if len(award_pcts) > 0 else 40),
+        ('Second Half',  second_half_standings, award_pcts[1] if len(award_pcts) > 1 else 40),
+        ('Championship', champ_standings,       award_pcts[2] if len(award_pcts) > 2 else 20),
+    ]
+
+    # Accumulate per-team totals across all three awards
+    team_totals = {}  # team_id -> {team, captain, prizes, total}
+
+    def _get_tt(team):
+        tid = team.id
+        if tid not in team_totals:
+            team_totals[tid] = {
+                'team':    team,
+                'captain': team.captain_name or '',
+                'prizes':  [],
+                'total':   0.0,
+            }
+        return team_totals[tid]
+
+    team_awards = []  # for summary page: [{name, pool_amount, pool_pct, rows}]
+    for (award_name, standings, pool_pct), place_pcts in zip(award_defs, place_pcts_all):
+        pool_amount = round(remainder * pool_pct / 100, 2)
+        award_rows = []
+        for i, standing in enumerate(standings):
+            pct = place_pcts[i] if i < len(place_pcts) else 0
+            if pct <= 0:
+                continue
+            amount = round(pool_amount * pct / 100, 2)
+            if amount <= 0:
+                continue
+            place_label = PLACE_LABELS[i] if i < len(PLACE_LABELS) else f'{i+1}th'
+            tt = _get_tt(standing['team'])
+            tt['prizes'].append({
+                'type':   'team_finish',
+                'label':  f"{award_name} \u2014 {place_label} Place",
+                'detail': f"{standing['points']} pts",
+                'amount': amount,
+            })
+            tt['total'] += amount
+            award_rows.append({
+                'team':   standing['team'],
+                'place':  place_label,
+                'points': standing['points'],
+                'amount': amount,
+            })
+        team_awards.append({
+            'name':        award_name,
+            'pool_amount': pool_amount,
+            'pool_pct':    pool_pct,
+            'rows':        award_rows,
         })
-    team_total = sum(tp['amount'] for tp in team_payouts)
+
+    team_payouts = sorted(team_totals.values(), key=lambda x: x['team'].number)
+    team_total = sum(tt['total'] for tt in team_payouts)
 
     # Sort individual payouts alphabetically
     individual_payouts = sorted(ind_map.values(),
                                 key=lambda x: x['bowler'].last_name)
 
     return {
-        'total_available':   config.total_available,
-        'tournament_items':  tournament_items,
-        'tournament_total':  tournament_total,
+        'total_available':    config.total_available,
+        'tournament_items':   tournament_items,
+        'tournament_total':   tournament_total,
         'individual_payouts': individual_payouts,
-        'individual_total':  individual_total,
-        'trophy_cost':       config.trophy_cost,
-        'team_payouts':      team_payouts,
-        'team_total':        team_total,
-        'remainder':         remainder,
-        'final_week':        final_week,
+        'individual_total':   individual_total,
+        'trophy_cost':        config.trophy_cost,
+        'team_awards':        team_awards,
+        'team_payouts':       team_payouts,
+        'team_total':         team_total,
+        'remainder':          remainder,
+        'final_week':         final_week,
     }
 
 
@@ -258,22 +315,21 @@ def _build_recipients(payout):
     # (guests don't get individual award pages since they have no bowler record)
 
     # Team recipients
-    for tp in payout['team_payouts']:
-        team = tp['team']
+    for tt in payout['team_payouts']:
+        team = tt['team']
+        num_label = f"Team {team.number}"
+        if (team.name and team.name != num_label
+                and team.name.lower() != f"team {team.number}"):
+            display_name = f"{num_label} \u2014 {team.name}"
+        else:
+            display_name = num_label
         recipients.append({
-            'type':      'team',
-            'team':      team,
-            'name':      f"Team {team.number} \u2014 {team.name}",
-            'captain':   team.captain_name or '',
-            'place':     tp['place'],
-            'points':    tp['points'],
-            'prizes': [{
-                'type':   'team_finish',
-                'label':  f"Season {tp['place']} Place",
-                'detail': f"{tp['points']} points",
-                'amount': tp['amount'],
-            }],
-            'total': tp['amount'],
+            'type':    'team',
+            'team':    team,
+            'name':    display_name,
+            'captain': tt['captain'],
+            'prizes':  tt['prizes'],
+            'total':   tt['total'],
         })
 
     return recipients
@@ -357,26 +413,51 @@ def payout_config(season_id):
         config.trophy_cost        = float(request.form.get('trophy_cost', 125))
         config.final_week         = int(request.form.get('final_week', 22))
 
-        pct_raw = request.form.get('team_pcts', '40,30,20,10')
         try:
-            pcts = [float(x.strip()) for x in pct_raw.split(',') if x.strip()]
-            config.team_pct_json = json.dumps(pcts)
+            award_pcts = [float(request.form.get(f'award_pct_{i}', 0)) for i in range(3)]
+            config.team_award_pcts_json = json.dumps(award_pcts)
         except ValueError:
-            flash('Team percentages must be comma-separated numbers.', 'warning')
+            flash('Award pool percentages must be numbers.', 'warning')
             return redirect(url_for('payout.payout_config', season_id=season_id))
+
+        try:
+            place_pcts_all = []
+            for i in range(3):
+                raw = request.form.get(f'place_pcts_{i}', '')
+                pcts = [float(x.strip()) for x in raw.split(',') if x.strip()]
+                place_pcts_all.append(pcts)
+            config.team_place_pcts_json = json.dumps(place_pcts_all)
+        except ValueError:
+            flash('Place percentages must be comma-separated numbers.', 'warning')
+            return redirect(url_for('payout.payout_config', season_id=season_id))
+
+        try:
+            config.championship_start_week = int(request.form.get('championship_start_week', 20))
+        except ValueError:
+            config.championship_start_week = 20
 
         db.session.commit()
         return redirect(url_for('payout.payout_summary', season_id=season_id))
 
     try:
-        team_pcts_str = ', '.join(str(int(x)) for x in json.loads(config.team_pct_json))
+        award_pcts = json.loads(config.team_award_pcts_json)
     except (ValueError, TypeError):
-        team_pcts_str = '40, 30, 20, 10'
+        award_pcts = [40, 40, 20]
+
+    try:
+        place_pcts_all = json.loads(config.team_place_pcts_json)
+    except (ValueError, TypeError):
+        place_pcts_all = [[35, 25, 20, 20], [35, 25, 20, 20], [60, 40]]
+
+    place_pcts_strs = [
+        ', '.join(str(int(x)) for x in lst) for lst in place_pcts_all
+    ]
 
     return render_template('payout/config.html',
                            season=season,
                            config=config,
-                           team_pcts_str=team_pcts_str)
+                           award_pcts=award_pcts,
+                           place_pcts_strs=place_pcts_strs)
 
 
 @payout_bp.route('/season/<int:season_id>/summary')
@@ -396,8 +477,8 @@ def payout_summary(season_id):
 
     # Team payouts currency breakdown
     team_breakdowns = {}
-    for tp in payout['team_payouts']:
-        team_breakdowns[tp['team'].id] = _currency_breakdown(tp['amount'])
+    for tt in payout['team_payouts']:
+        team_breakdowns[tt['team'].id] = _currency_breakdown(tt['total'])
 
     # Tournament payees (only league members, not guests)
     tourney_breakdowns = {}

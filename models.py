@@ -289,9 +289,13 @@ class PayoutConfig(db.Model):
     weekly_win_rate = db.Column(db.Float, default=10.0)
     ytd_prize_rate = db.Column(db.Float, default=75.0)
     trophy_cost = db.Column(db.Float, default=125.0)
-    # JSON list of team payout percentages e.g. [40,30,20,10]
+    # Legacy single-pool percentages (kept for migration safety, no longer used)
     team_pct_json = db.Column(db.Text, default='[40, 30, 20, 10]')
     final_week = db.Column(db.Integer, default=22)
+    # Three-award team payout structure
+    team_award_pcts_json = db.Column(db.Text, default='[40, 40, 20]')
+    team_place_pcts_json = db.Column(db.Text, default='[[35,25,20,20],[35,25,20,20],[60,40]]')
+    championship_start_week = db.Column(db.Integer, default=20)
 
     season = db.relationship('Season')
 
