@@ -114,8 +114,8 @@ def week_prizes(season_id, week_num):
         avg_rows = [r for r in avg_rows if r['handicap'] in top10_hcps]
 
     full_year = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
-    first_half_s = sorted(get_team_standings(season_id, half=1), key=lambda s: s['team'].number)
-    second_half_s = sorted(get_team_standings(season_id, half=2), key=lambda s: s['team'].number)
+    first_half_s = sorted(get_team_standings(season_id, half=1, through_week=week_num), key=lambda s: s['team'].number)
+    second_half_s = sorted(get_team_standings(season_id, half=2, through_week=week_num), key=lambda s: s['team'].number)
     fh_max = max((s['points'] for s in first_half_s), default=0)
     sh_max = max((s['points'] for s in second_half_s), default=0)
     fy_max = max((s['points'] for s in full_year), default=0)
@@ -201,8 +201,8 @@ def print_batch(season_id, week_num):
     player_count = sum(1 for e in all_entries if not e.is_blind)
     blind_games = sum(e.game_count for e in all_entries if e.is_blind)
     pb_full_year   = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
-    pb_first_half  = sorted(get_team_standings(season_id, half=1), key=lambda s: s['team'].number)
-    pb_second_half = sorted(get_team_standings(season_id, half=2), key=lambda s: s['team'].number)
+    pb_first_half  = sorted(get_team_standings(season_id, half=1,  through_week=week_num), key=lambda s: s['team'].number)
+    pb_second_half = sorted(get_team_standings(season_id, half=2, through_week=week_num), key=lambda s: s['team'].number)
     pb_fh_max = max((s['points'] for s in pb_first_half),  default=0)
     pb_sh_max = max((s['points'] for s in pb_second_half), default=0)
     pb_fy_max = max((s['points'] for s in pb_full_year),   default=0)
