@@ -20,6 +20,9 @@
   <div class="col-auto">
     <a href="{{ url_for('admin.import_season') }}" class="btn btn-outline-info btn-sm">Import Season from XLS</a>
   </div>
+  <div class="col-auto">
+    <a href="{{ url_for('payout.payout_config', season_id=season.id) }}" class="btn btn-outline-success btn-sm">Payout Config</a>
+  </div>
 </div>
 
 <h5>Teams <small class="text-muted fw-normal" style="font-size:0.75rem">Click a team to edit name &amp; captain</small></h5>

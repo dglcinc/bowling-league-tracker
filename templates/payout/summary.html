@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}Payout Summary — {{ season.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .waterfall-row { font-size: 0.9rem; }
+  .waterfall-row td:last-child { font-weight: 600; }
+  .section-head { font-weight: 700; font-size: 0.78rem; text-transform: uppercase;
+                  letter-spacing: 0.07em; background: #343a40; color: #fff;
+                  padding: 3px 8px; margin-bottom: 4px; }
+  .denom-header { font-size: 0.75rem; }
+  @media print {
+    @page { size: landscape; margin: 0.4in; }
+    body  { font-size: 7.5pt !important; }
+    .no-print { display: none !important; }
+    .navbar   { display: none !important; }
+    .table    { font-size: 7.5pt !important; border-collapse: collapse !important; }
+    .table th, .table td { padding: 1px 4px !important; line-height: 1.2 !important; }
+    .section-head { font-size: 6.5pt !important; padding: 1px 4px !important; }
+    h4, h5, h6 { font-size: 8pt !important; margin-bottom: 2px !important; }
+    a { color: inherit !important; text-decoration: none !important; }
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="no-print mb-2 d-flex align-items-center gap-3">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{{ url_for('payout.payout_overview', season_id=season.id) }}">Payout</a></li>
+      <li class="breadcrumb-item active">Summary</li>
+    </ol>
+  </nav>
+  <a href="{{ url_for('payout.payout_config', season_id=season.id) }}"
+     class="btn btn-outline-secondary btn-sm">Edit Config</a>
+  <a href="{{ url_for('payout.award_all', season_id=season.id) }}"
+     class="btn btn-outline-primary btn-sm" target="_blank">Print All Awards</a>
+</div>
+
+<div class="text-center mb-3" style="font-size:0.9rem">
+  <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp; {{ season.name }}
+  &nbsp;|&nbsp; End-of-Season Payout Summary
+</div>
+
+{# ─── Waterfall ─── #}
+<div class="section-head mb-2">Payout Waterfall</div>
+<table class="table table-sm table-bordered mb-4" style="max-width:420px">
+  <tbody class="waterfall-row">
+    <tr>
+      <td>Total Available</td>
+      <td class="text-end">${{ "%.2f"|format(payout.total_available) }}</td>
+    </tr>
+    <tr class="text-danger">
+      <td>Less: Tournament Awards</td>
+      <td class="text-end">−${{ "%.2f"|format(payout.tournament_total) }}</td>
+    </tr>
+    <tr class="text-danger">
+      <td>Less: Individual Awards</td>
+      <td class="text-end">−${{ "%.2f"|format(payout.individual_total) }}</td>
+    </tr>
+    <tr class="text-danger">
+      <td>Less: Trophies</td>
+      <td class="text-end">−${{ "%.2f"|format(payout.trophy_cost) }}</td>
+    </tr>
+    <tr class="table-success fw-bold">
+      <td>Available for Teams</td>
+      <td class="text-end">${{ "%.2f"|format(payout.remainder) }}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="row g-4">
+
+  {# ─── Column 1: Individual payouts ─── #}
+  <div class="col-12 col-xl-6">
+    <div class="section-head">Individual Payouts</div>
+    <table class="table table-sm table-bordered mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>Bowler</th><th>T</th>
+          <th>Prize</th>
+          <th class="text-end">Score</th>
+          <th class="text-end">Amt</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for ind in payout.individual_payouts %}
+        {% for item in ind.items %}
+        <tr>
+          {% if loop.first %}
+          <td rowspan="{{ ind.items|length }}" class="align-middle">
+            <a href="{{ url_for('payout.award_bowler', season_id=season.id, bowler_id=ind.bowler.id) }}"
+               class="text-decoration-none text-body" target="_blank">{{ ind.bowler.last_name }}</a>
+          </td>
+          <td rowspan="{{ ind.items|length }}" class="align-middle text-center">
+            {{ ind.team.number if ind.team else '' }}
+          </td>
+          {% endif %}
+          <td>
+            {% if item.type == 'weekly' %}Wk {{ item.week_num }} — {{ item.label }}
+            {% elif item.type == 'tournament' %}Tournament Wk {{ item.week_num }} — {{ item.place }}
+            {% elif item.type == 'most_improved' %}Most Improved
+            {% else %}{{ item.label }}
+            {% endif %}
+          </td>
+          <td class="text-end text-muted" style="font-size:0.8em">
+            {% if item.type == 'most_improved' %}
+              avg {{ item.prior_avg }} → {{ item.current_avg }}
+            {% elif item.score is defined %}{{ item.score }}
+            {% else %}—
+            {% endif %}
+          </td>
+          <td class="text-end">${{ item.amount | int }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="table-light">
+          <td colspan="4" class="text-end pe-2 fst-italic small">
+            {{ ind.bowler.last_name }} total
+          </td>
+          <td class="text-end fw-bold">${{ ind.total | int }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-muted text-center">No individual payouts.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    {% if payout.tournament_items %}
+    <div class="section-head mt-3">Tournament Awards</div>
+    <table class="table table-sm table-bordered mb-0">
+      <thead class="table-dark">
+        <tr><th>Tournament</th><th>Place</th><th>Bowler</th>
+            <th class="text-end">Score</th><th class="text-end">Amt</th></tr>
+      </thead>
+      <tbody>
+      {% for item in payout.tournament_items %}
+      <tr>
+        <td>Wk {{ item.week_num }} — {{ item.tournament_type }}</td>
+        <td>{{ item.place }}</td>
+        <td>{{ item.display_name }}</td>
+        <td class="text-end">{{ item.score }}</td>
+        <td class="text-end">${{ item.amount | int }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+
+  {# ─── Column 2: Team payouts + currency breakdown ─── #}
+  <div class="col-12 col-xl-6">
+    <div class="section-head">Team Payouts</div>
+    <table class="table table-sm table-bordered mb-3" style="max-width:400px">
+      <thead class="table-dark">
+        <tr><th>Place</th><th>Team</th><th class="text-end">Pts</th>
+            <th class="text-end">%</th><th class="text-end">Amount</th></tr>
+      </thead>
+      <tbody>
+      {% for tp in payout.team_payouts %}
+      <tr>
+        <td>{{ tp.place }}</td>
+        <td>
+          <a href="{{ url_for('payout.award_team', season_id=season.id, team_id=tp.team.id) }}"
+             class="text-decoration-none text-body" target="_blank">
+            {{ tp.team.number }} — {{ tp.team.name }}
+          </a>
+          {% if tp.captain %}<span class="text-muted small"> ({{ tp.captain }})</span>{% endif %}
+        </td>
+        <td class="text-end">{{ tp.points }}</td>
+        <td class="text-end">{{ tp.pct | int }}%</td>
+        <td class="text-end fw-bold">${{ "%.2f"|format(tp.amount) }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="table-light">
+        <td colspan="4" class="text-end fst-italic small">Total</td>
+        <td class="text-end fw-bold">${{ "%.2f"|format(payout.team_total) }}</td>
+      </tr>
+      </tbody>
+    </table>
+
+    <div class="section-head">Currency Breakdown</div>
+    <table class="table table-sm table-bordered mb-1">
+      <thead class="table-dark">
+        <tr>
+          <th>Payee</th><th class="text-end">Total</th>
+          {% for d in denoms %}
+          <th class="text-end denom-header">${{ d }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+      {# Individual payees #}
+      {% for ind in payout.individual_payouts %}
+      {% set bd = breakdowns[ind.bowler.id] %}
+      <tr>
+        <td>{{ ind.bowler.last_name }}{% if ind.bowler.nickname %} ({{ ind.bowler.nickname }}){% endif %}</td>
+        <td class="text-end fw-bold">${{ ind.total | int }}</td>
+        {% for d in denoms %}
+        <td class="text-end {{ 'text-muted' if bd[d] == 0 else '' }}">{{ bd[d] if bd[d] else '—' }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      {# Tournament guest payees (guests don't have individual payouts above) #}
+      {% for item in payout.tournament_items if item.bowler is none %}
+      <tr>
+        <td>{{ item.display_name }} <span class="text-muted small">(guest)</span></td>
+        <td class="text-end fw-bold">${{ item.amount | int }}</td>
+        {% set bd = item.amount | int %}
+        {% for d in denoms %}
+        <td class="text-end text-muted">—</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      {# Team payees #}
+      {% for tp in payout.team_payouts %}
+      {% set bd = team_breakdowns[tp.team.id] %}
+      <tr>
+        <td>{{ tp.team.number }} — {{ tp.team.name }}</td>
+        <td class="text-end fw-bold">${{ "%.2f"|format(tp.amount) }}</td>
+        {% for d in denoms %}
+        <td class="text-end {{ 'text-muted' if bd[d] == 0 else '' }}">{{ bd[d] if bd[d] else '—' }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      {# Aggregate bank inventory #}
+      <tr class="table-warning fw-bold">
+        <td colspan="2">Bank Inventory (total bills to withdraw)</td>
+        {% for d in denoms %}
+        <td class="text-end">{{ agg[d] if agg[d] else '—' }}</td>
+        {% endfor %}
+      </tr>
+      </tbody>
+    </table>
+    <div class="small text-muted">Greedy breakdown: largest bills first, whole dollars only.</div>
+  </div>
+
+</div>
+
+<div class="no-print mt-3 d-flex gap-2">
+  <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">Print Summary</button>
+  <a href="{{ url_for('payout.award_all', season_id=season.id) }}"
+     class="btn btn-primary btn-sm" target="_blank">Print All Award Pages</a>
+</div>
+{% endblock %}
