@@ -192,13 +192,28 @@
               fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
       </pattern>
 
-      {# ── 3-wave vertical guilloche (24 × 24 tile) ─────────── #}
-      <pattern id="vg{{ loop.index }}" patternUnits="userSpaceOnUse" width="24" height="24">
-        <path d="M 12,0 C 2,6  2,6  12,12 C 22,18 22,18 12,24"
+      {# ── Vertical guilloche — LEFT strip (x=22–46, centre x=34) ─
+         Waves anchored to x=34 so arcs reach x=24 and x=44,
+         both fully inside the 24-unit-wide strip.              #}
+      <pattern id="vgl{{ loop.index }}" patternUnits="userSpaceOnUse" width="24" height="24">
+        <path d="M 34,0 C 24,6  24,6  34,12 C 44,18 44,18 34,24"
               fill="none" stroke="#1b3a6b" stroke-width="2"   stroke-linecap="round"/>
-        <path d="M 12,0 C 22,6 22,6 12,12 C 2,18  2,18  12,24"
+        <path d="M 34,0 C 44,6  44,6  34,12 C 24,18 24,18 34,24"
               fill="none" stroke="#f47920" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M 12,0 C 7,6  7,6  12,12 C 17,18 17,18 12,24"
+        <path d="M 34,0 C 29,6  29,6  34,12 C 39,18 39,18 34,24"
+              fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
+      </pattern>
+      {# ── Vertical guilloche — RIGHT strip (x=804–828, centre x=816)
+         804 mod 24 = 12, so without this correction the leftward
+         arc (→x=794) is clipped outside the strip and the lines
+         appear to never cross.  Anchoring at x=816 keeps both
+         arcs (→806 and →826) fully inside the strip.           #}
+      <pattern id="vgr{{ loop.index }}" patternUnits="userSpaceOnUse" width="24" height="24">
+        <path d="M 816,0 C 806,6  806,6  816,12 C 826,18 826,18 816,24"
+              fill="none" stroke="#1b3a6b" stroke-width="2"   stroke-linecap="round"/>
+        <path d="M 816,0 C 826,6  826,6  816,12 C 806,18 806,18 816,24"
+              fill="none" stroke="#f47920" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M 816,0 C 811,6  811,6  816,12 C 821,18 821,18 816,24"
               fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
       </pattern>
 
