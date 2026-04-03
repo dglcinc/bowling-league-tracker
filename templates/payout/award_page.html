@@ -325,7 +325,7 @@
         <col style="width:30%">
         <col style="width:18%">
       </colgroup>
-      {% for item in rec.items %}
+      {% for item in rec.prizes %}
       <tr>
         <td class="col-label">
           {% if item.type == 'weekly' %}
@@ -360,7 +360,7 @@
     </table>
 
     {# Most improved narrative description (individual, when applicable) #}
-    {% for item in rec.items if item.type == 'most_improved' %}
+    {% for item in rec.prizes if item.type == 'most_improved' %}
     <hr class="gold-rule-thin">
     <p class="mi-description">
       {{ rec.first_name or rec.name }} improved {{ 'his' if rec.first_name else 'their' }}

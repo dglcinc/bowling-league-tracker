@@ -95,13 +95,13 @@ def _calculate_payout(season_id, config):
                      .order_by(Week.week_num)
                      .all())
 
-    # ind_map[bowler_id] = {'bowler', 'team', 'items': [], 'total'}
+    # ind_map[bowler_id] = {'bowler', 'team', 'prizes': [], 'total'}
     ind_map = {}
 
     def _get_ind(bowler, team):
         bid = bowler.id
         if bid not in ind_map:
-            ind_map[bid] = {'bowler': bowler, 'team': team, 'items': [], 'total': 0.0}
+            ind_map[bid] = {'bowler': bowler, 'team': team, 'prizes': [], 'total': 0.0}
         return ind_map[bid]
 
     for wk in regular_weeks:
@@ -116,7 +116,7 @@ def _calculate_payout(season_id, config):
                     bowler_id=bowler.id, season_id=season_id).first()
                 team = roster.team if roster else None
                 rec = _get_ind(bowler, team)
-                rec['items'].append({
+                rec['prizes'].append({
                     'type':     'weekly',
                     'week_num': wk.week_num,
                     'label':    long_label,
@@ -145,7 +145,7 @@ def _calculate_payout(season_id, config):
 
         for bowler, team, score in best_list:
             rec = _get_ind(bowler, team)
-            rec['items'].append({
+            rec['prizes'].append({
                 'type':   'ytd',
                 'label':  label,
                 'score':  score,
@@ -164,7 +164,7 @@ def _calculate_payout(season_id, config):
             bowler_id=bowler.id, season_id=season_id).first()
         team = roster_entry.team if roster_entry else None
         rec = _get_ind(bowler, team)
-        rec['items'].append({
+        rec['prizes'].append({
             'type':        'most_improved',
             'label':       'Most Improved',
             'improvement': best['improvement'],
@@ -249,7 +249,7 @@ def _build_recipients(payout):
             'nickname':   bowler.nickname or '',
             'team_label': (f"Team {team.number} \u2014 {team.name}"
                            if team else ''),
-            'items':      ind['items'],
+            'prizes':      ind['prizes'],
             'total':      ind['total'],
         })
 
@@ -267,7 +267,7 @@ def _build_recipients(payout):
             'captain':   team.captain_name or '',
             'place':     tp['place'],
             'points':    tp['points'],
-            'items': [{
+            'prizes': [{
                 'type':   'team_finish',
                 'label':  f"Season {tp['place']} Place",
                 'detail': f"{tp['points']} points",
