@@ -71,7 +71,7 @@
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 13pt;
       font-weight: 700;
-      color: #1a3a6b;
+      color: #1b3a6b;
       text-transform: uppercase;
       letter-spacing: 0.12em;
       line-height: 1.3;
@@ -85,18 +85,18 @@
       margin-bottom: 14pt;
     }
 
-    /* ── Gold rule ───────────────────────────────────────── */
-    .gold-rule {
+    /* ── Orange rule ─────────────────────────────────────── */
+    .orange-rule {
       width: 72%;
       height: 2px;
-      background: linear-gradient(to right, transparent, #c9a227 20%, #c9a227 80%, transparent);
+      background: linear-gradient(to right, transparent, #f47920 20%, #f47920 80%, transparent);
       margin: 0 auto 14pt;
       border: none;
     }
-    .gold-rule-thin {
+    .orange-rule-thin {
       width: 60%;
       height: 1px;
-      background: linear-gradient(to right, transparent, #c9a227 20%, #c9a227 80%, transparent);
+      background: linear-gradient(to right, transparent, #f47920 20%, #f47920 80%, transparent);
       margin: 10pt auto;
       border: none;
     }
@@ -106,7 +106,7 @@
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 28pt;
       font-weight: 700;
-      color: #1a3a6b;
+      color: #1b3a6b;
       line-height: 1.15;
       margin-bottom: 4pt;
     }
@@ -156,24 +156,24 @@
     .prize-table .col-amount {
       text-align: right;
       font-weight: 700;
-      color: #1a3a6b;
+      color: #1b3a6b;
       white-space: nowrap;
     }
     .prize-table .total-row td {
       padding-top: 8pt;
       font-weight: 700;
       font-size: 13pt;
-      border-top: 2px solid #c9a227;
+      border-top: 2px solid #f47920;
       border-bottom: none;
     }
     .prize-table .total-row .col-label {
       font-family: 'Playfair Display', Georgia, serif;
-      color: #1a3a6b;
+      color: #1b3a6b;
     }
     .prize-table .total-row .col-amount {
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 15pt;
-      color: #1a3a6b;
+      color: #1b3a6b;
     }
 
     /* ── Most improved description ───────────────────────── */
@@ -192,7 +192,7 @@
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 16pt;
       font-weight: 700;
-      color: #c9a227;
+      color: #f47920;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       margin: 4pt 0 10pt;
@@ -225,7 +225,7 @@
 <body>
 
 {% if single %}
-<div class="nav-bar no-print">
+<div class="nav-bar">
   <a href="javascript:history.back()">← Back</a>
   <span style="color:#6c757d">|</span>
   <a href="{{ url_for('payout.award_all', season_id=season.id) }}" target="_blank">Print All Awards</a>
@@ -239,30 +239,36 @@
 <div class="certificate-wrap">
 <div class="certificate">
 
-  {# ── SVG guilloche border ── #}
+  {# ── SVG guilloche border with ML logo corner medallions ── #}
   <svg class="cert-border-svg" viewBox="0 0 750 960"
        preserveAspectRatio="xMidYMid meet"
-       xmlns="http://www.w3.org/2000/svg">
+       xmlns="http://www.w3.org/2000/svg"
+       xmlns:xlink="http://www.w3.org/1999/xlink">
     <defs>
-      {# Horizontal guilloche: period=20, height=14, two interlocking S-curves #}
+      {# Horizontal guilloche: period=20, height=14, interlocking S-curves in ML blue/orange #}
       <pattern id="hg{{ loop.index }}" patternUnits="userSpaceOnUse" width="20" height="14">
         <path d="M 0,7 C 5,2 5,2 10,7 C 15,12 15,12 20,7"
-              fill="none" stroke="#1a3a6b" stroke-width="1.5" stroke-linecap="round"/>
+              fill="none" stroke="#1b3a6b" stroke-width="1.5" stroke-linecap="round"/>
         <path d="M 0,7 C 5,12 5,12 10,7 C 15,2 15,2 20,7"
-              fill="none" stroke="#c9a227" stroke-width="1" stroke-linecap="round"/>
+              fill="none" stroke="#f47920" stroke-width="1" stroke-linecap="round"/>
       </pattern>
       {# Vertical guilloche: same motif rotated 90° #}
       <pattern id="vg{{ loop.index }}" patternUnits="userSpaceOnUse" width="14" height="20">
         <path d="M 7,0 C 2,5 2,5 7,10 C 12,15 12,15 7,20"
-              fill="none" stroke="#1a3a6b" stroke-width="1.5" stroke-linecap="round"/>
+              fill="none" stroke="#1b3a6b" stroke-width="1.5" stroke-linecap="round"/>
         <path d="M 7,0 C 12,5 12,5 7,10 C 2,15 2,15 7,20"
-              fill="none" stroke="#c9a227" stroke-width="1" stroke-linecap="round"/>
+              fill="none" stroke="#f47920" stroke-width="1" stroke-linecap="round"/>
       </pattern>
+      {# Circular clip masks for each logo medallion — unique per certificate #}
+      <clipPath id="clip-tl-{{ loop.index }}"><circle cx="19" cy="19" r="26"/></clipPath>
+      <clipPath id="clip-tr-{{ loop.index }}"><circle cx="731" cy="19" r="26"/></clipPath>
+      <clipPath id="clip-bl-{{ loop.index }}"><circle cx="19" cy="941" r="26"/></clipPath>
+      <clipPath id="clip-br-{{ loop.index }}"><circle cx="731" cy="941" r="26"/></clipPath>
     </defs>
 
-    {# Outer border rectangle — navy, slightly rounded #}
+    {# Outer border rectangle — ML blue #}
     <rect x="6" y="6" width="738" height="948" rx="4" ry="4"
-          fill="none" stroke="#1a3a6b" stroke-width="4"/>
+          fill="none" stroke="#1b3a6b" stroke-width="4"/>
 
     {# Guilloche strips along all four edges #}
     <rect x="12" y="12" width="726" height="14" fill="url(#hg{{ loop.index }})"/>
@@ -270,21 +276,35 @@
     <rect x="12" y="12" width="14" height="936" fill="url(#vg{{ loop.index }})"/>
     <rect x="724" y="12" width="14" height="936" fill="url(#vg{{ loop.index }})"/>
 
-    {# Cover corners with navy squares (hide ragged wave ends) #}
-    <rect x="12" y="12" width="14" height="14" fill="#1a3a6b"/>
-    <rect x="724" y="12" width="14" height="14" fill="#1a3a6b"/>
-    <rect x="12" y="934" width="14" height="14" fill="#1a3a6b"/>
-    <rect x="724" y="934" width="14" height="14" fill="#1a3a6b"/>
-
-    {# Gold diamond corner ornaments #}
-    <polygon points="19,6  26,13  19,20  12,13" fill="#c9a227"/>
-    <polygon points="731,6  738,13  731,20  724,13" fill="#c9a227"/>
-    <polygon points="19,940  26,947  19,954  12,947" fill="#c9a227"/>
-    <polygon points="731,940  738,947  731,954  724,947" fill="#c9a227"/>
-
-    {# Inner gold border line #}
+    {# Inner orange border line #}
     <rect x="28" y="28" width="694" height="904" rx="2" ry="2"
-          fill="none" stroke="#c9a227" stroke-width="1.5"/>
+          fill="none" stroke="#f47920" stroke-width="1.5"/>
+
+    {# ── Corner logo medallions ─────────────────────────────── #}
+    {# White fill circles provide a clean background for the logo #}
+    {# Top-left #}
+    <circle cx="19" cy="19" r="27" fill="white" stroke="#f47920" stroke-width="2"/>
+    <image href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           x="-7" y="-7" width="52" height="52"
+           clip-path="url(#clip-tl-{{ loop.index }})"/>
+
+    {# Top-right #}
+    <circle cx="731" cy="19" r="27" fill="white" stroke="#f47920" stroke-width="2"/>
+    <image href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           x="705" y="-7" width="52" height="52"
+           clip-path="url(#clip-tr-{{ loop.index }})"/>
+
+    {# Bottom-left #}
+    <circle cx="19" cy="941" r="27" fill="white" stroke="#f47920" stroke-width="2"/>
+    <image href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           x="-7" y="915" width="52" height="52"
+           clip-path="url(#clip-bl-{{ loop.index }})"/>
+
+    {# Bottom-right #}
+    <circle cx="731" cy="941" r="27" fill="white" stroke="#f47920" stroke-width="2"/>
+    <image href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           x="705" y="915" width="52" height="52"
+           clip-path="url(#clip-br-{{ loop.index }})"/>
   </svg>
 
   {# ── Certificate content ── #}
@@ -293,7 +313,7 @@
     <div class="cert-league">Mountain Lakes Men's Bowling League</div>
     <div class="cert-season">{{ season.name }} Season</div>
 
-    <hr class="gold-rule">
+    <hr class="orange-rule">
 
     {% if rec.type == 'individual' %}
       {# Individual recipient #}
@@ -316,7 +336,7 @@
       {% endif %}
     {% endif %}
 
-    <hr class="gold-rule">
+    <hr class="orange-rule">
 
     {# Prize table #}
     <table class="prize-table">
@@ -359,9 +379,9 @@
       </tr>
     </table>
 
-    {# Most improved narrative description (individual, when applicable) #}
+    {# Most improved narrative description #}
     {% for item in rec.prizes if item.type == 'most_improved' %}
-    <hr class="gold-rule-thin">
+    <hr class="orange-rule-thin">
     <p class="mi-description">
       {{ rec.first_name or rec.name }} improved {{ 'his' if rec.first_name else 'their' }}
       average by {{ item.improvement }} pin{{ 's' if item.improvement != 1 else '' }} per game
