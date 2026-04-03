@@ -10,215 +10,140 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      background: #e8e8e8;
-      font-family: 'Lato', Georgia, sans-serif;
-    }
+    body { background: #e8e8e8; font-family: 'Lato', Georgia, sans-serif; }
 
-    /* ── Navigation bar (screen only) ───────────────────── */
+    /* ── Nav bar (screen only) ───────────────────────────── */
     .nav-bar {
-      background: #343a40;
-      color: #fff;
-      padding: 8px 16px;
-      font-size: 0.85rem;
-      display: flex;
-      gap: 16px;
-      align-items: center;
+      background: #343a40; color: #fff;
+      padding: 8px 16px; font-size: 0.85rem;
+      display: flex; gap: 16px; align-items: center;
     }
     .nav-bar a { color: #adb5bd; text-decoration: none; }
     .nav-bar a:hover { color: #fff; }
 
     /* ── Certificate wrapper ─────────────────────────────── */
-    .certificate-wrap {
-      display: flex;
-      justify-content: center;
-      padding: 24px 0;
-    }
+    .certificate-wrap { display: flex; justify-content: center; padding: 24px 0; }
 
-    /* ── The certificate itself ──────────────────────────── */
+    /* ── Certificate: sized to letter proportions ────────── */
     .certificate {
       position: relative;
+      /* 850×1100 viewBox → 7.5in wide means height = 7.5*(1100/850) = 9.706in */
       width: 7.5in;
-      min-height: 9.6in;
+      height: 9.71in;
       background: #faf8f4;
       page-break-after: always;
       break-after: page;
+      overflow: hidden;
     }
 
-    /* ── SVG border (absolute, behind content) ───────────── */
+    /* ── SVG border — fills the certificate exactly ──────── */
     .cert-border-svg {
       position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
+      top: 0; left: 0; width: 100%; height: 100%;
       pointer-events: none;
-      overflow: visible;
     }
 
-    /* ── Content area ────────────────────────────────────── */
+    /* ── Content sits above the SVG ─────────────────────── */
     .cert-content {
-      position: relative;
-      z-index: 1;
-      padding: 0.7in 0.65in 0.55in;
-      min-height: 9.6in;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
+      position: relative; z-index: 1;
+      /* 60 SVG units from each edge = 60/850*7.5in ≈ 0.53in; add breathing room */
+      padding: 0.78in 0.75in 0.6in;
+      height: 100%;
+      display: flex; flex-direction: column;
+      align-items: center; text-align: center;
     }
 
     /* ── League header ───────────────────────────────────── */
     .cert-league {
       font-family: 'Playfair Display', Georgia, serif;
-      font-size: 13pt;
-      font-weight: 700;
-      color: #1b3a6b;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      line-height: 1.3;
-      margin-bottom: 2pt;
+      font-size: 13pt; font-weight: 700; color: #1b3a6b;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      line-height: 1.3; margin-bottom: 2pt;
     }
     .cert-season {
       font-family: 'Playfair Display', Georgia, serif;
-      font-size: 10pt;
-      color: #555;
-      font-style: italic;
-      margin-bottom: 14pt;
+      font-size: 10pt; color: #555; font-style: italic; margin-bottom: 14pt;
     }
 
-    /* ── Orange rule ─────────────────────────────────────── */
+    /* ── Orange accent rules ─────────────────────────────── */
     .orange-rule {
-      width: 72%;
-      height: 2px;
+      width: 72%; height: 2px; border: none;
       background: linear-gradient(to right, transparent, #f47920 20%, #f47920 80%, transparent);
       margin: 0 auto 14pt;
-      border: none;
     }
     .orange-rule-thin {
-      width: 60%;
-      height: 1px;
+      width: 60%; height: 1px; border: none;
       background: linear-gradient(to right, transparent, #f47920 20%, #f47920 80%, transparent);
       margin: 10pt auto;
-      border: none;
     }
 
     /* ── Recipient name block ────────────────────────────── */
     .cert-name {
       font-family: 'Playfair Display', Georgia, serif;
-      font-size: 28pt;
-      font-weight: 700;
-      color: #1b3a6b;
-      line-height: 1.15;
-      margin-bottom: 4pt;
+      font-size: 28pt; font-weight: 700; color: #1b3a6b;
+      line-height: 1.15; margin-bottom: 4pt;
     }
     .cert-nickname {
       font-family: 'Playfair Display', Georgia, serif;
-      font-size: 14pt;
-      font-style: italic;
-      color: #444;
-      margin-bottom: 5pt;
+      font-size: 14pt; font-style: italic; color: #444; margin-bottom: 5pt;
     }
     .cert-team {
       font-family: 'Lato', sans-serif;
-      font-size: 10pt;
-      color: #666;
-      letter-spacing: 0.04em;
-      margin-bottom: 14pt;
+      font-size: 10pt; color: #666; letter-spacing: 0.04em; margin-bottom: 14pt;
     }
     .cert-captain {
-      font-family: 'Lato', sans-serif;
-      font-size: 9pt;
-      color: #888;
-      margin-bottom: 5pt;
+      font-family: 'Lato', sans-serif; font-size: 9pt; color: #888; margin-bottom: 5pt;
     }
 
     /* ── Prize table ─────────────────────────────────────── */
-    .prize-table {
-      width: 88%;
-      border-collapse: collapse;
-      margin: 0 auto 10pt;
-    }
+    .prize-table { width: 88%; border-collapse: collapse; margin: 0 auto 10pt; }
     .prize-table tr { border-bottom: 1px solid #e0d8cc; }
     .prize-table tr:last-child { border-bottom: none; }
     .prize-table td {
-      font-family: 'Lato', sans-serif;
-      font-size: 10pt;
-      padding: 5pt 8pt;
-      color: #222;
-      vertical-align: top;
+      font-family: 'Lato', sans-serif; font-size: 10pt;
+      padding: 5pt 8pt; color: #222; vertical-align: top;
     }
-    .prize-table .col-label { text-align: left; }
-    .prize-table .col-detail {
-      text-align: center;
-      color: #666;
-      font-size: 9pt;
-      font-style: italic;
-    }
-    .prize-table .col-amount {
-      text-align: right;
-      font-weight: 700;
-      color: #1b3a6b;
-      white-space: nowrap;
-    }
+    .prize-table .col-label  { text-align: left; }
+    .prize-table .col-detail { text-align: center; color: #666; font-size: 9pt; font-style: italic; }
+    .prize-table .col-amount { text-align: right; font-weight: 700; color: #1b3a6b; white-space: nowrap; }
     .prize-table .total-row td {
-      padding-top: 8pt;
-      font-weight: 700;
-      font-size: 13pt;
-      border-top: 2px solid #f47920;
-      border-bottom: none;
+      padding-top: 8pt; font-weight: 700; font-size: 13pt;
+      border-top: 2px solid #f47920; border-bottom: none;
     }
     .prize-table .total-row .col-label {
-      font-family: 'Playfair Display', Georgia, serif;
-      color: #1b3a6b;
+      font-family: 'Playfair Display', Georgia, serif; color: #1b3a6b;
     }
     .prize-table .total-row .col-amount {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 15pt;
-      color: #1b3a6b;
+      font-family: 'Playfair Display', Georgia, serif; font-size: 15pt; color: #1b3a6b;
     }
 
-    /* ── Most improved description ───────────────────────── */
+    /* ── Most improved narrative ─────────────────────────── */
     .mi-description {
-      font-family: 'Lato', sans-serif;
-      font-size: 9.5pt;
-      font-style: italic;
-      color: #555;
-      line-height: 1.5;
-      margin: 6pt auto 0;
-      max-width: 80%;
+      font-family: 'Lato', sans-serif; font-size: 9.5pt; font-style: italic;
+      color: #555; line-height: 1.5; margin: 6pt auto 0; max-width: 80%;
     }
 
     /* ── Team finish badge ───────────────────────────────── */
     .team-finish-badge {
       font-family: 'Playfair Display', Georgia, serif;
-      font-size: 16pt;
-      font-weight: 700;
-      color: #f47920;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin: 4pt 0 10pt;
+      font-size: 16pt; font-weight: 700; color: #f47920;
+      text-transform: uppercase; letter-spacing: 0.1em; margin: 4pt 0 10pt;
     }
 
     /* ── Footer ──────────────────────────────────────────── */
     .cert-footer {
-      margin-top: auto;
-      padding-top: 18pt;
-      font-family: 'Lato', sans-serif;
-      font-size: 8.5pt;
-      font-style: italic;
-      color: #888;
-      letter-spacing: 0.03em;
+      margin-top: auto; padding-top: 18pt;
+      font-family: 'Lato', sans-serif; font-size: 8.5pt;
+      font-style: italic; color: #888; letter-spacing: 0.03em;
     }
 
-    /* ── Print rules ─────────────────────────────────────── */
+    /* ── Print ───────────────────────────────────────────── */
     @media print {
       @page { size: letter; margin: 0; }
       body { background: white; }
       .nav-bar { display: none !important; }
       .certificate-wrap { padding: 0; }
-      .certificate {
-        width: 8.5in;
-        min-height: 11in;
-      }
+      .certificate { width: 8.5in; height: 11in; }
     }
   </style>
 </head>
@@ -230,84 +155,131 @@
   <span style="color:#6c757d">|</span>
   <a href="{{ url_for('payout.award_all', season_id=season.id) }}" target="_blank">Print All Awards</a>
   <span style="flex:1"></span>
-  <button onclick="window.print()" style="background:#495057;border:1px solid #6c757d;color:#fff;padding:3px 12px;border-radius:3px;cursor:pointer">Print</button>
+  <button onclick="window.print()"
+          style="background:#495057;border:1px solid #6c757d;color:#fff;padding:3px 12px;border-radius:3px;cursor:pointer">
+    Print
+  </button>
 </div>
 {% endif %}
 
-{# ── One certificate per recipient ── #}
+{# ────────────────────────────────────────────────────────────
+   SVG coordinate system: 850 × 1100 units (100 units = 1 inch
+   on an 8.5 × 11 letter page).  Everything stays ≥ 18 units
+   from each edge so nothing clips on a standard printer.
+   ──────────────────────────────────────────────────────────── #}
+
 {% for rec in recipients %}
 <div class="certificate-wrap">
 <div class="certificate">
 
-  {# ── SVG guilloche border with ML logo corner medallions ── #}
-  <svg class="cert-border-svg" viewBox="0 0 750 960"
+  <svg class="cert-border-svg"
+       viewBox="0 0 850 1100"
        preserveAspectRatio="xMidYMid meet"
        xmlns="http://www.w3.org/2000/svg"
        xmlns:xlink="http://www.w3.org/1999/xlink">
     <defs>
-      {# Horizontal guilloche: period=20, height=14, interlocking S-curves in ML blue/orange #}
-      <pattern id="hg{{ loop.index }}" patternUnits="userSpaceOnUse" width="20" height="14">
-        <path d="M 0,7 C 5,2 5,2 10,7 C 15,12 15,12 20,7"
-              fill="none" stroke="#1b3a6b" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M 0,7 C 5,12 5,12 10,7 C 15,2 15,2 20,7"
-              fill="none" stroke="#f47920" stroke-width="1" stroke-linecap="round"/>
+
+      {# ── 3-wave horizontal guilloche (24 × 24 tile) ─────────
+         Wave 1: navy, large outer arc  (amplitude ±10 from centre)
+         Wave 2: orange, large counter-arc (opposite phase)
+         Wave 3: navy, subtle inner ripple (amplitude ±5)        #}
+      <pattern id="hg{{ loop.index }}" patternUnits="userSpaceOnUse" width="24" height="24">
+        <path d="M 0,12 C 6,2 6,2 12,12 C 18,22 18,22 24,12"
+              fill="none" stroke="#1b3a6b" stroke-width="2"   stroke-linecap="round"/>
+        <path d="M 0,12 C 6,22 6,22 12,12 C 18,2  18,2  24,12"
+              fill="none" stroke="#f47920" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M 0,12 C 6,7  6,7  12,12 C 18,17 18,17 24,12"
+              fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
       </pattern>
-      {# Vertical guilloche: same motif rotated 90° #}
-      <pattern id="vg{{ loop.index }}" patternUnits="userSpaceOnUse" width="14" height="20">
-        <path d="M 7,0 C 2,5 2,5 7,10 C 12,15 12,15 7,20"
-              fill="none" stroke="#1b3a6b" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M 7,0 C 12,5 12,5 7,10 C 2,15 2,15 7,20"
-              fill="none" stroke="#f47920" stroke-width="1" stroke-linecap="round"/>
+
+      {# ── 3-wave vertical guilloche (24 × 24 tile) ─────────── #}
+      <pattern id="vg{{ loop.index }}" patternUnits="userSpaceOnUse" width="24" height="24">
+        <path d="M 12,0 C 2,6  2,6  12,12 C 22,18 22,18 12,24"
+              fill="none" stroke="#1b3a6b" stroke-width="2"   stroke-linecap="round"/>
+        <path d="M 12,0 C 22,6 22,6 12,12 C 2,18  2,18  12,24"
+              fill="none" stroke="#f47920" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M 12,0 C 7,6  7,6  12,12 C 17,18 17,18 12,24"
+              fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
       </pattern>
-      {# Circular clip masks for each logo medallion — unique per certificate #}
-      <clipPath id="clip-tl-{{ loop.index }}"><circle cx="19" cy="19" r="26"/></clipPath>
-      <clipPath id="clip-tr-{{ loop.index }}"><circle cx="731" cy="19" r="26"/></clipPath>
-      <clipPath id="clip-bl-{{ loop.index }}"><circle cx="19" cy="941" r="26"/></clipPath>
-      <clipPath id="clip-br-{{ loop.index }}"><circle cx="731" cy="941" r="26"/></clipPath>
+
+      {# ── Circular clip masks for logo medallions ─────────── #}
+      {# TL centroid: ((20+95+20)/3, (20+20+95)/3) = (45, 45)  #}
+      <clipPath id="clip-tl-{{ loop.index }}"><circle cx="45"  cy="45"   r="21"/></clipPath>
+      <clipPath id="clip-tr-{{ loop.index }}"><circle cx="805" cy="45"   r="21"/></clipPath>
+      <clipPath id="clip-bl-{{ loop.index }}"><circle cx="45"  cy="1055" r="21"/></clipPath>
+      <clipPath id="clip-br-{{ loop.index }}"><circle cx="805" cy="1055" r="21"/></clipPath>
     </defs>
 
-    {# Outer border rectangle — ML blue #}
-    <rect x="6" y="6" width="738" height="948" rx="4" ry="4"
+    {# ── Outer border rectangle ──────────────────────────── #}
+    {# Rect x=20 y=20: outer stroke edge = 18 (18/850*8.5in ≈ 0.18in from paper) #}
+    <rect x="20" y="20" width="810" height="1060"
           fill="none" stroke="#1b3a6b" stroke-width="4"/>
 
-    {# Guilloche strips along all four edges #}
-    <rect x="12" y="12" width="726" height="14" fill="url(#hg{{ loop.index }})"/>
-    <rect x="12" y="934" width="726" height="14" fill="url(#hg{{ loop.index }})"/>
-    <rect x="12" y="12" width="14" height="936" fill="url(#vg{{ loop.index }})"/>
-    <rect x="724" y="12" width="14" height="936" fill="url(#vg{{ loop.index }})"/>
+    {# ── Guilloche strips — run between the corner triangles ─ #}
+    {# Top: from x=95 (end of TL triangle) to x=755 (start of TR), height=24 #}
+    <rect x="95"  y="22"   width="660" height="24" fill="url(#hg{{ loop.index }})"/>
+    {# Bottom: symmetric                                                         #}
+    <rect x="95"  y="1054" width="660" height="24" fill="url(#hg{{ loop.index }})"/>
+    {# Left: from y=95 (below TL triangle) to y=1005 (above BL triangle)        #}
+    <rect x="22"  y="95"   width="24"  height="910" fill="url(#vg{{ loop.index }})"/>
+    {# Right: symmetric                                                           #}
+    <rect x="804" y="95"   width="24"  height="910" fill="url(#vg{{ loop.index }})"/>
 
-    {# Inner orange border line #}
-    <rect x="28" y="28" width="694" height="904" rx="2" ry="2"
+    {# ── Inner orange border — well inside the guilloche ────  #}
+    {# x=60: (60/850)*8.5in ≈ 0.60in from edge; corner (60,60): 60+60=120 > 115  #}
+    {# (hypotenuse of 75-leg triangle is x+y=115, so inner border clears it)     #}
+    <rect x="60" y="60" width="730" height="980"
           fill="none" stroke="#f47920" stroke-width="1.5"/>
 
-    {# ── Corner logo medallions ─────────────────────────────── #}
-    {# White fill circles provide a clean background for the logo #}
-    {# Top-left #}
-    <circle cx="19" cy="19" r="27" fill="white" stroke="#f47920" stroke-width="2"/>
+    {# ── Corner triangles — ML blue filled, T=75 leg ────────  #}
+    {# TL: right angle at (20,20); hypotenuse from (95,20) to (20,95)            #}
+    <polygon points="20,20 95,20 20,95"  fill="#1b3a6b"/>
+    {# TR: right angle at (830,20)                                                #}
+    <polygon points="830,20 755,20 830,95" fill="#1b3a6b"/>
+    {# BL: right angle at (20,1080)                                               #}
+    <polygon points="20,1080 95,1080 20,1005" fill="#1b3a6b"/>
+    {# BR: right angle at (830,1080)                                              #}
+    <polygon points="830,1080 755,1080 830,1005" fill="#1b3a6b"/>
+
+    {# ── ML logo medallions on each triangle ────────────────  #}
+    {# White circle background + orange ring, logo clipped to circle             #}
+    {# Logo image 42×42, centered at triangle centroid                           #}
+
+    {# Top-left  (centroid 45,45)  #}
+    <circle cx="45"  cy="45"   r="22" fill="white" stroke="#f47920" stroke-width="1.5"/>
     <image href="{{ url_for('static', filename='ml_logo.jpg') }}"
-           x="-7" y="-7" width="52" height="52"
+           xlink:href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           x="24"  y="24"  width="42" height="42"
+           preserveAspectRatio="xMidYMid meet"
            clip-path="url(#clip-tl-{{ loop.index }})"/>
 
-    {# Top-right #}
-    <circle cx="731" cy="19" r="27" fill="white" stroke="#f47920" stroke-width="2"/>
+    {# Top-right  (centroid 805,45) #}
+    <circle cx="805" cy="45"   r="22" fill="white" stroke="#f47920" stroke-width="1.5"/>
     <image href="{{ url_for('static', filename='ml_logo.jpg') }}"
-           x="705" y="-7" width="52" height="52"
+           xlink:href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           x="784" y="24"  width="42" height="42"
+           preserveAspectRatio="xMidYMid meet"
            clip-path="url(#clip-tr-{{ loop.index }})"/>
 
-    {# Bottom-left #}
-    <circle cx="19" cy="941" r="27" fill="white" stroke="#f47920" stroke-width="2"/>
+    {# Bottom-left  (centroid 45,1055) #}
+    <circle cx="45"  cy="1055" r="22" fill="white" stroke="#f47920" stroke-width="1.5"/>
     <image href="{{ url_for('static', filename='ml_logo.jpg') }}"
-           x="-7" y="915" width="52" height="52"
+           xlink:href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           x="24"  y="1034" width="42" height="42"
+           preserveAspectRatio="xMidYMid meet"
            clip-path="url(#clip-bl-{{ loop.index }})"/>
 
-    {# Bottom-right #}
-    <circle cx="731" cy="941" r="27" fill="white" stroke="#f47920" stroke-width="2"/>
+    {# Bottom-right  (centroid 805,1055) #}
+    <circle cx="805" cy="1055" r="22" fill="white" stroke="#f47920" stroke-width="1.5"/>
     <image href="{{ url_for('static', filename='ml_logo.jpg') }}"
-           x="705" y="915" width="52" height="52"
+           xlink:href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           x="784" y="1034" width="42" height="42"
+           preserveAspectRatio="xMidYMid meet"
            clip-path="url(#clip-br-{{ loop.index }})"/>
+
   </svg>
 
-  {# ── Certificate content ── #}
+  {# ── Certificate content ────────────────────────────────── #}
   <div class="cert-content">
 
     <div class="cert-league">Mountain Lakes Men's Bowling League</div>
@@ -316,49 +288,31 @@
     <hr class="orange-rule">
 
     {% if rec.type == 'individual' %}
-      {# Individual recipient #}
-      <div class="cert-name">{{ rec.first_name ~ ' ' ~ rec.name if rec.first_name else rec.name }}</div>
-      {% if rec.nickname %}
-      <div class="cert-nickname">"{{ rec.nickname }}"</div>
-      {% endif %}
+      <div class="cert-name">{{ (rec.first_name ~ ' ' ~ rec.name) if rec.first_name else rec.name }}</div>
+      {% if rec.nickname %}<div class="cert-nickname">"{{ rec.nickname }}"</div>{% endif %}
       <div class="cert-team">{{ rec.team_label }}</div>
-
     {% else %}
-      {# Team recipient #}
       <div class="cert-name">{{ rec.name }}</div>
-      {% if rec.captain %}
-      <div class="cert-captain">Captain: {{ rec.captain }}</div>
-      {% endif %}
-      {% if rec.place == '1st' %}
-      <div class="team-finish-badge">&#9733; Season Champions &#9733;</div>
-      {% else %}
-      <div class="team-finish-badge">{{ rec.place }} Place</div>
-      {% endif %}
+      {% if rec.captain %}<div class="cert-captain">Captain: {{ rec.captain }}</div>{% endif %}
+      <div class="team-finish-badge">
+        {% if rec.place == '1st' %}&#9733; Season Champions &#9733;{% else %}{{ rec.place }} Place{% endif %}
+      </div>
     {% endif %}
 
     <hr class="orange-rule">
 
-    {# Prize table #}
     <table class="prize-table">
       <colgroup>
-        <col style="width:52%">
-        <col style="width:30%">
-        <col style="width:18%">
+        <col style="width:52%"><col style="width:30%"><col style="width:18%">
       </colgroup>
       {% for item in rec.prizes %}
       <tr>
         <td class="col-label">
-          {% if item.type == 'weekly' %}
-            Week {{ item.week_num }} &nbsp;&middot;&nbsp; {{ item.label }}
-          {% elif item.type == 'tournament' %}
-            {{ item.tournament_type }} &nbsp;&middot;&nbsp; {{ item.place }} Place
-          {% elif item.type == 'most_improved' %}
-            Most Improved
-          {% elif item.type == 'team_finish' %}
-            {{ item.label }}
-          {% else %}
-            {{ item.label }}
-          {% endif %}
+          {% if item.type == 'weekly' %}Week {{ item.week_num }} &nbsp;&middot;&nbsp; {{ item.label }}
+          {% elif item.type == 'tournament' %}{{ item.tournament_type }} &nbsp;&middot;&nbsp; {{ item.place }} Place
+          {% elif item.type == 'most_improved' %}Most Improved
+          {% elif item.type == 'team_finish' %}{{ item.label }}
+          {% else %}{{ item.label }}{% endif %}
         </td>
         <td class="col-detail">
           {% if item.type == 'weekly' %}{{ item.score }}
@@ -366,8 +320,7 @@
           {% elif item.type == 'most_improved' %}{{ item.description }}
           {% elif item.type == 'team_finish' %}{{ item.detail }}
           {% elif item.score is defined %}{{ item.score }}
-          {% else %}—
-          {% endif %}
+          {% else %}—{% endif %}
         </td>
         <td class="col-amount">${{ item.amount | int }}</td>
       </tr>
@@ -379,7 +332,6 @@
       </tr>
     </table>
 
-    {# Most improved narrative description #}
     {% for item in rec.prizes if item.type == 'most_improved' %}
     <hr class="orange-rule-thin">
     <p class="mi-description">
@@ -393,9 +345,9 @@
       Presented by the Mountain Lakes Men's Bowling League &nbsp;&mdash;&nbsp; {{ season.name }}
     </div>
 
-  </div>{# /cert-content #}
-</div>{# /certificate #}
-</div>{# /certificate-wrap #}
+  </div>
+</div>
+</div>
 {% endfor %}
 
 </body>
