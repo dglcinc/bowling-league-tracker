@@ -27,7 +27,7 @@
   Week {{ week.week_num }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
   {% if week.is_position_night %}<span class="badge bg-warning text-dark">Position Night</span>{% endif %}
   &nbsp;|&nbsp; Matchup {{ sched.matchup_num }}:
-  Team {{ sched.team1.number }} {{ sched.team1.name }} vs Team {{ sched.team2.number }} {{ sched.team2.name }}
+  {{ sched.team1.name }} vs {{ sched.team2.name }}
   {% if sched.lane_pair %}<small class="text-muted">(Lanes {{ sched.lane_pair }})</small>{% endif %}
 </h4>
 
@@ -37,7 +37,7 @@
 <div class="col-12 col-xl-6">
   <div class="card mb-3">
     <div class="card-header team-header">
-      Team {{ team.number }} — {{ team.name }}
+      {{ team.name }}
       <span class="badge bg-secondary float-end">{{ 'Side A' if team.id == sched.team1_id else 'Side B' }}</span>
     </div>
     <div class="card-body p-2">

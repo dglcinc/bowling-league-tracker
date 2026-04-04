@@ -94,7 +94,7 @@
                class="text-decoration-none text-body" target="_blank">{{ ind.bowler.last_name }}</a>
           </td>
           <td rowspan="{{ ind.prizes|length }}" class="align-middle text-center">
-            {{ ind.team.number if ind.team else '' }}
+            {{ ind.team.name if ind.team else '' }}
           </td>
           {% endif %}
           <td>
@@ -165,7 +165,7 @@
       {% for row in award.rows %}
       <tr>
         <td>{{ row.place }}</td>
-        <td>Team {{ row.team.number }}</td>
+        <td>{{ row.team.name }}</td>
         <td class="text-end">{{ row.points }}</td>
         <td class="text-end fw-bold">${{ row.amount | int }}</td>
       </tr>
@@ -188,7 +188,7 @@
         <td>
           <a href="{{ url_for('payout.award_team', season_id=season.id, team_id=tt.team.id) }}"
              class="text-decoration-none text-body" target="_blank">
-            Team {{ tt.team.number }}{% if tt.team.name and tt.team.name != 'Team ' ~ tt.team.number %} — {{ tt.team.name }}{% endif %}
+            {{ tt.team.name }}
           </a>
           {% if tt.captain %}<span class="text-muted small"> ({{ tt.captain }})</span>{% endif %}
         </td>
@@ -239,7 +239,7 @@
       {% for tt in payout.team_payouts %}
       {% set bd = team_breakdowns[tt.team.id] %}
       <tr>
-        <td>Team {{ tt.team.number }}{% if tt.team.name and tt.team.name != 'Team ' ~ tt.team.number %} — {{ tt.team.name }}{% endif %}</td>
+        <td>{{ tt.team.name }}</td>
         <td class="text-end fw-bold">${{ "%.2f"|format(tt.total) }}</td>
         {% for d in denoms %}
         <td class="text-end {{ 'text-muted' if bd[d] == 0 else '' }}">{{ bd[d] if bd[d] else '—' }}</td>

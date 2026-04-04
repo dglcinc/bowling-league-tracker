@@ -28,7 +28,7 @@
   {% for row in ytd_prizes %}
   <tr>
     <td>{{ row.bowler.last_name }}</td>
-    <td>{{ row.team.number }}</td>
+    <td>{{ row.team.name }}</td>
     {% for key, label in prize_keys %}
     <td class="text-center">{{ row.counts[key] or '' }}</td>
     {% endfor %}

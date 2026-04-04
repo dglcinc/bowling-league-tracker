@@ -2,7 +2,7 @@
 {% block title %}Week {{ week.week_num }} — Score Entry{% endblock %}
 
 {% macro bname(b) %}{{ b.short_name(league_settings.use_nickname if league_settings else false) }}{% endmacro %}
-{% macro tname(team) %}Team {{ team.number }}{% if league_settings and league_settings.show_captain_name and team.captain_name %} ({{ team.captain_name }}){% endif %}{% endmacro %}
+{% macro tname(team) %}{{ team.name }}{% if league_settings and league_settings.show_captain_name and team.captain_name %} ({{ team.captain_name }}){% endif %}{% endmacro %}
 
 {% block content %}
 <div class="d-flex align-items-center gap-2 mb-2 no-print">
@@ -150,7 +150,7 @@
         {% for row in weekly_team_pts %}
         {% if row.team.id == sched0.team1.id or row.team.id == sched0.team2.id %}
         <span class="badge bg-{{ 'success' if row.points > 8 else 'secondary' }} me-1">
-          Team {{ row.team.number }}: {{ row.points | int if row.points == row.points | int else row.points }} pts
+          {{ row.team.name }}: {{ row.points | int if row.points == row.points | int else row.points }} pts
         </span>
         {% endif %}
         {% endfor %}
@@ -286,7 +286,7 @@
   <tbody>
   {% for row in weekly_team_pts %}
   <tr>
-    <td>Team {{ row.team.number }} — {{ row.team.name }}</td>
+    <td>{{ row.team.name }}</td>
     <td class="text-end fw-bold">{{ row.points | int if row.points == row.points | int else row.points }}</td>
   </tr>
   {% endfor %}
