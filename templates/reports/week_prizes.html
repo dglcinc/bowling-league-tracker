@@ -50,7 +50,9 @@
     .row { --bs-gutter-y: 0.25rem !important; }
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
     a { color: inherit !important; text-decoration: none !important; }
+    .print-page-2 { display: block !important; page-break-before: always; }
   }
+  .print-page-2 { display: none; }
 </style>
 {% endblock %}
 
@@ -219,5 +221,53 @@
 <div class="no-print mt-3">
   <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}"
      class="btn btn-outline-secondary btn-sm">Back to Week</a>
+</div>
+
+{# Print page 2: High Games & Averages #}
+<div class="print-page-2">
+  <div class="text-center mb-2" style="font-size:0.9rem">
+    <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp; {{ season.name }}
+    &nbsp;|&nbsp; High Games &amp; Averages — through Week {{ week.week_num }}
+  </div>
+  <div class="row">
+    <div class="col-6">
+      <div class="section-head">Average Leaders (min {{ min_games }} games{% if top10 %}, top 10{% endif %})</div>
+      <table class="table table-sm table-bordered">
+        <thead><tr><th>#</th><th>Bowler</th><th>Team</th><th class="text-end">Avg</th><th class="text-end">Hcp</th><th class="text-end">G</th></tr></thead>
+        <tbody>
+          {% for i, r in enumerate(avg_rows[:20]) %}
+          <tr>
+            <td>{{ i+1 }}</td>
+            <td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler.id) }}">{{ r.bowler.last_name }}</a></td>
+            <td>{{ r.team.name }}</td>
+            <td class="text-end">{{ r.average }}</td>
+            <td class="text-end">{{ r.handicap }}</td>
+            <td class="text-end">{{ r.games }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="col-6">
+      {% for attr, label in [('high_game_scratch','High Game Scratch'),('high_game_hcp','High Game w/ Handicap'),
+                              ('high_series_scratch','High Series Scratch'),('high_series_hcp','High Series w/ Handicap')] %}
+      <div class="section-head">{{ label }}</div>
+      <table class="table table-sm table-bordered mb-2">
+        <thead><tr><th>#</th><th>Bowler</th><th class="text-end">Score</th></tr></thead>
+        <tbody>
+          {% for i, r in enumerate(leaders | sort(attribute=attr, reverse=True)) %}
+          {% if i < 10 %}
+          <tr>
+            <td>{{ i+1 }}</td>
+            <td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler.id) }}">{{ r.bowler.last_name }}</a></td>
+            <td class="text-end">{{ r[attr] }}</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endfor %}
+    </div>
+  </div>
 </div>
 {% endblock %}
