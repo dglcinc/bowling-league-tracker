@@ -116,14 +116,13 @@
         <th class="text-end">Full<br>Year</th>
       </tr></thead>
       <tbody>
-      {% for i in range(standings | length) %}
-      {% set s1 = first_half_s[i] %}
-      {% set s2 = second_half_s[i] %}
-      {% set sy = standings[i] %}
+      {% for sy in standings %}
+      {% set fh_pts = first_half_map.get(sy['team'].id, 0) %}
+      {% set sh_pts = second_half_map.get(sy['team'].id, 0) %}
       <tr>
-        <td>{{ sy['team'].number }} — {{ sy['team'].name }}</td>
-        <td class="text-end fw-bold"{% if s1['points'] == fh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s1['points'] }}</td>
-        <td class="text-end fw-bold"{% if s2['points'] == sh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s2['points'] }}</td>
+        <td>{{ sy['team'].name }}</td>
+        <td class="text-end fw-bold"{% if fh_pts == fh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ fh_pts }}</td>
+        <td class="text-end fw-bold"{% if sh_pts == sh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ sh_pts }}</td>
         <td class="text-end fw-bold"{% if sy['points'] == fy_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ sy['points'] }}</td>
       </tr>
       {% endfor %}

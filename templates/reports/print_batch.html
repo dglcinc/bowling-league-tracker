@@ -178,14 +178,13 @@ function printGroup(n) {
           <th class="text-end">Full<br>Year</th>
         </tr></thead>
         <tbody>
-        {% for i in range(week_standings | length) %}
-        {% set s1 = pb_first_half[i] %}
-        {% set s2 = pb_second_half[i] %}
-        {% set sy = week_standings[i] %}
+        {% for sy in week_standings %}
+        {% set fh_pts = pb_first_half.get(sy['team'].id, 0) %}
+        {% set sh_pts = pb_second_half.get(sy['team'].id, 0) %}
         <tr>
-          <td>{{ sy['team'].number }} — {{ sy['team'].name }}</td>
-          <td class="text-end fw-bold"{% if s1['points'] == pb_fh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s1['points'] }}</td>
-          <td class="text-end fw-bold"{% if s2['points'] == pb_sh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s2['points'] }}</td>
+          <td>{{ sy['team'].name }}</td>
+          <td class="text-end fw-bold"{% if fh_pts == pb_fh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ fh_pts }}</td>
+          <td class="text-end fw-bold"{% if sh_pts == pb_sh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ sh_pts }}</td>
           <td class="text-end fw-bold"{% if sy['points'] == pb_fy_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ sy['points'] }}</td>
         </tr>
         {% endfor %}
