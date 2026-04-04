@@ -229,9 +229,9 @@
     {% for attr, label in [('high_game_scratch','High Game Scratch'),('high_game_hcp','High Game w/ Handicap'),
                             ('high_series_scratch','High Series Scratch'),('high_series_hcp','High Series w/ Handicap')] %}
     <div class="col-3">
-      <strong style="font-size:0.8rem">{{ label }}</strong>
+      <div class="section-head">{{ label }}</div>
       <table class="table table-sm table-bordered">
-        <thead><tr><th>#</th><th>Bowler</th><th class="text-end">Score</th></tr></thead>
+        <thead class="table-dark"><tr><th>#</th><th>Bowler</th><th class="text-end">Score</th></tr></thead>
         <tbody>
           {% for i, r in enumerate(leaders | sort(attribute=attr, reverse=True)) %}
           {% if i < 10 %}
