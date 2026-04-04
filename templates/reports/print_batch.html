@@ -175,7 +175,7 @@ function printGroup(n) {
 
     {# Left: weekly prize boxes #}
     <div class="col-5">
-      <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px">Week {{ week_num }} Prizes</div>
+      <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact">Week {{ week_num }} Prizes</div>
       {% macro pb_prize(cat, label) %}
       <div style="border:1px solid #dee2e6;border-radius:3px;padding:2px 6px;margin-bottom:3px">
         <div style="font-size:0.65rem;text-transform:uppercase;color:#6c757d">{{ label }}</div>
@@ -200,7 +200,7 @@ function printGroup(n) {
 
     {# Middle: team standings #}
     <div class="col-4">
-      <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px">Standings — Week {{ week_num }}</div>
+      <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact">Standings — Week {{ week_num }}</div>
       <table class="table table-sm table-bordered mb-0">
         <thead><tr>
           <th>Team</th>
@@ -225,7 +225,7 @@ function printGroup(n) {
 
     {# Right: YTD leaders #}
     <div class="col-3">
-      <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px">YTD Leaders — Through Week {{ week_num }}</div>
+      <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact">YTD Leaders — Through Week {{ week_num }}</div>
       {% set ytd_cats = [
         ('high_game_hcp',      'YTD High Game — Handicap'),
         ('high_game_scratch',  'YTD High Game — Scratch'),
@@ -252,7 +252,7 @@ function printGroup(n) {
 
   {# Averages table #}
   <div style="margin-top:6px">
-    <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px">High Averages — through Week {{ hg_through }}</div>
+    <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact">High Averages — through Week {{ hg_through }}</div>
     <table class="table table-sm table-bordered mb-0" style="max-width:500px">
       <thead class="table-dark"><tr><th>#</th><th>Bowler</th><th>Team</th><th class="text-end">G</th><th class="text-end">Ave</th><th class="text-end">Hcp</th></tr></thead>
       <tbody>
