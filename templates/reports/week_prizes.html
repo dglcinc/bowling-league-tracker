@@ -31,7 +31,8 @@
   .prize-tie   { font-size: 0.75rem; }
   .section-head { font-weight: 700; font-size: 0.8rem; text-transform: uppercase;
                   letter-spacing: 0.07em; background: #343a40; color: #fff;
-                  padding: 3px 6px; margin-bottom: 4px; }
+                  padding: 3px 6px; margin-bottom: 4px;
+                  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @media print {
     @page { size: landscape; margin: 0.35in; }
     body  { font-size: 7.5pt !important; }
@@ -48,7 +49,7 @@
     .section-head { font-size: 6.5pt !important; padding: 1px 4px !important; margin-bottom: 2px !important; }
     hr { margin: 3px 0 !important; }
     .row { --bs-gutter-y: 0.25rem !important; }
-    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    thead.table-dark { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     a { color: inherit !important; text-decoration: none !important; }
     .print-page-2 { display: block !important; }
   }
