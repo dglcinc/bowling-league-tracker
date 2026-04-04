@@ -2,6 +2,25 @@
 {% block title %}Print Batch — Week {{ week_num }} — {{ season.name }}{% endblock %}
 
 {% block extra_head %}
+<script>
+(function() {
+  var LS_MG  = 'bowling_prizes_min_games';
+  var LS_T10 = 'bowling_prizes_top10';
+  var params = new URLSearchParams(window.location.search);
+  if (params.has('min_games') || params.has('top10')) {
+    localStorage.setItem(LS_MG,  params.get('min_games') || '9');
+    localStorage.setItem(LS_T10, params.has('top10') ? '1' : '0');
+  } else {
+    var mg  = localStorage.getItem(LS_MG);
+    var t10 = localStorage.getItem(LS_T10);
+    if (mg !== null) {
+      params.set('min_games', mg);
+      if (t10 === '1') params.set('top10', '1');
+      window.location.search = params.toString();
+    }
+  }
+})();
+</script>
 <style>
   .batch-section { margin-bottom: 2rem; }
 
@@ -102,6 +121,18 @@ function printGroup(n) {
       </option>
       {% endfor %}
     </select>
+    <form method="get" class="d-flex align-items-center gap-2">
+      <label class="form-label mb-0 small">Min games:</label>
+      <input type="number" name="min_games" value="{{ min_games }}" min="0" max="99"
+             class="form-control form-control-sm" style="width:70px">
+      <div class="form-check mb-0">
+        <input class="form-check-input" type="checkbox" name="top10" value="1" id="pb_top10chk"
+               {{ 'checked' if top10 else '' }} onchange="this.form.submit()">
+        <label class="form-check-label small" for="pb_top10chk">Top 10</label>
+      </div>
+      <button type="submit" class="btn btn-sm btn-outline-secondary">Apply</button>
+    </form>
+    <div class="vr"></div>
     <button onclick="printGroup(1)" class="btn btn-sm btn-outline-primary">
       Print Group 1 (4× Alpha)
     </button>

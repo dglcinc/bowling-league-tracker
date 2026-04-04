@@ -187,8 +187,13 @@ def print_batch(season_id, week_num):
                     .order_by(Week.week_num.desc())
                     .first())
     hg_through = last_entered.week_num if last_entered else week_num
-    hg_leaders = _build_high_games_leaders(season_id, hg_through)
+    min_games = request.args.get('min_games', 9, type=int)
+    top10 = request.args.get('top10', 0, type=int)
+    hg_leaders = _build_high_games_leaders(season_id, hg_through, min_games=min_games)
     by_avg  = sorted(hg_leaders, key=lambda x: x['average'], reverse=True)
+    if top10:
+        top10_hcps = set(sorted({r['handicap'] for r in by_avg})[:10])
+        by_avg = [r for r in by_avg if r['handicap'] in top10_hcps]
     by_hgs  = sorted(hg_leaders, key=lambda x: x['high_game_scratch'], reverse=True)
     by_hgh  = sorted(hg_leaders, key=lambda x: x['high_game_hcp'], reverse=True)
     by_hss  = sorted(hg_leaders, key=lambda x: x['high_series_scratch'], reverse=True)
@@ -223,6 +228,7 @@ def print_batch(season_id, week_num):
                            by_avg=by_avg, by_hgs=by_hgs, by_hgh=by_hgh,
                            by_hss=by_hss, by_hsh=by_hsh,
                            hg_through=hg_through,
+                           min_games=min_games, top10=top10,
                            prizes=prizes,
                            pb_leaders=hg_leaders,
                            week_standings=pb_full_year,
