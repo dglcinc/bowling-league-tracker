@@ -174,7 +174,7 @@ function printGroup(n) {
   <div class="row g-2">
 
     {# Left: weekly prize boxes #}
-    <div class="col-4">
+    <div class="col-5">
       <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact">Week {{ week_num }} Prizes</div>
       {% macro pb_prize(cat, label) %}
       <div style="border:1px solid #dee2e6;border-radius:3px;padding:2px 6px;margin-bottom:3px">
@@ -199,7 +199,7 @@ function printGroup(n) {
     </div>
 
     {# Middle: team standings #}
-    <div class="col-4">
+    <div class="col-3">
       <div style="width:fit-content;margin:0 auto">
       <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;background:#343a40;color:#fff;padding:2px 6px;margin-bottom:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact">Standings — Week {{ week_num }}</div>
       <table class="table table-sm table-bordered mb-0">

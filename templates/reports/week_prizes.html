@@ -91,7 +91,7 @@
 <div class="row g-3">
 
   {# Left: this week's prizes (2 columns per category pair) #}
-  <div class="col-12 col-xl-4">
+  <div class="col-12 col-xl-5">
     <div class="section-head">Week {{ week.week_num }} Prizes</div>
     <div class="row g-2">
       <div class="col-6">{{ prize_box(prizes.hg_hcp if prizes else none, 'High Game — Handicap') }}</div>
@@ -109,7 +109,7 @@
   </div>
 
   {# Middle: team standings #}
-  <div class="col-12 col-xl-4">
+  <div class="col-12 col-xl-3">
     <div style="width:fit-content;margin:0 auto">
     <div class="section-head">Team Standings — Week {{ week.week_num }}</div>
     <table class="table table-sm table-bordered mb-0">
