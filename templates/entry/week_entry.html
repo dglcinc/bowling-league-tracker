@@ -117,8 +117,8 @@
         <table class="table table-sm table-bordered mt-2 mb-1" style="font-size:0.8rem">
           <thead class="table-light"><tr>
             <th></th>
-            <th class="text-center">Team {{ bd.team1.number }}</th>
-            <th class="text-center">Team {{ bd.team2.number }}</th>
+            <th class="text-center">{{ bd.team1.name }}</th>
+            <th class="text-center">{{ bd.team2.name }}</th>
             <th class="text-center">Pt</th>
           </tr></thead>
           <tbody>
@@ -128,8 +128,8 @@
             <td class="text-center {{ 'fw-bold' if g.winner == bd.team1.id else '' }}">{{ g.t1 }}</td>
             <td class="text-center {{ 'fw-bold' if g.winner == bd.team2.id else '' }}">{{ g.t2 }}</td>
             <td class="text-center small">
-              {% if g.winner == bd.team1.id %}T{{ bd.team1.number }}
-              {% elif g.winner == bd.team2.id %}T{{ bd.team2.number }}
+              {% if g.winner == bd.team1.id %}{{ bd.team1.name }}
+              {% elif g.winner == bd.team2.id %}{{ bd.team2.name }}
               {% else %}&mdash;{% endif %}
             </td>
           </tr>
@@ -139,8 +139,8 @@
             <td class="text-center {{ 'fw-bold' if bd.series.winner == bd.team1.id else '' }}">{{ bd.series.t1 }}</td>
             <td class="text-center {{ 'fw-bold' if bd.series.winner == bd.team2.id else '' }}">{{ bd.series.t2 }}</td>
             <td class="text-center small">
-              {% if bd.series.winner == bd.team1.id %}T{{ bd.team1.number }}
-              {% elif bd.series.winner == bd.team2.id %}T{{ bd.team2.number }}
+              {% if bd.series.winner == bd.team1.id %}{{ bd.team1.name }}
+              {% elif bd.series.winner == bd.team2.id %}{{ bd.team2.name }}
               {% else %}&mdash;{% endif %}
             </td>
           </tr>
@@ -234,8 +234,8 @@
         <table class="table table-sm table-bordered mt-2 mb-0" style="font-size:0.8rem">
           <thead class="table-light"><tr>
             <th></th>
-            <th class="text-center">Team {{ bd.team1.number }}</th>
-            <th class="text-center">Team {{ bd.team2.number }}</th>
+            <th class="text-center">{{ bd.team1.name }}</th>
+            <th class="text-center">{{ bd.team2.name }}</th>
             <th class="text-center">Pt</th>
           </tr></thead>
           <tbody>
@@ -245,8 +245,8 @@
             <td class="text-center {{ 'fw-bold' if g.winner == bd.team1.id else '' }}">{{ g.t1 }}</td>
             <td class="text-center {{ 'fw-bold' if g.winner == bd.team2.id else '' }}">{{ g.t2 }}</td>
             <td class="text-center small">
-              {% if g.winner == bd.team1.id %}T{{ bd.team1.number }}
-              {% elif g.winner == bd.team2.id %}T{{ bd.team2.number }}
+              {% if g.winner == bd.team1.id %}{{ bd.team1.name }}
+              {% elif g.winner == bd.team2.id %}{{ bd.team2.name }}
               {% else %}&mdash;{% endif %}
             </td>
           </tr>
@@ -256,8 +256,8 @@
             <td class="text-center {{ 'fw-bold' if bd.series.winner == bd.team1.id else '' }}">{{ bd.series.t1 }}</td>
             <td class="text-center {{ 'fw-bold' if bd.series.winner == bd.team2.id else '' }}">{{ bd.series.t2 }}</td>
             <td class="text-center small">
-              {% if bd.series.winner == bd.team1.id %}T{{ bd.team1.number }}
-              {% elif bd.series.winner == bd.team2.id %}T{{ bd.team2.number }}
+              {% if bd.series.winner == bd.team1.id %}{{ bd.team1.name }}
+              {% elif bd.series.winner == bd.team2.id %}{{ bd.team2.name }}
               {% else %}&mdash;{% endif %}
             </td>
           </tr>

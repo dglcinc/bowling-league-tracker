@@ -18,9 +18,14 @@ def wkly_alpha(season_id, week_num):
     week = Week.query.filter_by(season_id=season_id, week_num=week_num).first()
     rows = get_wkly_alpha(season_id, week_num)
     weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
+    teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
+    team_filter = request.args.get('team', '')
+    if team_filter:
+        rows = [r for r in rows if r.team and r.team.name == team_filter]
     return render_template('reports/wkly_alpha.html',
                            season=season, week=week, week_num=week_num,
-                           rows=rows, weeks=weeks)
+                           rows=rows, weeks=weeks, teams=teams,
+                           team_filter=team_filter)
 
 
 

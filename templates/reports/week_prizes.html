@@ -177,7 +177,7 @@
 <h6 class="d-none d-print-block">High Averages{% if top10 %} — Top 10{% endif %} (min {{ min_games }} games)</h6>
 <table class="table table-sm table-bordered mb-3" style="max-width:500px">
   <thead class="table-dark"><tr>
-    <th>#</th><th>Bowler</th><th>T</th>
+    <th>#</th><th>Bowler</th><th>Team</th>
     <th class="text-end">G</th><th class="text-end">Ave</th><th class="text-end">Hcp</th>
   </tr></thead>
   <tbody>
@@ -185,7 +185,7 @@
   <tr>
     <td>{{ i + 1 }}</td>
     <td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler.id) }}" class="text-decoration-none text-body">{{ r.bowler.last_name }}</a></td>
-    <td>{{ r.team.number }}</td>
+    <td>{{ r.team.name }}</td>
     <td class="text-end">{{ r.games }}</td>
     <td class="text-end fw-bold">{{ r.average }}</td>
     <td class="text-end">{{ r.handicap if r.handicap is defined else '' }}</td>
@@ -203,7 +203,7 @@
   <div class="col-12 col-md-6 col-xl-3">
     <h6>{{ label }}</h6>
     <table class="table table-sm table-bordered mb-0">
-      <thead><tr><th>#</th><th>Bowler</th><th>T</th><th class="text-end">Score</th></tr></thead>
+      <thead><tr><th>#</th><th>Bowler</th><th>Team</th><th class="text-end">Score</th></tr></thead>
       <tbody>
       {% for i, r in enumerate(leaders | sort(attribute=attr, reverse=True)) %}
       {% if i < 10 %}
