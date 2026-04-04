@@ -41,15 +41,15 @@
       {% for i in range(overall | length) %}
       <tr>
         <td>{{ i + 1 }}</td>
-        <td>{{ first_half[i].team.number }} — {{ first_half[i].team.name }}</td>
+        <td>{{ first_half[i].team.name }}</td>
         <td class="text-end fw-bold">{{ first_half[i].points }}</td>
         <td class="table-secondary"></td>
         <td>{{ i + 1 }}</td>
-        <td>{{ second_half[i].team.number }} — {{ second_half[i].team.name }}</td>
+        <td>{{ second_half[i].team.name }}</td>
         <td class="text-end fw-bold">{{ second_half[i].points }}</td>
         <td class="table-secondary"></td>
         <td>{{ i + 1 }}</td>
-        <td>{{ overall[i].team.number }} — {{ overall[i].team.name }}</td>
+        <td>{{ overall[i].team.name }}</td>
         <td class="text-end fw-bold">{{ overall[i].points }}</td>
       </tr>
       {% endfor %}
@@ -66,7 +66,7 @@
       <th>Wk</th>
       <th>Date</th>
       {% for team in standing_teams %}
-      <th class="text-center" colspan="3">{{ team.number }} — {{ team.name }}</th>
+      <th class="text-center" colspan="3">{{ team.name }}</th>
       {% endfor %}
       <th class="text-center">Grand</th>
     </tr>

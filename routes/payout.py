@@ -304,8 +304,7 @@ def _build_recipients(payout):
             'name':       bowler.last_name,
             'first_name': bowler.first_name or '',
             'nickname':   bowler.nickname or '',
-            'team_label': (f"Team {team.number} \u2014 {team.name}"
-                           if team else ''),
+            'team_label': team.name if team else '',
             'prizes':      ind['prizes'],
             'total':      ind['total'],
         })
@@ -317,12 +316,7 @@ def _build_recipients(payout):
     # Team recipients
     for tt in payout['team_payouts']:
         team = tt['team']
-        num_label = f"Team {team.number}"
-        if (team.name and team.name != num_label
-                and team.name.lower() != f"team {team.number}"):
-            display_name = f"{num_label} \u2014 {team.name}"
-        else:
-            display_name = num_label
+        display_name = team.name
         recipients.append({
             'type':    'team',
             'team':    team,

@@ -5,6 +5,34 @@
 <h4>Schedule — {{ season.name }}</h4>
 <p class="text-muted">Set which teams play each other in each matchup each week. 4 matchups per week, each on one lane pair.</p>
 
+<div class="mb-3 p-2 border rounded bg-light">
+  <div class="fw-semibold small mb-2">Global Lane Pairs — fill all weeks at once</div>
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    {% for m in range(1, 5) %}
+    <div class="d-flex align-items-center gap-1">
+      <label class="form-label mb-0 small">Matchup {{ m }}:</label>
+      <input type="text" id="global_lane_{{ m }}" class="form-control form-control-sm"
+             style="width:70px" placeholder="e.g. {{ (m*2-1) }}-{{ m*2 }}">
+    </div>
+    {% endfor %}
+    <button type="button" class="btn btn-outline-secondary btn-sm"
+            onclick="fillAllLanes()">Fill All Weeks</button>
+  </div>
+</div>
+
+<script>
+function fillAllLanes() {
+  {% for m in range(1, 5) %}
+  var val{{ m }} = document.getElementById('global_lane_{{ m }}').value;
+  if (val{{ m }}) {
+    document.querySelectorAll('input[name$="_matchup_{{ m }}_lane"]').forEach(function(el) {
+      el.value = val{{ m }};
+    });
+  }
+  {% endfor %}
+}
+</script>
+
 <form method="post" action="{{ url_for('admin.save_schedule', season_id=season.id) }}">
   <div class="table-responsive">
     <table class="table table-sm table-bordered">
@@ -33,7 +61,7 @@
               <option value="">—</option>
               {% for t in teams %}
               <option value="{{ t.id }}" {% if entry and entry.team1_id == t.id %}selected{% endif %}>
-                {{ t.number }}
+                {{ t.name }}
               </option>
               {% endfor %}
             </select>
