@@ -109,9 +109,10 @@
   </div>
 
   {# Middle: team standings #}
-  <div class="col-12 col-xl-4 d-flex flex-column align-items-center">
-    <div class="section-head w-100">Team Standings — Week {{ week.week_num }}</div>
-    <table class="table table-sm table-bordered mb-0" style="width:auto;margin:0 auto">
+  <div class="col-12 col-xl-4">
+    <div style="width:fit-content;margin:0 auto">
+    <div class="section-head">Team Standings — Week {{ week.week_num }}</div>
+    <table class="table table-sm table-bordered mb-0">
       <thead><tr>
         <th>Team</th>
         <th class="text-end" style="width:2.5rem">1st<br>Half</th>
@@ -131,6 +132,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 
   {# Right: YTD leaders #}
