@@ -66,7 +66,7 @@ function printGroup(n) {
     <tr>
       <td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=row.bowler.id) }}" class="text-decoration-none text-body">{{ row.bowler.last_name }}</a></td>
       <td class="text-muted">{{ row.bowler.nickname or '' }}</td>
-      <td>{{ row.team.number }}</td>
+      <td>{{ row.team.name }}</td>
       <td class="text-end">{{ row.total_pins or '' }}</td>
       <td class="text-end">{{ row.second_half_pins or '' }}</td>
       <td class="text-end">{{ row.games or '' }}</td>
@@ -300,7 +300,7 @@ function printGroup(n) {
         <thead><tr><th>#</th><th>Bowler</th><th>Team</th><th class="text-end">Avg</th><th class="text-end">Hcp</th><th class="text-end">G</th></tr></thead>
         <tbody>
           {% for i, r in enumerate(by_avg[:20]) %}
-          <tr><td>{{ i+1 }}</td><td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler.id) }}" class="text-decoration-none text-body">{{ r.bowler.last_name }}</a></td><td>{{ r.team.number }}</td>
+          <tr><td>{{ i+1 }}</td><td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler.id) }}" class="text-decoration-none text-body">{{ r.bowler.last_name }}</a></td><td>{{ r.team.name }}</td>
               <td class="text-end">{{ r.average }}</td><td class="text-end">{{ r.handicap }}</td><td class="text-end">{{ r.games }}</td></tr>
           {% endfor %}
         </tbody>
