@@ -1,3 +1,5 @@
 flask>=3.0.0
 flask-sqlalchemy>=3.1.0
+flask-mail>=0.10.0
 openpyxl>=3.1.0
+weasyprint>=62.0
