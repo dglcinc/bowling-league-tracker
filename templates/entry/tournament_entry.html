@@ -70,14 +70,14 @@
       </td>
       {% if use_handicap %}
       <td class="text-center">
-        <input type="number" name="hcp_{{ i }}" class="form-control form-control-sm score-input hcp-input"
+        <input type="number" inputmode="numeric" name="hcp_{{ i }}" class="form-control form-control-sm score-input hcp-input"
                min="0" max="200"
                value="{{ entry.handicap if entry else '' }}">
       </td>
       {% endif %}
       {% for g in range(1, num_games + 1) %}
       <td>
-        <input type="number" name="game{{ g }}_{{ i }}" class="form-control form-control-sm score-input game-input"
+        <input type="number" inputmode="numeric" name="game{{ g }}_{{ i }}" class="form-control form-control-sm score-input game-input"
                min="0" max="300"
                value="{{ entry['game'~g] if entry and entry['game'~g] is not none else '' }}">
       </td>
@@ -233,12 +233,12 @@ function addRow() {
   const row = document.createElement('tr');
 
   const hcpCell = useHandicap
-    ? `<td class="text-center"><input type="number" name="hcp_${i}" class="form-control form-control-sm score-input hcp-input" min="0" max="200"></td>`
+    ? `<td class="text-center"><input type="number" inputmode="numeric" name="hcp_${i}" class="form-control form-control-sm score-input hcp-input" min="0" max="200"></td>`
     : '';
 
   let gameCells = '';
   for (let g = 1; g <= numGames; g++) {
-    gameCells += `<td><input type="number" name="game${g}_${i}" class="form-control form-control-sm score-input game-input" min="0" max="300"></td>`;
+    gameCells += `<td><input type="number" inputmode="numeric" name="game${g}_${i}" class="form-control form-control-sm score-input game-input" min="0" max="300"></td>`;
   }
 
   row.innerHTML = `

@@ -179,6 +179,7 @@
   </form>
 </div>
 <h6 class="d-none d-print-block">High Averages{% if top10 %} — Top 10{% endif %} (min {{ min_games }} games)</h6>
+<div class="table-scroll">
 <table class="table table-sm table-bordered mb-3" style="max-width:500px">
   <thead class="table-dark"><tr>
     <th>#</th><th>Bowler</th><th>Team</th>
@@ -199,6 +200,7 @@
   {% endfor %}
   </tbody>
 </table>
+</div>
 
 {# YTD leader boxes (screen only) #}
 <div class="row g-3 mt-1 no-print">
