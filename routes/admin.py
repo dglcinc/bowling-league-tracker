@@ -728,3 +728,94 @@ def import_season():
         return redirect(url_for('admin.season_detail', season_id=season.id))
 
     return render_template('admin/import_season.html')
+
+
+# ---------------------------------------------------------------------------
+# Backup and restore
+# ---------------------------------------------------------------------------
+
+@admin_bp.route('/backup')
+def backup_restore():
+    from flask import current_app
+    from pathlib import Path
+    import os
+
+    backup_dir = Path(current_app.config['BACKUP_DIR'])
+    backups = sorted(backup_dir.glob('league-*.db'), reverse=True)
+
+    from datetime import datetime as _dt
+    backup_list = []
+    for f in backups:
+        stat = f.stat()
+        backup_list.append({
+            'filename': f.name,
+            'size_kb': round(stat.st_size / 1024, 1),
+            'created': _dt.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M'),
+        })
+
+    db_path = Path(current_app.config['db_path'])
+    db_size_kb = round(db_path.stat().st_size / 1024, 1) if db_path.exists() else 0
+
+    return render_template('admin/backup_restore.html',
+                           backups=backup_list,
+                           db_path=str(db_path),
+                           db_size_kb=db_size_kb,
+                           backup_dir=str(backup_dir))
+
+
+@admin_bp.route('/backup/now', methods=['POST'])
+def backup_now():
+    """Trigger an immediate backup regardless of throttle."""
+    from flask import current_app
+    import shutil
+    from pathlib import Path
+    from datetime import datetime
+
+    try:
+        db_path = Path(current_app.config['db_path'])
+        backup_dir = Path(current_app.config['BACKUP_DIR'])
+        stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        dest = backup_dir / f'league-{stamp}.db'
+        shutil.copy2(db_path, dest)
+        flash(f'Backup created: {dest.name}', 'success')
+    except Exception as e:
+        flash(f'Backup failed: {e}', 'danger')
+    return redirect(url_for('admin.backup_restore'))
+
+
+@admin_bp.route('/backup/restore/<filename>', methods=['POST'])
+def restore_backup(filename):
+    """Restore the live DB from a named backup file."""
+    from flask import current_app
+    import shutil, sqlite3
+    from pathlib import Path
+
+    backup_dir = Path(current_app.config['BACKUP_DIR'])
+    db_path = Path(current_app.config['db_path'])
+
+    # Sanitise: only allow filenames matching our naming pattern
+    src = backup_dir / filename
+    if not src.exists() or not filename.startswith('league-') or not filename.endswith('.db'):
+        flash('Invalid or missing backup file.', 'danger')
+        return redirect(url_for('admin.backup_restore'))
+
+    try:
+        # Take a safety snapshot of the current DB before overwriting
+        from datetime import datetime
+        stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        pre_restore = backup_dir / f'league-{stamp}-pre-restore.db'
+        shutil.copy2(db_path, pre_restore)
+
+        # Use SQLite's backup API to safely replace the live DB
+        src_conn = sqlite3.connect(str(src))
+        dst_conn = sqlite3.connect(str(db_path))
+        src_conn.backup(dst_conn)
+        src_conn.close()
+        dst_conn.close()
+
+        flash(f'Database restored from {filename}. '
+              f'Pre-restore snapshot saved as {pre_restore.name}.', 'success')
+    except Exception as e:
+        flash(f'Restore failed: {e}', 'danger')
+
+    return redirect(url_for('admin.backup_restore'))

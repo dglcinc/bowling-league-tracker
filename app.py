@@ -4,9 +4,42 @@ Run with: python app.py
 Then open http://localhost:5000 in your browser.
 """
 
+import shutil
+import time
+from datetime import datetime
+from pathlib import Path
+
 from flask import Flask, redirect, url_for
 from config import Config
 from models import db
+
+# Throttle: don't write a backup more than once per 60 seconds
+_last_backup_time: float = 0.0
+_BACKUP_THROTTLE_SECS = 60
+_BACKUP_KEEP = 30   # number of dated backups to retain
+
+
+def _do_backup(app):
+    """Copy the live SQLite file to the backup directory, prune old copies."""
+    global _last_backup_time
+    now = time.monotonic()
+    if now - _last_backup_time < _BACKUP_THROTTLE_SECS:
+        return
+    _last_backup_time = now
+
+    try:
+        db_path = Path(app.config['db_path'])
+        backup_dir = Path(app.config['BACKUP_DIR'])
+        stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        dest = backup_dir / f'league-{stamp}.db'
+        shutil.copy2(db_path, dest)
+
+        # Prune: keep only the N most recent backups
+        backups = sorted(backup_dir.glob('league-*.db'))
+        for old in backups[:-_BACKUP_KEEP]:
+            old.unlink(missing_ok=True)
+    except Exception:
+        pass  # never let backup errors surface to the user
 
 
 def _migrate_db(db):
@@ -67,6 +100,13 @@ def create_app():
     with app.app_context():
         db.create_all()
         _migrate_db(db)
+
+    # Automatic DB backup after every committed write (throttled to once per minute)
+    from sqlalchemy import event
+
+    @event.listens_for(db.session, 'after_commit')
+    def _after_commit(session):
+        _do_backup(app)
 
     # Register blueprints
     from routes.admin import admin_bp
