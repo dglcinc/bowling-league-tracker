@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Edit Team {{ team.number }} — {{ season.name }}{% endblock %}
+{% block title %}Edit {{ team.name }} — {{ season.name }}{% endblock %}
 
 {% block content %}
 <nav aria-label="breadcrumb" class="no-print">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="{{ url_for('admin.seasons') }}">Admin</a></li>
     <li class="breadcrumb-item"><a href="{{ url_for('admin.season_detail', season_id=season.id) }}">{{ season.name }}</a></li>
-    <li class="breadcrumb-item active">Edit Team {{ team.number }}</li>
+    <li class="breadcrumb-item active">Edit {{ team.name }}</li>
   </ol>
 </nav>
 
-<h4>Edit Team {{ team.number }} — {{ season.name }}</h4>
+<h4>Edit {{ team.name }} — {{ season.name }}</h4>
 
 <form method="post" style="max-width:400px">
   <div class="mb-3">

@@ -39,7 +39,7 @@
     {% set e = d.entry %}
     <tr class="{{ 'table-warning' if e.is_blind else '' }}">
       <td>{{ e.matchup_num }}</td>
-      <td>{{ e.team.number }}</td>
+      <td>{{ e.team.name }}</td>
       <td>{{ e.bowler.last_name if e.bowler else 'BLIND' }}</td>
       <td>{{ '✓' if e.is_blind else '' }}</td>
       <td class="text-end">{{ e.game1 if e.game1 is not none else '' }}</td>

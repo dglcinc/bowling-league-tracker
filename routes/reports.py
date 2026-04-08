@@ -18,9 +18,14 @@ def wkly_alpha(season_id, week_num):
     week = Week.query.filter_by(season_id=season_id, week_num=week_num).first()
     rows = get_wkly_alpha(season_id, week_num)
     weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
+    teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
+    team_filter = request.args.get('team', '')
+    if team_filter:
+        rows = [r for r in rows if r.get('team') and r['team'].name == team_filter]
     return render_template('reports/wkly_alpha.html',
                            season=season, week=week, week_num=week_num,
-                           rows=rows, weeks=weeks)
+                           rows=rows, weeks=weeks, teams=teams,
+                           team_filter=team_filter)
 
 
 
@@ -114,10 +119,12 @@ def week_prizes(season_id, week_num):
         avg_rows = [r for r in avg_rows if r['handicap'] in top10_hcps]
 
     full_year = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
-    first_half_s = sorted(get_team_standings(season_id, half=1, through_week=week_num), key=lambda s: s['team'].number)
-    second_half_s = sorted(get_team_standings(season_id, half=2, through_week=week_num), key=lambda s: s['team'].number)
-    fh_max = max((s['points'] for s in first_half_s), default=0)
-    sh_max = max((s['points'] for s in second_half_s), default=0)
+    fh_list = get_team_standings(season_id, half=1, through_week=week_num)
+    sh_list = get_team_standings(season_id, half=2, through_week=week_num)
+    first_half_map  = {s['team'].id: s['points'] for s in fh_list}
+    second_half_map = {s['team'].id: s['points'] for s in sh_list}
+    fh_max = max(first_half_map.values(),  default=0)
+    sh_max = max(second_half_map.values(), default=0)
     fy_max = max((s['points'] for s in full_year), default=0)
 
     return render_template('reports/week_prizes.html',
@@ -125,8 +132,8 @@ def week_prizes(season_id, week_num):
                            prizes=prizes,
                            leaders=leaders,
                            standings=full_year,
-                           first_half_s=first_half_s,
-                           second_half_s=second_half_s,
+                           first_half_map=first_half_map,
+                           second_half_map=second_half_map,
                            fh_max=fh_max, sh_max=sh_max, fy_max=fy_max,
                            avg_rows=avg_rows,
                            min_games=min_games,
@@ -180,8 +187,13 @@ def print_batch(season_id, week_num):
                     .order_by(Week.week_num.desc())
                     .first())
     hg_through = last_entered.week_num if last_entered else week_num
-    hg_leaders = _build_high_games_leaders(season_id, hg_through)
+    min_games = request.args.get('min_games', 9, type=int)
+    top10 = request.args.get('top10', 0, type=int)
+    hg_leaders = _build_high_games_leaders(season_id, hg_through, min_games=min_games)
     by_avg  = sorted(hg_leaders, key=lambda x: x['average'], reverse=True)
+    if top10:
+        top10_hcps = set(sorted({r['handicap'] for r in by_avg})[:10])
+        by_avg = [r for r in by_avg if r['handicap'] in top10_hcps]
     by_hgs  = sorted(hg_leaders, key=lambda x: x['high_game_scratch'], reverse=True)
     by_hgh  = sorted(hg_leaders, key=lambda x: x['high_game_hcp'], reverse=True)
     by_hss  = sorted(hg_leaders, key=lambda x: x['high_series_scratch'], reverse=True)
@@ -201,10 +213,12 @@ def print_batch(season_id, week_num):
     player_count = sum(1 for e in all_entries if not e.is_blind)
     blind_games = sum(e.game_count for e in all_entries if e.is_blind)
     pb_full_year   = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
-    pb_first_half  = sorted(get_team_standings(season_id, half=1,  through_week=week_num), key=lambda s: s['team'].number)
-    pb_second_half = sorted(get_team_standings(season_id, half=2, through_week=week_num), key=lambda s: s['team'].number)
-    pb_fh_max = max((s['points'] for s in pb_first_half),  default=0)
-    pb_sh_max = max((s['points'] for s in pb_second_half), default=0)
+    pb_fh_list     = get_team_standings(season_id, half=1, through_week=week_num)
+    pb_sh_list     = get_team_standings(season_id, half=2, through_week=week_num)
+    pb_first_half  = {s['team'].id: s['points'] for s in pb_fh_list}
+    pb_second_half = {s['team'].id: s['points'] for s in pb_sh_list}
+    pb_fh_max = max(pb_first_half.values(),  default=0)
+    pb_sh_max = max(pb_second_half.values(), default=0)
     pb_fy_max = max((s['points'] for s in pb_full_year),   default=0)
 
     return render_template('reports/print_batch.html',
@@ -214,6 +228,7 @@ def print_batch(season_id, week_num):
                            by_avg=by_avg, by_hgs=by_hgs, by_hgh=by_hgh,
                            by_hss=by_hss, by_hsh=by_hsh,
                            hg_through=hg_through,
+                           min_games=min_games, top10=top10,
                            prizes=prizes,
                            pb_leaders=hg_leaders,
                            week_standings=pb_full_year,

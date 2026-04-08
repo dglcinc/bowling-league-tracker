@@ -27,15 +27,24 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-2 no-print">
   <h2>Wkly Alpha — {{ season.name }}</h2>
-  <select class="form-select form-select-sm d-inline-block w-auto"
-          onchange="location='{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=0) }}'.replace('/0', '/'+this.value)">
-    {% for wk in weeks %}
-    <option value="{{ wk.week_num }}" {% if wk.week_num == week_num %}selected{% endif %}>
-      Week {{ wk.week_num }}{% if wk.date %} — {{ wk.date.strftime('%b %d') }}{% endif %}
-      {% if wk.is_position_night %}★{% endif %}
-    </option>
-    {% endfor %}
-  </select>
+  <div class="d-flex gap-2">
+    <select class="form-select form-select-sm w-auto"
+            onchange="location='{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=0) }}'.replace('/0', '/'+this.value)+'{{ ('?team='+team_filter) if team_filter else '' }}'">
+      {% for wk in weeks %}
+      <option value="{{ wk.week_num }}" {% if wk.week_num == week_num %}selected{% endif %}>
+        Week {{ wk.week_num }}{% if wk.date %} — {{ wk.date.strftime('%b %d') }}{% endif %}
+        {% if wk.is_position_night %}★{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    <select class="form-select form-select-sm w-auto"
+            onchange="location='{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=week_num) }}'+(this.value?'?team='+encodeURIComponent(this.value):'')">
+      <option value="">All Teams</option>
+      {% for t in teams %}
+      <option value="{{ t.name }}" {% if t.name == team_filter %}selected{% endif %}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
 </div>
 
 <div class="text-center mb-1" style="font-size:0.9rem">
@@ -45,13 +54,14 @@
   {% if week and week.is_position_night %}&nbsp;&#9733; Position Night{% endif %}
 </div>
 
+<div class="table-scroll">
 <table class="table table-bordered table-sm table-striped mb-1">
   <thead class="table-dark">
     <tr>
       <th>Name</th>
       <th class="no-print">First</th>
       <th>Nick</th>
-      <th>T</th>
+      <th>Team</th>
       <th class="text-end">Total</th>
       <th class="text-end">2nd</th>
       <th class="text-end">G</th>
@@ -71,7 +81,7 @@
       <td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=row.bowler.id) }}">{{ row.bowler.last_name }}</a></td>
       <td class="no-print text-muted">{{ row.bowler.first_name or '' }}</td>
       <td class="text-muted">{{ row.bowler.nickname or '' }}</td>
-      <td>{{ row.team.number }}</td>
+      <td>{{ row.team.name }}</td>
       <td class="text-end">{{ row.total_pins or '' }}</td>
       <td class="text-end">{{ row.second_half_pins or '' }}</td>
       <td class="text-end">{{ row.games or '' }}</td>
@@ -89,5 +99,6 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 
 {% endblock %}

@@ -127,7 +127,7 @@ def edit_team(season_id, team_id):
             team.name = name
         team.captain_name = request.form.get('captain_name', '').strip() or None
         db.session.commit()
-        flash(f'Team {team.number} updated.', 'success')
+        flash(f'{team.name} updated.', 'success')
         return redirect(url_for('admin.season_detail', season_id=season_id))
     return render_template('admin/edit_team.html', season=season, team=team)
 

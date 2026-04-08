@@ -4,7 +4,7 @@
   <select name="team_id" class="form-select" required>
     {% for team in teams %}
     <option value="{{ team.id }}" {% if r is defined and r.team_id == team.id %}selected{% endif %}>
-      Team {{ team.number }} — {{ team.name }}
+      {{ team.name }}
     </option>
     {% endfor %}
   </select>
