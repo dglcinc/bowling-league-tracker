@@ -137,11 +137,17 @@ bowling-league-tracker/
 
 ### 1. Prerequisites
 
-Install [Homebrew](https://brew.sh) if not already present, then install system libraries required by WeasyPrint (PDF generation):
+Install [Homebrew](https://brew.sh) if not already present, then install system libraries required by WeasyPrint (PDF generation) and create symlinks so WeasyPrint can find them by the Linux-style names it expects:
 
 ```bash
 brew install pango
+sudo ln -sf /opt/homebrew/lib/libgobject-2.0.0.dylib   /usr/local/lib/libgobject-2.0-0.dylib
+sudo ln -sf /opt/homebrew/lib/libpango-1.0.0.dylib      /usr/local/lib/libpango-1.0.0.dylib
+sudo ln -sf /opt/homebrew/lib/libpangocairo-1.0.0.dylib /usr/local/lib/libpangocairo-1.0.0.dylib
+sudo ln -sf /opt/homebrew/lib/libcairo.2.dylib          /usr/local/lib/libcairo.2.dylib
 ```
+
+> **Why symlinks?** WeasyPrint uses Linux library names (e.g. `libgobject-2.0-0`) but macOS Homebrew installs them with different names (e.g. `libgobject-2.0.0.dylib`). Setting `DYLD_LIBRARY_PATH` does not fix this because the filename mismatch means the linker still can't match the name WeasyPrint requests.
 
 Verify Python 3.11 or later is available:
 
@@ -182,9 +188,6 @@ Edit `.env`:
 
 ```
 SECRET_KEY=<any-long-random-string>
-
-# WeasyPrint needs Homebrew libs (Apple Silicon path)
-DYLD_LIBRARY_PATH=/opt/homebrew/lib
 
 MAIL_SERVER=smtp.office365.com
 MAIL_PORT=587
