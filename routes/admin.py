@@ -1081,18 +1081,20 @@ def _generate_prizes_pdf(season_id, week_num):
 
     avg_rows = sorted([l for l in leaders if l['games'] >= 9],
                       key=lambda x: (-x['average'], x['bowler'].last_name))
-    full_year    = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
-    first_half_s = sorted(get_team_standings(season_id, half=1, through_week=week_num), key=lambda s: s['team'].number)
-    second_half_s= sorted(get_team_standings(season_id, half=2, through_week=week_num), key=lambda s: s['team'].number)
-    fh_max = max((s['points'] for s in first_half_s),  default=0)
-    sh_max = max((s['points'] for s in second_half_s), default=0)
-    fy_max = max((s['points'] for s in full_year),     default=0)
+    full_year       = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
+    fh_list         = get_team_standings(season_id, half=1, through_week=week_num)
+    sh_list         = get_team_standings(season_id, half=2, through_week=week_num)
+    first_half_map  = {s['team'].id: s['points'] for s in fh_list}
+    second_half_map = {s['team'].id: s['points'] for s in sh_list}
+    fh_max = max(first_half_map.values(),  default=0)
+    sh_max = max(second_half_map.values(), default=0)
+    fy_max = max((s['points'] for s in full_year), default=0)
 
     html_str = rt('reports/week_prizes.html',
                   season=season, week=week,
                   prizes=prizes, leaders=leaders,
                   standings=full_year,
-                  first_half_s=first_half_s, second_half_s=second_half_s,
+                  first_half_map=first_half_map, second_half_map=second_half_map,
                   fh_max=fh_max, sh_max=sh_max, fy_max=fy_max,
                   avg_rows=avg_rows, min_games=9, top10=False,
                   total_wood=total_wood, player_count=player_count,
