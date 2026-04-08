@@ -991,21 +991,21 @@ def _build_email_html(body_text, prizes, above_avg, standings, season, week):
     import html as h
 
     def prize_line(cat, label):
-        if not cat or not cat.winners:
+        if not cat or not cat['winners']:
             return f'<li>{h.escape(label)}: —</li>'
-        names = ' / '.join(w.bowler.last_name for w in cat.winners)
-        tie = ' (tie)' if len(cat.winners) > 1 else ''
-        return f'<li>{h.escape(label)}: <strong>{h.escape(names)}</strong>{tie} — {cat.score}</li>'
+        names = ' / '.join(w['bowler'].last_name for w in cat['winners'])
+        tie = ' (tie)' if len(cat['winners']) > 1 else ''
+        return f'<li>{h.escape(label)}: <strong>{h.escape(names)}</strong>{tie} — {cat["score"]}</li>'
 
     prizes_html = ''
     if prizes:
         prizes_html = f'''
 <p><strong>Weekly Prizes:</strong></p>
 <ul>
-  {prize_line(prizes.hg_hcp,    'High Game — Handicap')}
-  {prize_line(prizes.hg_scratch,'High Game — Scratch')}
-  {prize_line(prizes.hs_hcp,    'High Series — Handicap')}
-  {prize_line(prizes.hs_scratch,'High Series — Scratch')}
+  {prize_line(prizes['hg_hcp'],    'High Game — Handicap')}
+  {prize_line(prizes['hg_scratch'],'High Game — Scratch')}
+  {prize_line(prizes['hs_hcp'],    'High Series — Handicap')}
+  {prize_line(prizes['hs_scratch'],'High Series — Scratch')}
 </ul>'''
 
     above_html = ''
