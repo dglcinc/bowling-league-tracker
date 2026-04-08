@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Backup & Restore{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4>Backup &amp; Restore</h4>
+  <a href="{{ url_for('admin.seasons') }}" class="btn btn-sm btn-outline-secondary">Back to Seasons</a>
+</div>
+
+<div class="row g-4">
+
+  {# ── Status card ──────────────────────────────────────────────────────── #}
+  <div class="col-12 col-lg-4">
+    <div class="card">
+      <div class="card-header fw-bold">Database Status</div>
+      <div class="card-body">
+        <dl class="mb-2" style="font-size:0.9rem">
+          <dt>Live DB</dt>
+          <dd class="text-muted" style="word-break:break-all">{{ db_path }}</dd>
+          <dt>Size</dt>
+          <dd>{{ db_size_kb }} KB</dd>
+          <dt>Backup folder</dt>
+          <dd class="text-muted" style="word-break:break-all">{{ backup_dir }}</dd>
+          <dt>Stored backups</dt>
+          <dd>{{ backups|length }}</dd>
+        </dl>
+
+        <form method="post" action="{{ url_for('admin.backup_now') }}">
+          <button type="submit" class="btn btn-primary btn-sm">
+            📦 Back Up Now
+          </button>
+        </form>
+        <div class="form-text mt-1">
+          Automatic backups run after every write (up to once per minute, keeping the last 30).
+          Use this button to take an immediate snapshot at any time.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Backup list ──────────────────────────────────────────────────────── #}
+  <div class="col-12 col-lg-8">
+    <div class="card">
+      <div class="card-header fw-bold">Available Backups</div>
+      {% if backups %}
+      <div class="table-responsive">
+      <table class="table table-sm table-bordered mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>Filename</th>
+            <th class="text-end">Size</th>
+            <th class="text-end">Created</th>
+            <th class="no-print"></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for b in backups %}
+        <tr class="{{ 'table-warning' if 'pre-restore' in b.filename else '' }}">
+          <td style="font-family:monospace;font-size:0.8rem">{{ b.filename }}</td>
+          <td class="text-end">{{ b.size_kb }} KB</td>
+          <td class="text-end text-muted" style="font-size:0.8rem">{{ b.created }}</td>
+          <td class="no-print">
+            {% if 'pre-restore' not in b.filename %}
+            <form method="post"
+                  action="{{ url_for('admin.restore_backup', filename=b.filename) }}"
+                  onsubmit="return confirm('Restore from {{ b.filename }}?\n\nThe current database will be saved as a pre-restore snapshot first.')">
+              <button type="submit" class="btn btn-xs btn-outline-danger"
+                      style="font-size:0.75rem;padding:1px 6px">Restore</button>
+            </form>
+            {% else %}
+            <span class="text-muted" style="font-size:0.75rem">pre-restore</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% else %}
+      <div class="card-body text-muted">
+        No backups yet. Backups are created automatically after each write, or use the Back Up Now button.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% endblock %}
