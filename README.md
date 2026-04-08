@@ -133,41 +133,174 @@ bowling-league-tracker/
 └── seed_*.py               # One-time data import scripts (historical XLS import)
 ```
 
-## Setup
+## Installation & Deployment
 
-### Requirements
+### 1. Prerequisites
 
-```
-flask
-flask-sqlalchemy
-openpyxl          # only needed for XLS import (seed scripts and web import)
-```
-
-Install:
-```bash
-pip install flask flask-sqlalchemy openpyxl
-```
-
-### Running
+Install [Homebrew](https://brew.sh) if not already present, then install system libraries required by WeasyPrint (PDF generation):
 
 ```bash
-python app.py
+brew install pango
 ```
 
-The app runs on port 5001. The SQLite database is created automatically on first run, placed in the OneDrive-backed folder if available, otherwise in a local `data/` directory. Database migrations (new columns, backfills) run automatically on startup.
+Verify Python 3.11 or later is available:
 
-### First-time setup
+```bash
+python3 --version
+```
 
-1. Go to `/admin/seasons` and create a season — set the number of weeks, bowling format, and team names
-2. Add bowlers to the roster under Admin → Season
-3. Set up the weekly schedule (lane assignments) under Admin → Schedule
-4. Set week dates under Admin → Week Dates — enter the first date and subsequent weeks auto-fill at weekly intervals
+### 2. Clone the repository
 
-Four post-season tournament weeks are created automatically; their order can be adjusted by changing the tournament type dropdown in Week Dates.
+```bash
+git clone https://github.com/dglcinc/bowling-league-tracker.git
+cd bowling-league-tracker
+```
+
+### 3. Install Python dependencies
+
+```bash
+pip3 install -r requirements.txt
+```
+
+Dependencies installed:
+- `flask` — web framework
+- `flask-sqlalchemy` — ORM / SQLite
+- `flask-mail` — outbound email via Exchange SMTP
+- `python-dotenv` — loads secrets from `.env` file
+- `openpyxl` — XLS import
+- `weasyprint` — PDF generation for email attachments and print batch
+
+### 4. Configure secrets
+
+Copy the example file and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```
+SECRET_KEY=<any-long-random-string>
+
+MAIL_SERVER=smtp.office365.com
+MAIL_PORT=587
+MAIL_USE_TLS=true
+MAIL_USERNAME=you@yourdomain.com
+MAIL_PASSWORD=<exchange-app-password>
+MAIL_DEFAULT_SENDER=you@yourdomain.com
+```
+
+`MAIL_PASSWORD` must be an **app password**, not your main account password. Create one in your Microsoft account security settings.
+
+### 5. Enable SMTP AUTH in Microsoft 365
+
+Microsoft 365 disables SMTP AUTH by default. Enable it for your mailbox:
+
+1. Sign in to [Microsoft 365 Admin Center](https://admin.microsoft.com)
+2. Go to **Users → Active users** → click your account
+3. Open the **Mail** tab → **Manage email apps**
+4. Check **Authenticated SMTP** → Save
+
+### 6. Run the app
+
+```bash
+python3 app.py
+```
+
+The app starts on **port 5001**. Open `http://localhost:5001` in a browser.
+
+The SQLite database is created automatically on first run. It is stored in `~/OneDrive - DGLC/Claude/bowling-league-tracker/league.db` if that path is available, otherwise in a local `data/` directory. Automatic backups are written to a `backups/` subfolder next to the database after every write.
+
+### 7. Running as a background service (headless Mac)
+
+To start the app automatically at login on a headless Mac Mini, create a launchd plist:
+
+```bash
+mkdir -p ~/Library/LaunchAgents
+```
+
+Create `~/Library/LaunchAgents/com.dglc.bowling-tracker.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.dglc.bowling-tracker</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/david/github/bowling-league-tracker/app.py</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/david/github/bowling-league-tracker</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/david/Library/Logs/bowling-tracker.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/david/Library/Logs/bowling-tracker.log</string>
+</dict>
+</plist>
+```
+
+Load it:
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.dglc.bowling-tracker.plist
+```
+
+To stop/restart:
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.dglc.bowling-tracker.plist
+launchctl load   ~/Library/LaunchAgents/com.dglc.bowling-tracker.plist
+```
+
+### 8. Remote access via Caddy (optional)
+
+To access the app from outside the local network, set up [Caddy](https://caddyserver.com) as a reverse proxy with automatic HTTPS:
+
+```bash
+brew install caddy
+```
+
+Create `/usr/local/etc/Caddyfile` (replace with your domain):
+
+```
+bowling.yourdomain.com {
+    reverse_proxy localhost:5001
+}
+```
+
+Configure your router to forward ports 80 and 443 to the Mac Mini, then start Caddy:
+
+```bash
+brew services start caddy
+```
+
+Caddy handles TLS certificates automatically via Let's Encrypt.
+
+---
+
+### First-time data setup
+
+1. Go to **Admin → Seasons → New Season** — set weeks, bowling format, team names, handicap formula
+2. Add bowlers under **Admin → Manage** → **+ Add Bowler**
+3. Set up weekly lane assignments under **Admin → Schedule**
+4. Set week dates under **Admin → Week Dates** — enter the first date; subsequent weeks auto-fill at +7 days
+5. Update bowler email addresses under **Admin → Mailing List**
+
+Four post-season tournament weeks are appended automatically.
 
 ### Importing a historical season
 
-Use `/admin/import_season` to upload an existing Excel workbook. The import reads `wkly alpha` for roster, individual bowler sheets for game scores, and `team scoring` for team standings.
+Use **Admin → Import Season from XLS** to upload an existing Excel workbook. The import reads `wkly alpha` for roster, individual bowler sheets for game scores, and `team scoring` for team standings.
 
 ## Configuring for a Different League
 
