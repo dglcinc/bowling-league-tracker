@@ -183,6 +183,9 @@ Edit `.env`:
 ```
 SECRET_KEY=<any-long-random-string>
 
+# WeasyPrint needs Homebrew libs (Apple Silicon path)
+DYLD_LIBRARY_PATH=/opt/homebrew/lib
+
 MAIL_SERVER=smtp.office365.com
 MAIL_PORT=587
 MAIL_USE_TLS=true
@@ -191,16 +194,28 @@ MAIL_PASSWORD=<exchange-app-password>
 MAIL_DEFAULT_SENDER=you@yourdomain.com
 ```
 
-`MAIL_PASSWORD` must be an **app password**, not your main account password. Create one in your Microsoft account security settings.
+`MAIL_PASSWORD` must be an **app password**, not your main account password. Create one in your Microsoft account security settings under **Security → Advanced security options → App passwords**.
 
 ### 5. Enable SMTP AUTH in Microsoft 365
 
-Microsoft 365 disables SMTP AUTH by default. Enable it for your mailbox:
+Two settings must be changed — both are required:
+
+**Step A: Disable Security Defaults in Azure AD**
+
+Security Defaults blocks all basic/legacy authentication (including SMTP AUTH) tenant-wide.
+
+1. Go to [portal.azure.com](https://portal.azure.com)
+2. **Azure Active Directory → Properties → Manage Security Defaults**
+3. Set **Enable Security Defaults** to **No** → Save
+
+**Step B: Enable Authenticated SMTP for your mailbox**
 
 1. Sign in to [Microsoft 365 Admin Center](https://admin.microsoft.com)
 2. Go to **Users → Active users** → click your account
 3. Open the **Mail** tab → **Manage email apps**
 4. Check **Authenticated SMTP** → Save
+
+Both steps are required. Step A alone won't work, and Step B has no effect while Security Defaults is on.
 
 ### 6. Run the app
 
