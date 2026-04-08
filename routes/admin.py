@@ -186,7 +186,7 @@ def add_bowler(season_id):
 
 @admin_bp.route('/settings', methods=['GET', 'POST'])
 def league_settings():
-    settings = LeagueSettings.query.get(1)
+    settings = db.session.get(LeagueSettings, 1)
     if not settings:
         settings = LeagueSettings(id=1)
         db.session.add(settings)
@@ -215,7 +215,7 @@ def league_settings():
 def edit_bowler(bowler_id):
     bowler = Bowler.query.get_or_404(bowler_id)
     season_id = request.args.get('season_id', type=int) or request.form.get('season_id', type=int)
-    season = Season.query.get(season_id) if season_id else None
+    season = db.session.get(Season, season_id) if season_id else None
     roster = Roster.query.filter_by(bowler_id=bowler_id, season_id=season_id).first() if season_id else None
     teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all() if season_id else []
 
@@ -399,7 +399,7 @@ def assign_matchups(season_id, week_num):
         for key, val in request.form.items():
             if key.startswith('entry_'):
                 entry_id = int(key[6:])
-                entry = MatchupEntry.query.get(entry_id)
+                entry = db.session.get(MatchupEntry, entry_id)
                 if entry:
                     entry.matchup_num = int(val)
 
@@ -811,7 +811,7 @@ def email_compose(season_id, week_num):
     season = Season.query.get_or_404(season_id)
     week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
     teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
-    settings = LeagueSettings.query.get(1)
+    settings = db.session.get(LeagueSettings, 1)
     league_name = (settings.league_name if settings else 'MLC Pirate Bowling League')
 
     captain_info = _resolve_captain_emails(teams, season_id)
@@ -960,7 +960,7 @@ def _generate_prizes_pdf(season_id, week_num):
                                calculate_handicap)
     from models import MatchupEntry, Roster, Bowler
 
-    season = Season.query.get(season_id)
+    season = db.session.get(Season, season_id)
     week = Week.query.filter_by(season_id=season_id, week_num=week_num).first()
     prizes = get_weekly_prizes(season_id, week_num)
 

@@ -51,7 +51,7 @@ def calculate_handicap(bowler_id, season_id, for_week, entries=None):
     if not roster:
         return 0
 
-    season = Season.query.get(season_id)
+    season = db.session.get(Season, season_id)
     base = season.handicap_base      # 200
     factor = season.handicap_factor  # 0.9
     prior_hcp = roster.prior_handicap or 0
@@ -98,7 +98,7 @@ def get_bowler_stats(bowler_id, season_id, through_week=None):
     if through_week is not None:
         entries = [e for e in entries if e.week_num <= through_week]
 
-    season = Season.query.get(season_id)
+    season = db.session.get(Season, season_id)
     roster = Roster.query.filter_by(bowler_id=bowler_id, season_id=season_id).first()
     prior_hcp = roster.prior_handicap if roster else 0
 
@@ -218,7 +218,7 @@ def score_matchup(season_id, week_num, matchup_num):
     For position nights: aggregation happens at a higher level (score_position_night).
     Forfeit: if one team has 0 bowlers, present team gets all 4 points.
     """
-    season = Season.query.get(season_id)
+    season = db.session.get(Season, season_id)
     sched = ScheduleEntry.query.filter_by(
         season_id=season_id, week_num=week_num, matchup_num=matchup_num
     ).first()
@@ -377,7 +377,7 @@ def get_position_night_breakdown(season_id, week_num, pairing_num):
     if not entry_count:
         return None
 
-    season = Season.query.get(season_id)
+    season = db.session.get(Season, season_id)
     team1 = scheds[0].team1
     team2 = scheds[0].team2
     t1_id, t2_id = team1.id, team2.id
@@ -424,7 +424,7 @@ def score_position_night(season_id, week_num):
     Position night: aggregate all matchup sheets for each team pairing.
     Returns {team_id: points} — 2 pts per game (3 games) + 2 pts series = max 8 per pairing.
     """
-    season = Season.query.get(season_id)
+    season = db.session.get(Season, season_id)
     schedule = ScheduleEntry.query.filter_by(
         season_id=season_id, week_num=week_num
     ).all()
@@ -495,7 +495,7 @@ def get_team_standings(season_id, half=None, through_week=None):
     half=1 → first half weeks, half=2 → second half, None → full season.
     through_week → cap at that week number (applied on top of half filter).
     """
-    season = Season.query.get(season_id)
+    season = db.session.get(Season, season_id)
     query = TeamPoints.query.filter_by(season_id=season_id)
 
     if half == 1:
@@ -590,7 +590,7 @@ def get_most_improved(season_id, through_week):
     Returns bowlers sorted by (current_avg - prior_year_avg) descending.
     Prior year avg back-calculated from prior_handicap: avg ≈ 200 - (prior_hcp / 0.9)
     """
-    season = Season.query.get(season_id)
+    season = db.session.get(Season, season_id)
     roster_entries = Roster.query.filter_by(season_id=season_id, active=True).all()
 
     results = []
