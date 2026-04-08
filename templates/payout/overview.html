@@ -2,7 +2,17 @@
 {% block title %}Payouts — {{ season.name }}{% endblock %}
 
 {% block content %}
-<h4>Payouts — {{ season.name }} through Week {{ through_week }}</h4>
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0">Payouts — {{ season.name }} through Week {{ through_week }}</h4>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('payout.payout_config', season_id=season.id) }}"
+       class="btn btn-outline-secondary btn-sm">Payout Config</a>
+    {% if config and config.total_available %}
+    <a href="{{ url_for('payout.payout_summary', season_id=season.id) }}"
+       class="btn btn-primary btn-sm">Payout Summary</a>
+    {% endif %}
+  </div>
+</div>
 
 {# YTD prize totals per bowler #}
 <h5>YTD Prize Summary</h5>
@@ -18,7 +28,7 @@
   {% for row in ytd_prizes %}
   <tr>
     <td>{{ row.bowler.last_name }}</td>
-    <td>{{ row.team.number }}</td>
+    <td>{{ row.team.name }}</td>
     {% for key, label in prize_keys %}
     <td class="text-center">{{ row.counts[key] or '' }}</td>
     {% endfor %}

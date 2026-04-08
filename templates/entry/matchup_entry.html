@@ -27,7 +27,7 @@
   Week {{ week.week_num }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
   {% if week.is_position_night %}<span class="badge bg-warning text-dark">Position Night</span>{% endif %}
   &nbsp;|&nbsp; Matchup {{ sched.matchup_num }}:
-  Team {{ sched.team1.number }} {{ sched.team1.name }} vs Team {{ sched.team2.number }} {{ sched.team2.name }}
+  {{ sched.team1.name }} vs {{ sched.team2.name }}
   {% if sched.lane_pair %}<small class="text-muted">(Lanes {{ sched.lane_pair }})</small>{% endif %}
 </h4>
 
@@ -37,7 +37,7 @@
 <div class="col-12 col-xl-6">
   <div class="card mb-3">
     <div class="card-header team-header">
-      Team {{ team.number }} — {{ team.name }}
+      {{ team.name }}
       <span class="badge bg-secondary float-end">{{ 'Side A' if team.id == sched.team1_id else 'Side B' }}</span>
     </div>
     <div class="card-body p-2">
@@ -87,7 +87,7 @@
             </td>
             {% for g in range(1, 7) %}
             <td class="{{ 'night2-col' if g > 3 else '' }}">
-              <input type="number" class="form-control form-control-sm score-input"
+              <input type="number" inputmode="numeric" class="form-control form-control-sm score-input"
                      name="t{{ team.number }}_row_{{ i }}_game{{ g }}"
                      min="0" max="300"
                      value="{{ entry['game'~g] if entry and entry['game'~g] is not none else '' }}"
@@ -123,8 +123,8 @@
   <thead>
     <tr>
       <th></th>
-      <th class="text-center">Team {{ breakdown.team1.number }}</th>
-      <th class="text-center">Team {{ breakdown.team2.number }}</th>
+      <th class="text-center">{{ breakdown.team1.name }}</th>
+      <th class="text-center">{{ breakdown.team2.name }}</th>
       <th class="text-center">Pt</th>
     </tr>
   </thead>
@@ -135,8 +135,8 @@
     <td class="text-center {{ 'fw-bold' if g.winner == breakdown.team1.id else '' }}">{{ g.t1 }}</td>
     <td class="text-center {{ 'fw-bold' if g.winner == breakdown.team2.id else '' }}">{{ g.t2 }}</td>
     <td class="text-center">
-      {% if g.winner == breakdown.team1.id %}T{{ breakdown.team1.number }}
-      {% elif g.winner == breakdown.team2.id %}T{{ breakdown.team2.number }}
+      {% if g.winner == breakdown.team1.id %}{{ breakdown.team1.name }}
+      {% elif g.winner == breakdown.team2.id %}{{ breakdown.team2.name }}
       {% else %}—{% endif %}
     </td>
   </tr>
@@ -146,8 +146,8 @@
     <td class="text-center {{ 'fw-bold' if breakdown.series.winner == breakdown.team1.id else '' }}">{{ breakdown.series.t1 }}</td>
     <td class="text-center {{ 'fw-bold' if breakdown.series.winner == breakdown.team2.id else '' }}">{{ breakdown.series.t2 }}</td>
     <td class="text-center">
-      {% if breakdown.series.winner == breakdown.team1.id %}T{{ breakdown.team1.number }}
-      {% elif breakdown.series.winner == breakdown.team2.id %}T{{ breakdown.team2.number }}
+      {% if breakdown.series.winner == breakdown.team1.id %}{{ breakdown.team1.name }}
+      {% elif breakdown.series.winner == breakdown.team2.id %}{{ breakdown.team2.name }}
       {% else %}—{% endif %}
     </td>
   </tr>
@@ -193,7 +193,7 @@ function addRow(teamNum) {
     </td>
     <td class="text-center"><span class="hcp-display" id="hcp-t${teamNum}-${i}"></span></td>
     ${[1,2,3,4,5,6].map(g => `
-      <td${g > 3 ? night2style : ''}><input type="number" class="form-control form-control-sm score-input"
+      <td${g > 3 ? night2style : ''}><input type="number" inputmode="numeric" class="form-control form-control-sm score-input"
                  name="t${teamNum}_row_${i}_game${g}" min="0" max="300" placeholder=""></td>
     `).join('')}
     <td class="no-print"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">×</button></td>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Award{% if recipients|length == 1 %} — {{ recipients[0].name }}{% endif %} — {{ season.name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:ital,wght@0,300;0,400;0,700;1,300;1,400&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body { background: #e8e8e8; font-family: 'Lato', Georgia, sans-serif; }
+
+    /* ── Nav bar (screen only) ───────────────────────────── */
+    .nav-bar {
+      background: #343a40; color: #fff;
+      padding: 8px 16px; font-size: 0.85rem;
+      display: flex; gap: 16px; align-items: center;
+    }
+    .nav-bar a { color: #adb5bd; text-decoration: none; }
+    .nav-bar a:hover { color: #fff; }
+
+    /* ── Certificate wrapper ─────────────────────────────── */
+    .certificate-wrap { display: flex; justify-content: center; padding: 24px 0; }
+
+    /* ── Certificate: sized to letter proportions ────────── */
+    .certificate {
+      position: relative;
+      /* 850×1100 viewBox → 7.5in wide means height = 7.5*(1100/850) = 9.706in */
+      width: 7.5in;
+      height: 9.71in;
+      background: #faf8f4;
+      page-break-after: always;
+      break-after: page;
+      overflow: hidden;
+    }
+
+    /* ── SVG border — fills the certificate exactly ──────── */
+    .cert-border-svg {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+    }
+
+    /* ── Content sits above the SVG ─────────────────────── */
+    .cert-content {
+      position: relative; z-index: 1;
+      /* 60 SVG units from each edge = 60/850*7.5in ≈ 0.53in; add breathing room */
+      padding: 0.78in 0.75in 0.6in;
+      height: 100%;
+      display: flex; flex-direction: column;
+      align-items: center; text-align: center;
+    }
+
+    /* ── League header ───────────────────────────────────── */
+    .cert-league {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 13pt; font-weight: 700; color: #1b3a6b;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      line-height: 1.3; margin-bottom: 2pt;
+    }
+    .cert-season {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 10pt; color: #555; font-style: italic; margin-bottom: 14pt;
+    }
+
+    /* ── Orange accent rules ─────────────────────────────── */
+    .orange-rule {
+      width: 72%; height: 2px; border: none;
+      background: linear-gradient(to right, transparent, #f47920 20%, #f47920 80%, transparent);
+      margin: 0 auto 14pt;
+    }
+    .orange-rule-thin {
+      width: 60%; height: 1px; border: none;
+      background: linear-gradient(to right, transparent, #f47920 20%, #f47920 80%, transparent);
+      margin: 10pt auto;
+    }
+
+    /* ── Recipient name block ────────────────────────────── */
+    .cert-name {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 28pt; font-weight: 700; color: #1b3a6b;
+      line-height: 1.15; margin-bottom: 4pt;
+    }
+    .cert-nickname {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 14pt; font-style: italic; color: #444; margin-bottom: 5pt;
+    }
+    .cert-team {
+      font-family: 'Lato', sans-serif;
+      font-size: 10pt; color: #666; letter-spacing: 0.04em; margin-bottom: 14pt;
+    }
+    .cert-captain {
+      font-family: 'Lato', sans-serif; font-size: 9pt; color: #888; margin-bottom: 5pt;
+    }
+
+    /* ── Prize table ─────────────────────────────────────── */
+    .prize-table { width: 88%; border-collapse: collapse; margin: 0 auto 10pt; }
+    .prize-table tr { border-bottom: 1px solid #e0d8cc; }
+    .prize-table tr:last-child { border-bottom: none; }
+    .prize-table td {
+      font-family: 'Lato', sans-serif; font-size: 10pt;
+      padding: 5pt 8pt; color: #222; vertical-align: top;
+    }
+    .prize-table .col-label  { text-align: left; }
+    .prize-table .col-detail { text-align: center; color: #666; font-size: 9pt; font-style: italic; }
+    .prize-table .col-amount { text-align: right; font-weight: 700; color: #1b3a6b; white-space: nowrap; }
+    .prize-table .total-row td {
+      padding-top: 8pt; font-weight: 700; font-size: 13pt;
+      border-top: 2px solid #f47920; border-bottom: none;
+    }
+    .prize-table .total-row .col-label {
+      font-family: 'Playfair Display', Georgia, serif; color: #1b3a6b;
+    }
+    .prize-table .total-row .col-amount {
+      font-family: 'Playfair Display', Georgia, serif; font-size: 15pt; color: #1b3a6b;
+    }
+
+    /* ── Most improved narrative ─────────────────────────── */
+    .mi-description {
+      font-family: 'Lato', sans-serif; font-size: 9.5pt; font-style: italic;
+      color: #555; line-height: 1.5; margin: 6pt auto 0; max-width: 80%;
+    }
+
+    /* ── Team finish badge ───────────────────────────────── */
+    .team-finish-badge {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 16pt; font-weight: 700; color: #f47920;
+      text-transform: uppercase; letter-spacing: 0.1em; margin: 4pt 0 10pt;
+    }
+
+    /* ── Footer ──────────────────────────────────────────── */
+    .cert-footer {
+      margin-top: auto; padding-top: 18pt;
+      font-family: 'Lato', sans-serif; font-size: 8.5pt;
+      font-style: italic; color: #888; letter-spacing: 0.03em;
+    }
+
+    /* ── Print ───────────────────────────────────────────── */
+    @media print {
+      @page { size: letter; margin: 0; }
+      body { background: white; }
+      .nav-bar { display: none !important; }
+      .certificate-wrap { padding: 0; }
+      .certificate { width: 8.5in; height: 11in; }
+    }
+  </style>
+</head>
+<body>
+
+{% if single %}
+<div class="nav-bar">
+  <a href="javascript:history.back()">← Back</a>
+  <span style="color:#6c757d">|</span>
+  <a href="{{ url_for('payout.award_all', season_id=season.id) }}" target="_blank">Print All Awards</a>
+  <span style="flex:1"></span>
+  <button onclick="window.print()"
+          style="background:#495057;border:1px solid #6c757d;color:#fff;padding:3px 12px;border-radius:3px;cursor:pointer">
+    Print
+  </button>
+</div>
+{% endif %}
+
+{# ────────────────────────────────────────────────────────────
+   SVG coordinate system: 850 × 1100 units (100 units = 1 inch
+   on an 8.5 × 11 letter page).  Everything stays ≥ 18 units
+   from each edge so nothing clips on a standard printer.
+   ──────────────────────────────────────────────────────────── #}
+
+{% for rec in recipients %}
+<div class="certificate-wrap">
+<div class="certificate">
+
+  <svg class="cert-border-svg"
+       viewBox="0 0 850 1100"
+       preserveAspectRatio="xMidYMid meet"
+       xmlns="http://www.w3.org/2000/svg"
+       xmlns:xlink="http://www.w3.org/1999/xlink">
+    <defs>
+
+      {# ── 3-wave horizontal guilloche (24 × 24 tile) ─────────
+         One wave per tile.  Wave paths use local x ∈ [0,24],
+         y centre=12, amplitude ±10 (outer), ±5 (inner ripple). #}
+      <pattern id="hg{{ loop.index }}" patternUnits="userSpaceOnUse" width="24" height="24">
+        <path d="M 0,12 C 6,2  6,2  12,12 C 18,22 18,22 24,12"
+              fill="none" stroke="#1b3a6b" stroke-width="2"   stroke-linecap="round"/>
+        <path d="M 0,12 C 6,22 6,22 12,12 C 18,2  18,2  24,12"
+              fill="none" stroke="#f47920" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M 0,12 C 6,7  6,7  12,12 C 18,17 18,17 24,12"
+              fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
+      </pattern>
+
+      {# ── Vertical guilloche — LEFT strip (x=22–46) ───────────
+         x="22" anchors tile origin at the strip's left edge, so
+         the single 24-unit tile covers exactly x=22–46 with no
+         horizontal tiling and no phase offset.
+         Wave paths in local coords: centre x=12, arcs x=2 & x=22,
+         both within the 0–24 tile — nothing clips.             #}
+      <pattern id="vgl{{ loop.index }}" patternUnits="userSpaceOnUse"
+               width="24" height="24" x="22" y="0">
+        <path d="M 12,0 C 2,6  2,6  12,12 C 22,18 22,18 12,24"
+              fill="none" stroke="#1b3a6b" stroke-width="2"   stroke-linecap="round"/>
+        <path d="M 12,0 C 22,6 22,6 12,12 C 2,18  2,18  12,24"
+              fill="none" stroke="#f47920" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M 12,0 C 7,6  7,6  12,12 C 17,18 17,18 12,24"
+              fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
+      </pattern>
+      {# ── Vertical guilloche — RIGHT strip (x=804–828) ────────
+         x="804" anchors tile origin at the strip's left edge.
+         Identical local-coord wave paths as vgl.               #}
+      <pattern id="vgr{{ loop.index }}" patternUnits="userSpaceOnUse"
+               width="24" height="24" x="804" y="0">
+        <path d="M 12,0 C 2,6  2,6  12,12 C 22,18 22,18 12,24"
+              fill="none" stroke="#1b3a6b" stroke-width="2"   stroke-linecap="round"/>
+        <path d="M 12,0 C 22,6 22,6 12,12 C 2,18  2,18  12,24"
+              fill="none" stroke="#f47920" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M 12,0 C 7,6  7,6  12,12 C 17,18 17,18 12,24"
+              fill="none" stroke="#1b3a6b" stroke-width="1"   stroke-linecap="round"/>
+      </pattern>
+
+      {# ── Circular clip masks for logo medallions ─────────── #}
+      {# TL centroid: ((20+95+20)/3, (20+20+95)/3) = (45, 45)  #}
+      <clipPath id="clip-tl-{{ loop.index }}"><circle cx="45"  cy="45"   r="21"/></clipPath>
+      <clipPath id="clip-tr-{{ loop.index }}"><circle cx="805" cy="45"   r="21"/></clipPath>
+      <clipPath id="clip-bl-{{ loop.index }}"><circle cx="45"  cy="1055" r="21"/></clipPath>
+      <clipPath id="clip-br-{{ loop.index }}"><circle cx="805" cy="1055" r="21"/></clipPath>
+    </defs>
+
+    {# ── Outer border rectangle ──────────────────────────── #}
+    {# Rect x=20 y=20: outer stroke edge = 18 (18/850*8.5in ≈ 0.18in from paper) #}
+    <rect x="20" y="20" width="810" height="1060"
+          fill="none" stroke="#1b3a6b" stroke-width="4"/>
+
+    {# ── Guilloche strips — run between the corner triangles ─ #}
+    {# Top: from x=95 (end of TL triangle) to x=755 (start of TR), height=24 #}
+    <rect x="95"  y="22"   width="660" height="24" fill="url(#hg{{ loop.index }})"/>
+    {# Bottom: symmetric                                                         #}
+    <rect x="95"  y="1054" width="660" height="24" fill="url(#hg{{ loop.index }})"/>
+    {# Left: from y=95 (below TL triangle) to y=1005 (above BL triangle)        #}
+    <rect x="22"  y="95"   width="24"  height="910" fill="url(#vgl{{ loop.index }})"/>
+    {# Right: symmetric                                                           #}
+    <rect x="804" y="95"   width="24"  height="910" fill="url(#vgr{{ loop.index }})"/>
+
+    {# ── Inner orange border — well inside the guilloche ────  #}
+    {# x=60: (60/850)*8.5in ≈ 0.60in from edge; corner (60,60): 60+60=120 > 115  #}
+    {# (hypotenuse of 75-leg triangle is x+y=115, so inner border clears it)     #}
+    <rect x="60" y="60" width="730" height="980"
+          fill="none" stroke="#f47920" stroke-width="1.5"/>
+
+    {# ── Corner triangles — ML blue filled, T=75 leg ────────  #}
+    {# TL: right angle at (20,20); hypotenuse from (95,20) to (20,95)            #}
+    <polygon points="20,20 95,20 20,95"  fill="#1b3a6b"/>
+    {# TR: right angle at (830,20)                                                #}
+    <polygon points="830,20 755,20 830,95" fill="#1b3a6b"/>
+    {# BL: right angle at (20,1080)                                               #}
+    <polygon points="20,1080 95,1080 20,1005" fill="#1b3a6b"/>
+    {# BR: right angle at (830,1080)                                              #}
+    <polygon points="830,1080 755,1080 830,1005" fill="#1b3a6b"/>
+
+    {# ── ML logo medallions on each triangle ────────────────  #}
+    {# White circle background + orange ring, logo clipped to circle             #}
+    {# Logo image 42×42, centered at triangle centroid                           #}
+
+    {# Top-left  (centroid 45,45)  #}
+    <circle cx="45"  cy="45"   r="22" fill="white" stroke="#f47920" stroke-width="1.5"/>
+    <image href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           xlink:href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           x="24"  y="24"  width="42" height="42"
+           preserveAspectRatio="xMidYMid meet"
+           clip-path="url(#clip-tl-{{ loop.index }})"/>
+
+    {# Top-right  (centroid 805,45) #}
+    <circle cx="805" cy="45"   r="22" fill="white" stroke="#f47920" stroke-width="1.5"/>
+    <image href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           xlink:href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           x="784" y="24"  width="42" height="42"
+           preserveAspectRatio="xMidYMid meet"
+           clip-path="url(#clip-tr-{{ loop.index }})"/>
+
+    {# Bottom-left  (centroid 45,1055) #}
+    <circle cx="45"  cy="1055" r="22" fill="white" stroke="#f47920" stroke-width="1.5"/>
+    <image href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           xlink:href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           x="24"  y="1034" width="42" height="42"
+           preserveAspectRatio="xMidYMid meet"
+           clip-path="url(#clip-bl-{{ loop.index }})"/>
+
+    {# Bottom-right  (centroid 805,1055) #}
+    <circle cx="805" cy="1055" r="22" fill="white" stroke="#f47920" stroke-width="1.5"/>
+    <image href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           xlink:href="{{ url_for('static', filename='ml_logo.jpg') }}"
+           x="784" y="1034" width="42" height="42"
+           preserveAspectRatio="xMidYMid meet"
+           clip-path="url(#clip-br-{{ loop.index }})"/>
+
+  </svg>
+
+  {# ── Certificate content ────────────────────────────────── #}
+  <div class="cert-content">
+
+    <div class="cert-league">Mountain Lakes Men's Bowling League</div>
+    <div class="cert-season">{{ season.name }} Season</div>
+
+    <hr class="orange-rule">
+
+    {% if rec.type == 'individual' %}
+      <div class="cert-name">{{ (rec.first_name ~ ' ' ~ rec.name) if rec.first_name else rec.name }}</div>
+      {% if rec.nickname %}<div class="cert-nickname">"{{ rec.nickname }}"</div>{% endif %}
+      <div class="cert-team">{{ rec.team_label }}</div>
+    {% else %}
+      <div class="cert-name">{{ rec.name }}</div>
+      {% if rec.captain %}<div class="cert-captain">Captain: {{ rec.captain }}</div>{% endif %}
+      {% if rec.prizes | selectattr('label', 'equalto', 'Championship \u2014 1st Place') | list %}
+      <div class="team-finish-badge">&#9733; Champions &#9733;</div>
+      {% endif %}
+    {% endif %}
+
+    <hr class="orange-rule">
+
+    <table class="prize-table">
+      <colgroup>
+        <col style="width:52%"><col style="width:30%"><col style="width:18%">
+      </colgroup>
+      {% for item in rec.prizes %}
+      <tr>
+        <td class="col-label">
+          {% if item.type == 'weekly' %}Week {{ item.week_num }} &nbsp;&middot;&nbsp; {{ item.label }}
+          {% elif item.type == 'tournament' %}{{ item.tournament_type }} &nbsp;&middot;&nbsp; {{ item.place }} Place
+          {% elif item.type == 'most_improved' %}Most Improved
+          {% elif item.type == 'team_finish' %}{{ item.label }}
+          {% else %}{{ item.label }}{% endif %}
+        </td>
+        <td class="col-detail">
+          {% if item.type == 'weekly' %}{{ item.score }}
+          {% elif item.type == 'tournament' %}{{ item.score }} (w/hcp)
+          {% elif item.type == 'most_improved' %}{{ item.description }}
+          {% elif item.type == 'team_finish' %}{{ item.detail }}
+          {% elif item.score is defined %}{{ item.score }}
+          {% else %}—{% endif %}
+        </td>
+        <td class="col-amount">${{ item.amount | int }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="total-row">
+        <td class="col-label">Total Award</td>
+        <td class="col-detail"></td>
+        <td class="col-amount">${{ rec.total | int }}</td>
+      </tr>
+    </table>
+
+    {% for item in rec.prizes if item.type == 'most_improved' %}
+    <hr class="orange-rule-thin">
+    <p class="mi-description">
+      {{ rec.first_name or rec.name }} improved {{ 'his' if rec.first_name else 'their' }}
+      average by {{ item.improvement }} pin{{ 's' if item.improvement != 1 else '' }} per game
+      over last season, from {{ item.prior_avg }} to {{ item.current_avg }}.
+    </p>
+    {% endfor %}
+
+    <div class="cert-footer">
+      Presented by the Mountain Lakes Men's Bowling League &nbsp;&mdash;&nbsp; {{ season.name }}
+    </div>
+
+  </div>
+</div>
+</div>
+{% endfor %}
+
+</body>
+</html>

@@ -276,6 +276,33 @@ class TournamentEntry(db.Model):
         return f'<TournamentEntry week={self.week_num} bowler={self.bowler_id}>'
 
 
+class PayoutConfig(db.Model):
+    """End-of-season payout configuration for one season."""
+    __tablename__ = 'payout_configs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    season_id = db.Column(db.Integer, db.ForeignKey('seasons.id'), nullable=False, unique=True)
+    total_available = db.Column(db.Float, default=0.0)
+    tournament_prize_1 = db.Column(db.Float, default=125.0)
+    tournament_prize_2 = db.Column(db.Float, default=100.0)
+    tournament_prize_3 = db.Column(db.Float, default=75.0)
+    weekly_win_rate = db.Column(db.Float, default=10.0)
+    ytd_prize_rate = db.Column(db.Float, default=75.0)
+    trophy_cost = db.Column(db.Float, default=125.0)
+    # Legacy single-pool percentages (kept for migration safety, no longer used)
+    team_pct_json = db.Column(db.Text, default='[40, 30, 20, 10]')
+    final_week = db.Column(db.Integer, default=22)
+    # Three-award team payout structure
+    team_award_pcts_json = db.Column(db.Text, default='[40, 40, 20]')
+    team_place_pcts_json = db.Column(db.Text, default='[[35,25,20,20],[35,25,20,20],[60,40]]')
+    championship_start_week = db.Column(db.Integer, default=20)
+
+    season = db.relationship('Season')
+
+    def __repr__(self):
+        return f'<PayoutConfig season={self.season_id}>'
+
+
 class Snapshot(db.Model):
     """Weekly JSON snapshot of all stats, auto-saved after entry."""
     __tablename__ = 'snapshots'

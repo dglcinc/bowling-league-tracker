@@ -2,7 +2,7 @@
 {% block title %}Week {{ week.week_num }} — Score Entry{% endblock %}
 
 {% macro bname(b) %}{{ b.short_name(league_settings.use_nickname if league_settings else false) }}{% endmacro %}
-{% macro tname(team) %}Team {{ team.number }}{% if league_settings and league_settings.show_captain_name and team.captain_name %} ({{ team.captain_name }}){% endif %}{% endmacro %}
+{% macro tname(team) %}{{ team.name }}{% if league_settings and league_settings.show_captain_name and team.captain_name %} ({{ team.captain_name }}){% endif %}{% endmacro %}
 
 {% block content %}
 <div class="d-flex align-items-center gap-2 mb-2 no-print">
@@ -37,6 +37,10 @@
       {{ 'Uncancel Week' if week.is_cancelled else 'Cancel Week' }}
     </button>
   </form>
+  {% if week.is_entered and not week.tournament_type %}
+  <a href="{{ url_for('admin.email_compose', season_id=season.id, week_num=week.week_num) }}"
+     class="btn btn-sm btn-outline-primary">📧 Send Weekly Email</a>
+  {% endif %}
 </div>
 
 {% if week.is_position_night %}
@@ -117,8 +121,8 @@
         <table class="table table-sm table-bordered mt-2 mb-1" style="font-size:0.8rem">
           <thead class="table-light"><tr>
             <th></th>
-            <th class="text-center">Team {{ bd.team1.number }}</th>
-            <th class="text-center">Team {{ bd.team2.number }}</th>
+            <th class="text-center">{{ bd.team1.name }}</th>
+            <th class="text-center">{{ bd.team2.name }}</th>
             <th class="text-center">Pt</th>
           </tr></thead>
           <tbody>
@@ -128,8 +132,8 @@
             <td class="text-center {{ 'fw-bold' if g.winner == bd.team1.id else '' }}">{{ g.t1 }}</td>
             <td class="text-center {{ 'fw-bold' if g.winner == bd.team2.id else '' }}">{{ g.t2 }}</td>
             <td class="text-center small">
-              {% if g.winner == bd.team1.id %}T{{ bd.team1.number }}
-              {% elif g.winner == bd.team2.id %}T{{ bd.team2.number }}
+              {% if g.winner == bd.team1.id %}{{ bd.team1.name }}
+              {% elif g.winner == bd.team2.id %}{{ bd.team2.name }}
               {% else %}&mdash;{% endif %}
             </td>
           </tr>
@@ -139,8 +143,8 @@
             <td class="text-center {{ 'fw-bold' if bd.series.winner == bd.team1.id else '' }}">{{ bd.series.t1 }}</td>
             <td class="text-center {{ 'fw-bold' if bd.series.winner == bd.team2.id else '' }}">{{ bd.series.t2 }}</td>
             <td class="text-center small">
-              {% if bd.series.winner == bd.team1.id %}T{{ bd.team1.number }}
-              {% elif bd.series.winner == bd.team2.id %}T{{ bd.team2.number }}
+              {% if bd.series.winner == bd.team1.id %}{{ bd.team1.name }}
+              {% elif bd.series.winner == bd.team2.id %}{{ bd.team2.name }}
               {% else %}&mdash;{% endif %}
             </td>
           </tr>
@@ -150,7 +154,7 @@
         {% for row in weekly_team_pts %}
         {% if row.team.id == sched0.team1.id or row.team.id == sched0.team2.id %}
         <span class="badge bg-{{ 'success' if row.points > 8 else 'secondary' }} me-1">
-          Team {{ row.team.number }}: {{ row.points | int if row.points == row.points | int else row.points }} pts
+          {{ row.team.name }}: {{ row.points | int if row.points == row.points | int else row.points }} pts
         </span>
         {% endif %}
         {% endfor %}
@@ -234,8 +238,8 @@
         <table class="table table-sm table-bordered mt-2 mb-0" style="font-size:0.8rem">
           <thead class="table-light"><tr>
             <th></th>
-            <th class="text-center">Team {{ bd.team1.number }}</th>
-            <th class="text-center">Team {{ bd.team2.number }}</th>
+            <th class="text-center">{{ bd.team1.name }}</th>
+            <th class="text-center">{{ bd.team2.name }}</th>
             <th class="text-center">Pt</th>
           </tr></thead>
           <tbody>
@@ -245,8 +249,8 @@
             <td class="text-center {{ 'fw-bold' if g.winner == bd.team1.id else '' }}">{{ g.t1 }}</td>
             <td class="text-center {{ 'fw-bold' if g.winner == bd.team2.id else '' }}">{{ g.t2 }}</td>
             <td class="text-center small">
-              {% if g.winner == bd.team1.id %}T{{ bd.team1.number }}
-              {% elif g.winner == bd.team2.id %}T{{ bd.team2.number }}
+              {% if g.winner == bd.team1.id %}{{ bd.team1.name }}
+              {% elif g.winner == bd.team2.id %}{{ bd.team2.name }}
               {% else %}&mdash;{% endif %}
             </td>
           </tr>
@@ -256,8 +260,8 @@
             <td class="text-center {{ 'fw-bold' if bd.series.winner == bd.team1.id else '' }}">{{ bd.series.t1 }}</td>
             <td class="text-center {{ 'fw-bold' if bd.series.winner == bd.team2.id else '' }}">{{ bd.series.t2 }}</td>
             <td class="text-center small">
-              {% if bd.series.winner == bd.team1.id %}T{{ bd.team1.number }}
-              {% elif bd.series.winner == bd.team2.id %}T{{ bd.team2.number }}
+              {% if bd.series.winner == bd.team1.id %}{{ bd.team1.name }}
+              {% elif bd.series.winner == bd.team2.id %}{{ bd.team2.name }}
               {% else %}&mdash;{% endif %}
             </td>
           </tr>
@@ -286,7 +290,7 @@
   <tbody>
   {% for row in weekly_team_pts %}
   <tr>
-    <td>Team {{ row.team.number }} — {{ row.team.name }}</td>
+    <td>{{ row.team.name }}</td>
     <td class="text-end fw-bold">{{ row.points | int if row.points == row.points | int else row.points }}</td>
   </tr>
   {% endfor %}

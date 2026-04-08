@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Payout Config — {{ season.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('payout.payout_overview', season_id=season.id) }}">Payout</a></li>
+    <li class="breadcrumb-item active">Configure</li>
+  </ol>
+</nav>
+
+<h4>Payout Configuration — {{ season.name }}</h4>
+<p class="text-muted small">Set the season totals and prize rates. Save to proceed to the payout summary.</p>
+
+<form method="post" style="max-width:600px">
+
+  <h6 class="mt-3 mb-2 text-uppercase text-secondary" style="font-size:0.72rem;letter-spacing:.07em">Total Available</h6>
+  <div class="mb-3 row align-items-center">
+    <label class="col-sm-5 col-form-label">Total amount available ($)</label>
+    <div class="col-sm-4">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">$</span>
+        <input type="number" name="total_available" class="form-control"
+               value="{{ config.total_available | int }}" min="0" step="1" required>
+      </div>
+    </div>
+  </div>
+
+  <h6 class="mt-3 mb-2 text-uppercase text-secondary" style="font-size:0.72rem;letter-spacing:.07em">Tournament Prizes (fixed dollar amounts)</h6>
+  {% for n, default_val in [('1', config.tournament_prize_1), ('2', config.tournament_prize_2), ('3', config.tournament_prize_3)] %}
+  <div class="mb-2 row align-items-center">
+    <label class="col-sm-5 col-form-label">{{ loop.index }}{{ ['st','nd','rd'][loop.index0] }} place</label>
+    <div class="col-sm-3">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">$</span>
+        <input type="number" name="tournament_prize_{{ n }}" class="form-control"
+               value="{{ default_val | int }}" min="0" step="1">
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  <h6 class="mt-3 mb-2 text-uppercase text-secondary" style="font-size:0.72rem;letter-spacing:.07em">Individual Prize Rates</h6>
+  <div class="mb-2 row align-items-center">
+    <label class="col-sm-5 col-form-label">Weekly prize win rate ($ per win)</label>
+    <div class="col-sm-3">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">$</span>
+        <input type="number" name="weekly_win_rate" class="form-control"
+               value="{{ config.weekly_win_rate | int }}" min="0" step="1">
+      </div>
+    </div>
+  </div>
+  <div class="mb-2 row align-items-center">
+    <label class="col-sm-5 col-form-label">YTD prize rate ($ per award)</label>
+    <div class="col-sm-3">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">$</span>
+        <input type="number" name="ytd_prize_rate" class="form-control"
+               value="{{ config.ytd_prize_rate | int }}" min="0" step="1">
+      </div>
+    </div>
+    <div class="col-sm-4 small text-muted">HG/HS leaders + Most Improved</div>
+  </div>
+  <div class="mb-2 row align-items-center">
+    <label class="col-sm-5 col-form-label">Final week for YTD prizes</label>
+    <div class="col-sm-3">
+      <input type="number" name="final_week" class="form-control form-control-sm"
+             value="{{ config.final_week }}" min="1" max="30">
+    </div>
+  </div>
+
+  <h6 class="mt-3 mb-2 text-uppercase text-secondary" style="font-size:0.72rem;letter-spacing:.07em">Other Deductions</h6>
+  <div class="mb-2 row align-items-center">
+    <label class="col-sm-5 col-form-label">Trophies ($)</label>
+    <div class="col-sm-3">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">$</span>
+        <input type="number" name="trophy_cost" class="form-control"
+               value="{{ config.trophy_cost | int }}" min="0" step="1">
+      </div>
+    </div>
+  </div>
+
+  <h6 class="mt-3 mb-2 text-uppercase text-secondary" style="font-size:0.72rem;letter-spacing:.07em">Team Awards</h6>
+  <p class="small text-muted mb-2">Three separate award pools from the team remainder. Pool %s must sum to 100; place %s within each pool must also sum to 100.</p>
+
+  {% set award_labels = ['First Half', 'Second Half', 'Championship'] %}
+  {% set default_place_pcts = ['35, 25, 20, 20', '35, 25, 20, 20', '60, 40'] %}
+  {% for i in range(3) %}
+  <div class="border rounded p-2 mb-2">
+    <div class="fw-semibold small mb-2">{{ award_labels[i] }}</div>
+    <div class="row align-items-center mb-1">
+      <label class="col-sm-5 col-form-label col-form-label-sm">Pool % of team remainder</label>
+      <div class="col-sm-3">
+        <div class="input-group input-group-sm">
+          <input type="number" name="award_pct_{{ i }}" class="form-control"
+                 value="{{ award_pcts[i] | int if award_pcts|length > i else [40,40,20][i] }}"
+                 min="0" max="100" step="1">
+          <span class="input-group-text">%</span>
+        </div>
+      </div>
+    </div>
+    <div class="row align-items-center mb-1">
+      <label class="col-sm-5 col-form-label col-form-label-sm">Place % (1st, 2nd, … comma-sep)</label>
+      <div class="col-sm-5">
+        <input type="text" name="place_pcts_{{ i }}" class="form-control form-control-sm"
+               value="{{ place_pcts_strs[i] if place_pcts_strs|length > i else default_place_pcts[i] }}"
+               placeholder="{{ default_place_pcts[i] }}">
+      </div>
+    </div>
+    {% if i == 2 %}
+    <div class="row align-items-center">
+      <label class="col-sm-5 col-form-label col-form-label-sm">Championship starts week</label>
+      <div class="col-sm-3">
+        <input type="number" name="championship_start_week" class="form-control form-control-sm"
+               value="{{ config.championship_start_week or 20 }}" min="1" max="30">
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <div class="d-flex gap-2 mt-3">
+    <button type="submit" class="btn btn-primary">Save &amp; View Summary</button>
+    <a href="{{ url_for('payout.payout_overview', season_id=season.id) }}"
+       class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}

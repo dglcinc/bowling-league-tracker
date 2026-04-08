@@ -4,9 +4,43 @@ Run with: python app.py
 Then open http://localhost:5000 in your browser.
 """
 
+from dotenv import load_dotenv
+load_dotenv()  # loads .env from project root before Config reads os.environ
+
 from flask import Flask, redirect, url_for
 from config import Config
 from models import db
+from flask_mail import Mail
+
+mail = Mail()
+
+# Throttle: don't write a backup more than once per 60 seconds
+_last_backup_time: float = 0.0
+_BACKUP_THROTTLE_SECS = 60
+_BACKUP_KEEP = 30   # number of dated backups to retain
+
+
+def _do_backup(app):
+    """Copy the live SQLite file to the backup directory, prune old copies."""
+    global _last_backup_time
+    now = time.monotonic()
+    if now - _last_backup_time < _BACKUP_THROTTLE_SECS:
+        return
+    _last_backup_time = now
+
+    try:
+        db_path = Path(app.config['db_path'])
+        backup_dir = Path(app.config['BACKUP_DIR'])
+        stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        dest = backup_dir / f'league-{stamp}.db'
+        shutil.copy2(db_path, dest)
+
+        # Prune: keep only the N most recent backups
+        backups = sorted(backup_dir.glob('league-*.db'))
+        for old in backups[:-_BACKUP_KEEP]:
+            old.unlink(missing_ok=True)
+    except Exception:
+        pass  # never let backup errors surface to the user
 
 
 def _migrate_db(db):
@@ -23,6 +57,9 @@ def _migrate_db(db):
         "UPDATE teams SET captain_name = name WHERE captain_name IS NULL AND name NOT LIKE 'Team %'",
         "UPDATE teams SET name = 'Team ' || CAST(number AS TEXT) WHERE name NOT LIKE 'Team %' AND name != 'Pinheads'",
         "UPDATE teams SET name = 'Pinheads' WHERE number = 2 AND season_id IN (SELECT id FROM seasons WHERE is_active = 1)",
+        "ALTER TABLE payout_configs ADD COLUMN team_award_pcts_json TEXT DEFAULT '[40, 40, 20]'",
+        "ALTER TABLE payout_configs ADD COLUMN team_place_pcts_json TEXT DEFAULT '[[35,25,20,20],[35,25,20,20],[60,40]]'",
+        "ALTER TABLE payout_configs ADD COLUMN championship_start_week INTEGER DEFAULT 20",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:
@@ -61,12 +98,20 @@ def create_app():
     app.config.from_object(Config)
 
     db.init_app(app)
+    mail.init_app(app)
 
     app.jinja_env.globals['enumerate'] = enumerate
 
     with app.app_context():
         db.create_all()
         _migrate_db(db)
+
+    # Automatic DB backup after every committed write (throttled to once per minute)
+    from sqlalchemy import event
+
+    @event.listens_for(db.session, 'after_commit')
+    def _after_commit(session):
+        _do_backup(app)
 
     # Register blueprints
     from routes.admin import admin_bp

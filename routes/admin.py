@@ -127,7 +127,7 @@ def edit_team(season_id, team_id):
             team.name = name
         team.captain_name = request.form.get('captain_name', '').strip() or None
         db.session.commit()
-        flash(f'Team {team.number} updated.', 'success')
+        flash(f'{team.name} updated.', 'success')
         return redirect(url_for('admin.season_detail', season_id=season_id))
     return render_template('admin/edit_team.html', season=season, team=team)
 
@@ -728,3 +728,290 @@ def import_season():
         return redirect(url_for('admin.season_detail', season_id=season.id))
 
     return render_template('admin/import_season.html')
+
+
+# ---------------------------------------------------------------------------
+# Mailing list management
+# ---------------------------------------------------------------------------
+
+@admin_bp.route('/seasons/<int:season_id>/mailing-list')
+def mailing_list(season_id):
+    season = Season.query.get_or_404(season_id)
+    teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
+    roster = (Roster.query
+              .filter_by(season_id=season_id, active=True)
+              .join(Bowler)
+              .order_by(Bowler.last_name)
+              .all())
+    missing_email = [r for r in roster if not r.bowler.email]
+    return render_template('admin/mailing_list.html',
+                           season=season, teams=teams,
+                           roster=roster, missing_email=missing_email)
+
+
+# ---------------------------------------------------------------------------
+# Weekly email compose and send
+# ---------------------------------------------------------------------------
+
+def _resolve_captain_emails(teams, season_id):
+    """Return list of (team, bowler_or_None, email_or_None) for all teams."""
+    result = []
+    for team in teams:
+        if not team.captain_name:
+            result.append((team, None, None))
+            continue
+        # Try to match captain_name against bowler last_name in this season's roster
+        roster_entry = (Roster.query
+                        .filter_by(season_id=season_id)
+                        .join(Bowler)
+                        .filter(Bowler.last_name == team.captain_name)
+                        .first())
+        if roster_entry and roster_entry.bowler.email:
+            result.append((team, roster_entry.bowler, roster_entry.bowler.email))
+        else:
+            result.append((team, None, None))
+    return result
+
+
+def _get_above_average_bowlers(season_id, week_num, threshold=30):
+    """Return bowlers who bowled >= threshold pins above their prior running average."""
+    entries = (MatchupEntry.query
+               .filter_by(season_id=season_id, week_num=week_num, is_blind=False)
+               .filter(MatchupEntry.bowler_id.isnot(None))
+               .all())
+    from calculations import get_bowler_stats
+    results = []
+    seen = set()
+    for entry in entries:
+        if entry.bowler_id in seen:
+            continue
+        seen.add(entry.bowler_id)
+        if entry.game_count == 0:
+            continue
+        prior = get_bowler_stats(entry.bowler_id, season_id, week_num - 1)
+        prior_avg = prior.get('running_avg') or 0
+        if prior_avg == 0:
+            continue
+        week_avg = entry.total_pins / entry.game_count
+        if week_avg - prior_avg >= threshold:
+            results.append({
+                'bowler': entry.bowler,
+                'week_avg': round(week_avg, 1),
+                'prior_avg': prior_avg,
+                'diff': round(week_avg - prior_avg, 1),
+            })
+    return sorted(results, key=lambda r: r['bowler'].last_name)
+
+
+@admin_bp.route('/seasons/<int:season_id>/week/<int:week_num>/email', methods=['GET', 'POST'])
+def email_compose(season_id, week_num):
+    from calculations import get_weekly_prizes, get_team_standings
+    from flask import current_app
+
+    season = Season.query.get_or_404(season_id)
+    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
+    teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
+    settings = LeagueSettings.query.get(1)
+    league_name = (settings.league_name if settings else 'MLC Pirate Bowling League')
+
+    captain_info = _resolve_captain_emails(teams, season_id)
+    # TO: all captains that have emails (sender's own team excluded only if they want;
+    # for now include all 4 — sender can remove themselves from the form)
+    to_captains = [(t, b, e) for t, b, e in captain_info if e]
+    missing_captains = [(t, b, e) for t, b, e in captain_info if not e]
+
+    # BCC: active roster
+    all_roster = (Roster.query
+                  .filter_by(season_id=season_id, active=True)
+                  .join(Bowler)
+                  .order_by(Bowler.last_name)
+                  .all())
+
+    prizes = get_weekly_prizes(season_id, week_num)
+    above_avg = _get_above_average_bowlers(season_id, week_num)
+    standings = get_team_standings(season_id, through_week=week_num)
+
+    week_date_str = week.date.strftime('%B %d, %Y') if week.date else f'Week {week_num}'
+    default_subject = f'{league_name} - Week {week_num} Standings'
+
+    if request.method == 'POST':
+        subject = request.form.get('subject', default_subject).strip()
+        body_text = request.form.get('body_text', '').strip()
+        bcc_scope = request.form.get('bcc_scope', 'all')
+        attach_pdf = request.form.get('attach_pdf') == '1'
+        to_emails_raw = request.form.get('to_emails', '').strip()
+
+        # Build TO list
+        to_list = [e.strip() for e in to_emails_raw.split(',') if e.strip()]
+
+        # Build BCC list
+        if bcc_scope == 'all':
+            bcc_roster = all_roster
+        else:
+            try:
+                team_num = int(bcc_scope)
+                bcc_roster = [r for r in all_roster if r.team.number == team_num]
+            except ValueError:
+                bcc_roster = all_roster
+
+        bcc_list = list({r.bowler.email for r in bcc_roster if r.bowler.email})
+
+        # Build HTML email body
+        html_body = _build_email_html(body_text, prizes, above_avg, standings, season, week)
+
+        # Send
+        try:
+            from flask_mail import Message
+            from app import mail
+
+            msg = Message(subject=subject,
+                          recipients=to_list,
+                          bcc=bcc_list,
+                          html=html_body)
+
+            if attach_pdf:
+                try:
+                    pdf_bytes = _generate_prizes_pdf(season_id, week_num)
+                    msg.attach(
+                        filename=f'Week{week_num}_Standings.pdf',
+                        content_type='application/pdf',
+                        data=pdf_bytes,
+                    )
+                except Exception as pdf_err:
+                    flash(f'PDF generation failed (email sent without attachment): {pdf_err}', 'warning')
+
+            mail.send(msg)
+            flash(f'Email sent to {len(to_list)} captain(s) with {len(bcc_list)} BCC recipients.', 'success')
+            return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+        except Exception as e:
+            flash(f'Email send failed: {e}', 'danger')
+
+    return render_template('admin/email_compose.html',
+                           season=season, week=week, week_num=week_num,
+                           teams=teams, settings=settings,
+                           to_captains=to_captains,
+                           missing_captains=missing_captains,
+                           all_roster=all_roster,
+                           prizes=prizes,
+                           above_avg=above_avg,
+                           standings=standings,
+                           default_subject=default_subject,
+                           league_name=league_name,
+                           mail_configured=bool(current_app.config.get('MAIL_USERNAME')))
+
+
+def _build_email_html(body_text, prizes, above_avg, standings, season, week):
+    """Build the HTML email body from user narrative + auto-generated data."""
+    import html as h
+
+    def prize_line(cat, label):
+        if not cat or not cat.winners:
+            return f'<li>{h.escape(label)}: —</li>'
+        names = ' / '.join(w.bowler.last_name for w in cat.winners)
+        tie = ' (tie)' if len(cat.winners) > 1 else ''
+        return f'<li>{h.escape(label)}: <strong>{h.escape(names)}</strong>{tie} — {cat.score}</li>'
+
+    prizes_html = ''
+    if prizes:
+        prizes_html = f'''
+<p><strong>Weekly Prizes:</strong></p>
+<ul>
+  {prize_line(prizes.hg_hcp,    'High Game — Handicap')}
+  {prize_line(prizes.hg_scratch,'High Game — Scratch')}
+  {prize_line(prizes.hs_hcp,    'High Series — Handicap')}
+  {prize_line(prizes.hs_scratch,'High Series — Scratch')}
+</ul>'''
+
+    above_html = ''
+    if above_avg:
+        names = ', '.join(r['bowler'].last_name for r in above_avg)
+        above_html = f'<p>Notable bowling (30+ above average): {h.escape(names)}.</p>'
+
+    standings_html = ''
+    if standings:
+        rows = ''.join(
+            f'<tr><td>{h.escape(s["team"].name)}</td><td align="right">{s["points"]}</td></tr>'
+            for s in standings
+        )
+        standings_html = f'''
+<p><strong>Standings through Week {week.week_num}:</strong></p>
+<table cellpadding="4" border="1" style="border-collapse:collapse">
+  <tr><th>Team</th><th>Points</th></tr>
+  {rows}
+</table>'''
+
+    body_html = body_text.replace('\n', '<br>\n') if body_text else ''
+
+    return f'''<html><body style="font-family:Arial,sans-serif;font-size:14px">
+<p>Ladies and Gentlemen:</p>
+{body_html}
+{above_html}
+{prizes_html}
+{standings_html}
+</body></html>'''
+
+
+def _generate_prizes_pdf(season_id, week_num):
+    """Render the prizes/standings page to PDF bytes via WeasyPrint."""
+    from weasyprint import HTML
+    from flask import current_app, render_template as rt
+    from calculations import (get_weekly_prizes, get_bowler_stats, get_team_standings,
+                               calculate_handicap)
+    from models import MatchupEntry, Roster, Bowler
+
+    season = Season.query.get(season_id)
+    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first()
+    prizes = get_weekly_prizes(season_id, week_num)
+
+    all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+    total_wood = sum(
+        e.total_pins + (
+            (season.blind_handicap if e.is_blind else calculate_handicap(e.bowler_id, season_id, week_num))
+            * e.game_count
+        )
+        for e in all_entries
+    )
+    player_count = sum(1 for e in all_entries if not e.is_blind)
+    blind_games  = sum(e.game_count for e in all_entries if e.is_blind)
+
+    roster_entries = (Roster.query
+                      .filter_by(season_id=season_id, active=True)
+                      .join(Bowler).order_by(Bowler.last_name).all())
+    leaders = []
+    for r in roster_entries:
+        stats = get_bowler_stats(r.bowler_id, season_id, week_num)
+        if stats['cumulative_games'] == 0:
+            continue
+        leaders.append({
+            'bowler': r.bowler, 'team': r.team,
+            'average':             stats['running_avg'],
+            'games':               stats['cumulative_games'],
+            'handicap':            stats['display_handicap'],
+            'high_game_scratch':   stats['ytd_high_game_scratch'],
+            'high_game_hcp':       stats['ytd_high_game_hcp'],
+            'high_series_scratch': stats['ytd_high_series_scratch'],
+            'high_series_hcp':     stats['ytd_high_series_hcp'],
+        })
+
+    avg_rows = sorted([l for l in leaders if l['games'] >= 9],
+                      key=lambda x: (-x['average'], x['bowler'].last_name))
+    full_year    = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
+    first_half_s = sorted(get_team_standings(season_id, half=1, through_week=week_num), key=lambda s: s['team'].number)
+    second_half_s= sorted(get_team_standings(season_id, half=2, through_week=week_num), key=lambda s: s['team'].number)
+    fh_max = max((s['points'] for s in first_half_s),  default=0)
+    sh_max = max((s['points'] for s in second_half_s), default=0)
+    fy_max = max((s['points'] for s in full_year),     default=0)
+
+    html_str = rt('reports/week_prizes.html',
+                  season=season, week=week,
+                  prizes=prizes, leaders=leaders,
+                  standings=full_year,
+                  first_half_s=first_half_s, second_half_s=second_half_s,
+                  fh_max=fh_max, sh_max=sh_max, fy_max=fy_max,
+                  avg_rows=avg_rows, min_games=9, top10=False,
+                  total_wood=total_wood, player_count=player_count,
+                  blind_games=blind_games)
+
+    cdn_base = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/'
+    return HTML(string=html_str, base_url=cdn_base).write_pdf()
