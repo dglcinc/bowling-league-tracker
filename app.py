@@ -135,7 +135,7 @@ def create_app():
                     .order_by(Week.week_num.desc())
                     .first())
             current_week = last.week_num if last else 0
-        settings = LeagueSettings.query.get(1)
+        settings = db.session.get(LeagueSettings, 1)
         return {'active_season': active, 'current_week': current_week, 'league_settings': settings}
 
     @app.route('/')

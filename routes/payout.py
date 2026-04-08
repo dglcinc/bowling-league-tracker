@@ -51,7 +51,7 @@ def _calculate_payout(season_id, config):
       individual_payouts (list sorted by last_name), individual_total,
       trophy_cost, team_payouts, team_total, remainder, final_week
     """
-    season = Season.query.get(season_id)
+    season = db.session.get(Season, season_id)
 
     # ---- 1. TOURNAMENT AWARDS ----
     tournament_weeks = (Week.query

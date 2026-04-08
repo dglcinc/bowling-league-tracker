@@ -18,7 +18,7 @@ def _default(obj):
 
 def build_snapshot(season_id, week_num):
     """Build the full snapshot dict for a season/week."""
-    season = Season.query.get(season_id)
+    season = db.session.get(Season, season_id)
     week = Week.query.filter_by(season_id=season_id, week_num=week_num).first()
 
     alpha = get_wkly_alpha(season_id, week_num)
@@ -67,7 +67,7 @@ def build_snapshot(season_id, week_num):
 def save_snapshot(season_id, week_num, snapshot_dir):
     """Build snapshot, save to OneDrive file and DB."""
     data = build_snapshot(season_id, week_num)
-    season = Season.query.get(season_id)
+    season = db.session.get(Season, season_id)
     json_str = json.dumps(data, default=_default, indent=2)
 
     # Write to OneDrive file
