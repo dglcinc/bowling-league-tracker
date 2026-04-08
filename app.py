@@ -4,6 +4,9 @@ Run with: python app.py
 Then open http://localhost:5000 in your browser.
 """
 
+from dotenv import load_dotenv
+load_dotenv()  # loads .env from project root before Config reads os.environ
+
 from flask import Flask, redirect, url_for
 from config import Config
 from models import db
