@@ -47,7 +47,13 @@ class Config:
     SNAPSHOT_DIR = get_snapshot_dir()
     BACKUP_DIR = get_backup_dir()
 
-    # Outbound email via Exchange SMTP — set these in environment or a .env loader
+    # Outbound email via Microsoft Graph API (OAuth2 — replaces SMTP)
+    GRAPH_TENANT_ID      = os.environ.get("GRAPH_TENANT_ID", "")
+    GRAPH_CLIENT_ID      = os.environ.get("GRAPH_CLIENT_ID", "")
+    GRAPH_CLIENT_SECRET  = os.environ.get("GRAPH_CLIENT_SECRET", "")
+    GRAPH_SENDER_EMAIL   = os.environ.get("GRAPH_SENDER_EMAIL", "")
+
+    # Outbound email via Exchange SMTP (legacy fallback — not recommended)
     MAIL_SERVER          = os.environ.get("MAIL_SERVER",  "smtp.office365.com")
     MAIL_PORT            = int(os.environ.get("MAIL_PORT", "587"))
     MAIL_USE_TLS         = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"

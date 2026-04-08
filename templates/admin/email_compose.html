@@ -72,9 +72,17 @@
         </label>
       </div>
 
-      <button type="submit" class="btn btn-primary" {{ 'disabled' if not mail_configured }}>
-        Send Email
-      </button>
+      <input type="hidden" name="test_only" value="0" id="testOnlyFlag">
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary" {{ 'disabled' if not mail_configured }}>
+          Send Email
+        </button>
+        <button type="submit" class="btn btn-outline-secondary"
+                {{ 'disabled' if not mail_configured }}
+                onclick="document.getElementById('testOnlyFlag').value='1'">
+          Send Test to Me
+        </button>
+      </div>
 
     </form>
   </div>

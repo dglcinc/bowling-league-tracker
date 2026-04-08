@@ -223,9 +223,11 @@
   {% endfor %}
 </div>
 
-<div class="no-print mt-3">
+<div class="no-print mt-3 d-flex gap-2">
   <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}"
      class="btn btn-outline-secondary btn-sm">Back to Week</a>
+  <a href="{{ url_for('admin.email_compose', season_id=season.id, week_num=week.week_num) }}"
+     class="btn btn-outline-primary btn-sm">Send Weekly Email</a>
 </div>
 
 {# Print section 2: YTD High Games (flows on same page, print only) #}

@@ -109,8 +109,13 @@ def season_detail(season_id):
               .join(Bowler)
               .order_by(Bowler.last_name)
               .all())
+    entered_weeks = (Week.query
+                     .filter_by(season_id=season_id, is_entered=True)
+                     .order_by(Week.week_num.desc())
+                     .all())
     return render_template('admin/season_detail.html',
-                           season=season, teams=teams, roster=roster)
+                           season=season, teams=teams, roster=roster,
+                           entered_weeks=entered_weeks)
 
 
 # ---------------------------------------------------------------------------
@@ -856,37 +861,45 @@ def email_compose(season_id, week_num):
 
         bcc_list = list({r.bowler.email for r in bcc_roster if r.bowler.email})
 
+        test_only = request.form.get('test_only') == '1'
+        if test_only:
+            my_email = current_app.config.get('GRAPH_SENDER_EMAIL', '')
+            to_list = [my_email] if my_email else []
+            bcc_list = []
+            subject = f'[TEST] {subject}'
+
         # Build HTML email body
         html_body = _build_email_html(body_text, prizes, above_avg, standings, season, week)
 
-        # Send
+        # Build optional PDF attachment
+        pdf_bytes = None
+        if attach_pdf:
+            try:
+                pdf_bytes = _generate_prizes_pdf(season_id, week_num)
+            except Exception as pdf_err:
+                flash(f'PDF generation failed (email sent without attachment): {pdf_err}', 'warning')
+
+        # Send via Microsoft Graph API
         try:
-            from flask_mail import Message
-            from app import mail
-
-            msg = Message(subject=subject,
-                          recipients=to_list,
-                          bcc=bcc_list,
-                          html=html_body)
-
-            if attach_pdf:
-                try:
-                    pdf_bytes = _generate_prizes_pdf(season_id, week_num)
-                    msg.attach(
-                        filename=f'Week{week_num}_Standings.pdf',
-                        content_type='application/pdf',
-                        data=pdf_bytes,
-                    )
-                except Exception as pdf_err:
-                    flash(f'PDF generation failed (email sent without attachment): {pdf_err}', 'warning')
-
-            mail.send(msg)
-            flash(f'Email sent to {len(to_list)} captain(s) with {len(bcc_list)} BCC recipients.', 'success')
+            _send_via_graph(
+                app_config=current_app.config,
+                subject=subject,
+                html_body=html_body,
+                to_list=to_list,
+                bcc_list=bcc_list,
+                pdf_attachment=pdf_bytes,
+                pdf_filename=f'Week{week_num}_Standings.pdf',
+            )
+            if test_only:
+                flash(f'Test email sent to {to_list[0] if to_list else "you"}.', 'success')
+            else:
+                flash(f'Email sent to {len(to_list)} captain(s) with {len(bcc_list)} BCC recipients.', 'success')
             return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
         except Exception as e:
             flash(f'Email send failed: {e}', 'danger')
 
+    graph_configured = bool(current_app.config.get('GRAPH_CLIENT_ID'))
     return render_template('admin/email_compose.html',
                            season=season, week=week, week_num=week_num,
                            teams=teams, settings=settings,
@@ -898,7 +911,79 @@ def email_compose(season_id, week_num):
                            standings=standings,
                            default_subject=default_subject,
                            league_name=league_name,
-                           mail_configured=bool(current_app.config.get('MAIL_USERNAME')))
+                           mail_configured=graph_configured)
+
+
+def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
+                    pdf_attachment=None, pdf_filename=None):
+    """Send email via Microsoft Graph API using client-credentials OAuth2."""
+    import base64
+    import json
+    import urllib.request
+    import urllib.parse
+    import msal
+
+    tenant_id    = app_config['GRAPH_TENANT_ID']
+    client_id    = app_config['GRAPH_CLIENT_ID']
+    client_secret= app_config['GRAPH_CLIENT_SECRET']
+    sender_email = app_config['GRAPH_SENDER_EMAIL']
+
+    if not all([tenant_id, client_id, client_secret, sender_email]):
+        raise RuntimeError('Microsoft Graph credentials not configured. '
+                           'Set GRAPH_TENANT_ID, GRAPH_CLIENT_ID, '
+                           'GRAPH_CLIENT_SECRET, GRAPH_SENDER_EMAIL in .env')
+
+    # Acquire access token
+    authority = f'https://login.microsoftonline.com/{tenant_id}'
+    app = msal.ConfidentialClientApplication(
+        client_id, authority=authority, client_credential=client_secret)
+    result = app.acquire_token_for_client(
+        scopes=['https://graph.microsoft.com/.default'])
+
+    if 'access_token' not in result:
+        raise RuntimeError(f"Token acquisition failed: {result.get('error_description', result)}")
+
+    token = result['access_token']
+
+    # Build message payload
+    to_recipients  = [{'emailAddress': {'address': e}} for e in to_list]
+    bcc_recipients = [{'emailAddress': {'address': e}} for e in bcc_list]
+
+    message = {
+        'subject': subject,
+        'body': {'contentType': 'HTML', 'content': html_body},
+        'toRecipients': to_recipients,
+        'bccRecipients': bcc_recipients,
+    }
+
+    if pdf_attachment and pdf_filename:
+        message['attachments'] = [{
+            '@odata.type': '#microsoft.graph.fileAttachment',
+            'name': pdf_filename,
+            'contentType': 'application/pdf',
+            'contentBytes': base64.b64encode(pdf_attachment).decode('utf-8'),
+        }]
+
+    payload = json.dumps({'message': message, 'saveToSentItems': True}).encode('utf-8')
+
+    url = f'https://graph.microsoft.com/v1.0/users/{sender_email}/sendMail'
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+        },
+        method='POST',
+    )
+
+    try:
+        with urllib.request.urlopen(req) as resp:
+            if resp.status not in (200, 202):
+                raise RuntimeError(f'Graph API returned {resp.status}')
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        raise RuntimeError(f'Graph API error {e.code}: {body}')
 
 
 def _build_email_html(body_text, prizes, above_avg, standings, season, week):
@@ -906,21 +991,21 @@ def _build_email_html(body_text, prizes, above_avg, standings, season, week):
     import html as h
 
     def prize_line(cat, label):
-        if not cat or not cat.winners:
+        if not cat or not cat['winners']:
             return f'<li>{h.escape(label)}: —</li>'
-        names = ' / '.join(w.bowler.last_name for w in cat.winners)
-        tie = ' (tie)' if len(cat.winners) > 1 else ''
-        return f'<li>{h.escape(label)}: <strong>{h.escape(names)}</strong>{tie} — {cat.score}</li>'
+        names = ' / '.join(w['bowler'].last_name for w in cat['winners'])
+        tie = ' (tie)' if len(cat['winners']) > 1 else ''
+        return f'<li>{h.escape(label)}: <strong>{h.escape(names)}</strong>{tie} — {cat["score"]}</li>'
 
     prizes_html = ''
     if prizes:
         prizes_html = f'''
 <p><strong>Weekly Prizes:</strong></p>
 <ul>
-  {prize_line(prizes.hg_hcp,    'High Game — Handicap')}
-  {prize_line(prizes.hg_scratch,'High Game — Scratch')}
-  {prize_line(prizes.hs_hcp,    'High Series — Handicap')}
-  {prize_line(prizes.hs_scratch,'High Series — Scratch')}
+  {prize_line(prizes['hg_hcp'],    'High Game — Handicap')}
+  {prize_line(prizes['hg_scratch'],'High Game — Scratch')}
+  {prize_line(prizes['hs_hcp'],    'High Series — Handicap')}
+  {prize_line(prizes['hs_scratch'],'High Series — Scratch')}
 </ul>'''
 
     above_html = ''
