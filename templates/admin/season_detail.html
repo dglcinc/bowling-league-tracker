@@ -25,6 +25,26 @@
   </div>
 </div>
 
+{% if entered_weeks %}
+<h5>Entered Weeks</h5>
+<table class="table table-sm table-hover mb-4" style="max-width:500px">
+  <thead><tr><th>Week</th><th>Date</th><th>Type</th><th></th></tr></thead>
+  <tbody>
+  {% for w in entered_weeks %}
+  <tr>
+    <td>{{ w.week_num }}</td>
+    <td>{{ w.date.strftime('%b %d, %Y') if w.date else '—' }}</td>
+    <td>{{ w.tournament_type or ('Position Night' if w.is_position_night else 'Regular') }}</td>
+    <td>
+      <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=w.week_num) }}" class="btn btn-xs btn-outline-secondary" style="font-size:0.75rem;padding:1px 6px">Scores</a>
+      <a href="{{ url_for('admin.email_compose', season_id=season.id, week_num=w.week_num) }}" class="btn btn-xs btn-outline-primary" style="font-size:0.75rem;padding:1px 6px">Email</a>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
 <h5>Teams <small class="text-muted fw-normal" style="font-size:0.75rem">Click a team to edit name &amp; captain</small></h5>
 <div class="row mb-4">
   {% for team in teams %}

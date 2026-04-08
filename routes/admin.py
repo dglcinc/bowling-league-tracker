@@ -109,8 +109,13 @@ def season_detail(season_id):
               .join(Bowler)
               .order_by(Bowler.last_name)
               .all())
+    entered_weeks = (Week.query
+                     .filter_by(season_id=season_id, is_entered=True)
+                     .order_by(Week.week_num.desc())
+                     .all())
     return render_template('admin/season_detail.html',
-                           season=season, teams=teams, roster=roster)
+                           season=season, teams=teams, roster=roster,
+                           entered_weeks=entered_weeks)
 
 
 # ---------------------------------------------------------------------------

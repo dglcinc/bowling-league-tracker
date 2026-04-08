@@ -37,7 +37,7 @@
       {{ 'Uncancel Week' if week.is_cancelled else 'Cancel Week' }}
     </button>
   </form>
-  {% if week.is_entered and not week.tournament_type %}
+  {% if week.is_entered %}
   <a href="{{ url_for('admin.email_compose', season_id=season.id, week_num=week.week_num) }}"
      class="btn btn-sm btn-outline-primary">📧 Send Weekly Email</a>
   {% endif %}
