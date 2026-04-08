@@ -845,21 +845,29 @@ def email_compose(season_id, week_num):
         bcc_scope = request.form.get('bcc_scope', 'all')
         attach_pdf = request.form.get('attach_pdf') == '1'
         to_emails_raw = request.form.get('to_emails', '').strip()
+        test_only = request.form.get('test_only') == '1'
 
-        # Build TO list
-        to_list = [e.strip() for e in to_emails_raw.split(',') if e.strip()]
-
-        # Build BCC list
-        if bcc_scope == 'all':
-            bcc_roster = all_roster
+        if test_only:
+            # Send only to the configured sender — no BCC, subject prefixed with [TEST]
+            my_email = current_app.config.get('MAIL_USERNAME', '')
+            to_list = [my_email] if my_email else []
+            bcc_list = []
+            subject = f'[TEST] {subject}'
         else:
-            try:
-                team_num = int(bcc_scope)
-                bcc_roster = [r for r in all_roster if r.team.number == team_num]
-            except ValueError:
-                bcc_roster = all_roster
+            # Build TO list
+            to_list = [e.strip() for e in to_emails_raw.split(',') if e.strip()]
 
-        bcc_list = list({r.bowler.email for r in bcc_roster if r.bowler.email})
+            # Build BCC list
+            if bcc_scope == 'all':
+                bcc_roster = all_roster
+            else:
+                try:
+                    team_num = int(bcc_scope)
+                    bcc_roster = [r for r in all_roster if r.team.number == team_num]
+                except ValueError:
+                    bcc_roster = all_roster
+
+            bcc_list = list({r.bowler.email for r in bcc_roster if r.bowler.email})
 
         # Build HTML email body
         html_body = _build_email_html(body_text, prizes, above_avg, standings, season, week)
@@ -886,7 +894,10 @@ def email_compose(season_id, week_num):
                     flash(f'PDF generation failed (email sent without attachment): {pdf_err}', 'warning')
 
             mail.send(msg)
-            flash(f'Email sent to {len(to_list)} captain(s) with {len(bcc_list)} BCC recipients.', 'success')
+            if test_only:
+                flash(f'Test email sent to {to_list[0] if to_list else "you"}.', 'success')
+            else:
+                flash(f'Email sent to {len(to_list)} captain(s) with {len(bcc_list)} BCC recipients.', 'success')
             return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
         except Exception as e:
