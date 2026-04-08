@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Send Weekly Email — Week {{ week_num }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4>Send Weekly Email — Week {{ week_num }}</h4>
+  <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week_num) }}"
+     class="btn btn-sm btn-outline-secondary">Back to Week</a>
+</div>
+
+{% if not mail_configured %}
+<div class="alert alert-danger">
+  <strong>Email not configured.</strong>
+  Set <code>MAIL_USERNAME</code> and <code>MAIL_PASSWORD</code> environment variables before sending.
+  See <code>config.py</code> for all required settings.
+</div>
+{% endif %}
+
+{% if missing_captains %}
+<div class="alert alert-warning">
+  <strong>Some captains are missing email addresses:</strong>
+  {% for team, bowler, email in missing_captains %}
+    {{ team.name }} ({{ team.captain_name or 'no captain set' }}){% if not loop.last %}, {% endif %}
+  {% endfor %}.
+  <a href="{{ url_for('admin.mailing_list', season_id=season.id) }}">Update the mailing list.</a>
+</div>
+{% endif %}
+
+<div class="row g-4">
+  {# ── Left: compose form ─────────────────────────────────────────────── #}
+  <div class="col-12 col-xl-7">
+    <form method="post">
+
+      <div class="mb-3">
+        <label class="form-label fw-bold">Subject</label>
+        <input type="text" name="subject" class="form-control"
+               value="{{ default_subject }}">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-bold">TO — Captains</label>
+        <input type="text" name="to_emails" class="form-control font-monospace"
+               value="{{ to_captains | map(attribute=2) | join(', ') }}"
+               placeholder="captain1@example.com, captain2@example.com">
+        <div class="form-text">Comma-separated. Resolved from captain names on each team.</div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-bold">BCC — Players</label>
+        <select name="bcc_scope" class="form-select form-select-sm w-auto">
+          <option value="all">All active players ({{ all_roster|length }})</option>
+          {% for team in teams %}
+          <option value="{{ team.number }}">{{ team.name }} only</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-bold">Your Message</label>
+        <textarea name="body_text" class="form-control" rows="10"
+                  placeholder="Type your weekly commentary here…&#10;&#10;The auto-generated prize and standings data will be appended below your message."></textarea>
+        <div class="form-text">
+          Prize winners, notable performances (30+ over average), and standings are added automatically below your text.
+        </div>
+      </div>
+
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" name="attach_pdf" value="1"
+               id="attachPdf" checked>
+        <label class="form-check-label" for="attachPdf">
+          Attach Prizes &amp; Standings PDF (Week {{ week_num }})
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-primary" {{ 'disabled' if not mail_configured }}>
+        Send Email
+      </button>
+
+    </form>
+  </div>
+
+  {# ── Right: auto-generated data preview ────────────────────────────── #}
+  <div class="col-12 col-xl-5">
+    <div class="card">
+      <div class="card-header fw-bold">Auto-generated content preview</div>
+      <div class="card-body" style="font-size:0.85rem">
+
+        {% if above_avg %}
+        <p class="mb-1"><strong>Notable bowling (30+ above average):</strong></p>
+        <p class="mb-3">{{ above_avg | map(attribute='bowler') | map(attribute='last_name') | join(', ') }}.</p>
+        {% else %}
+        <p class="text-muted mb-3"><em>No bowlers 30+ above average this week.</em></p>
+        {% endif %}
+
+        {% if prizes %}
+        <p class="mb-1"><strong>Weekly Prizes:</strong></p>
+        <ul class="mb-3" style="padding-left:1.2rem">
+          {% macro pline(cat, label) %}
+          <li>{{ label }}:
+            {% if cat and cat.winners %}
+              <strong>{% for w in cat.winners %}{{ w.bowler.last_name }}{% if not loop.last %} / {% endif %}{% endfor %}</strong>
+              {% if cat.winners|length > 1 %}<em>(tie)</em>{% endif %} — {{ cat.score }}
+            {% else %}—{% endif %}
+          </li>
+          {% endmacro %}
+          {{ pline(prizes.hg_hcp,     'High Game — Handicap') }}
+          {{ pline(prizes.hg_scratch, 'High Game — Scratch') }}
+          {{ pline(prizes.hs_hcp,     'High Series — Handicap') }}
+          {{ pline(prizes.hs_scratch, 'High Series — Scratch') }}
+        </ul>
+        {% endif %}
+
+        {% if standings %}
+        <p class="mb-1"><strong>Standings through Week {{ week_num }}:</strong></p>
+        <table class="table table-sm table-bordered mb-0" style="max-width:250px">
+          <thead><tr><th>Team</th><th class="text-end">Pts</th></tr></thead>
+          <tbody>
+          {% for s in standings %}
+          <tr>
+            <td>{{ s['team'].name }}</td>
+            <td class="text-end fw-bold">{{ s['points'] }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <div class="mt-3">
+      <a href="{{ url_for('admin.mailing_list', season_id=season.id) }}"
+         class="btn btn-sm btn-outline-secondary">Manage Mailing List</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

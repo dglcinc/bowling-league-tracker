@@ -4,9 +4,15 @@ Run with: python app.py
 Then open http://localhost:5000 in your browser.
 """
 
+from dotenv import load_dotenv
+load_dotenv()  # loads .env from project root before Config reads os.environ
+
 from flask import Flask, redirect, url_for
 from config import Config
 from models import db
+from flask_mail import Mail
+
+mail = Mail()
 
 
 def _migrate_db(db):
@@ -64,6 +70,7 @@ def create_app():
     app.config.from_object(Config)
 
     db.init_app(app)
+    mail.init_app(app)
 
     app.jinja_env.globals['enumerate'] = enumerate
 
