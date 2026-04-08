@@ -40,12 +40,13 @@
   {% if week and week.is_position_night %}&nbsp;&#9733; Position Night{% endif %}
 </div>
 
+<div class="table-scroll">
 <table class="table table-bordered table-sm table-striped mb-1">
   <thead class="table-dark">
     <tr>
       <th>#</th>
       <th>Name</th>
-      <th>T</th>
+      <th>Team</th>
       <th class="text-end">Total</th>
       <th class="text-end">G</th>
       <th class="text-end">Ave</th>
@@ -62,7 +63,7 @@
     <tr>
       <td>{{ loop.index }}</td>
       <td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=row.bowler.id) }}" class="text-decoration-none text-body">{{ row.bowler.last_name }}</a></td>
-      <td>{{ row.team.number }}</td>
+      <td>{{ row.team.name }}</td>
       <td class="text-end">{{ row.total_pins or '' }}</td>
       <td class="text-end">{{ row.games or '' }}</td>
       <td class="text-end">{{ row.average or '' }}</td>
@@ -78,5 +79,6 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 
 {% endblock %}

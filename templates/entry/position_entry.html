@@ -27,7 +27,7 @@
   Week {{ week.week_num }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
   <span class="badge bg-warning text-dark">Position Night</span>
   &nbsp;|&nbsp; Pairing {{ pairing_num }}:
-  Team {{ teams[0].number }} {{ teams[0].name }} vs Team {{ teams[1].number }} {{ teams[1].name }}
+  {{ teams[0].name }} vs {{ teams[1].name }}
 </h4>
 <p class="text-muted small">Scores are totaled across both lane pairs for this matchup. Enter each lane pair's score sheet below.</p>
 
@@ -44,7 +44,7 @@
     <div class="col-6">
       <div class="card">
         <div class="card-header fw-bold py-1">
-          Team {{ team.number }} — {{ team.name }}
+          {{ team.name }}
           <span class="badge bg-secondary float-end">{{ 'Side A' if team.id == sched.team1_id else 'Side B' }}</span>
         </div>
         <div class="card-body p-2">

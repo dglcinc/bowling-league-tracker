@@ -31,7 +31,8 @@
   .prize-tie   { font-size: 0.75rem; }
   .section-head { font-weight: 700; font-size: 0.8rem; text-transform: uppercase;
                   letter-spacing: 0.07em; background: #343a40; color: #fff;
-                  padding: 3px 6px; margin-bottom: 4px; }
+                  padding: 3px 6px; margin-bottom: 4px;
+                  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @media print {
     @page { size: landscape; margin: 0.35in; }
     body  { font-size: 7.5pt !important; }
@@ -48,9 +49,11 @@
     .section-head { font-size: 6.5pt !important; padding: 1px 4px !important; margin-bottom: 2px !important; }
     hr { margin: 3px 0 !important; }
     .row { --bs-gutter-y: 0.25rem !important; }
-    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    thead.table-dark { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     a { color: inherit !important; text-decoration: none !important; }
+    .print-page-2 { display: block !important; }
   }
+  .print-page-2 { display: none; }
 </style>
 {% endblock %}
 
@@ -88,7 +91,7 @@
 <div class="row g-3">
 
   {# Left: this week's prizes (2 columns per category pair) #}
-  <div class="col-12 col-xl-5">
+  <div class="col-12 col-xl">
     <div class="section-head">Week {{ week.week_num }} Prizes</div>
     <div class="row g-2">
       <div class="col-6">{{ prize_box(prizes.hg_hcp if prizes else none, 'High Game — Handicap') }}</div>
@@ -106,33 +109,34 @@
   </div>
 
   {# Middle: team standings #}
-  <div class="col-12 col-xl-4">
+  <div class="col-12 col-xl-auto">
+    <div style="width:fit-content">
     <div class="section-head">Team Standings — Week {{ week.week_num }}</div>
     <table class="table table-sm table-bordered mb-0">
       <thead><tr>
         <th>Team</th>
-        <th class="text-end">1st<br>Half</th>
-        <th class="text-end">2nd<br>Half</th>
-        <th class="text-end">Full<br>Year</th>
+        <th class="text-end" style="width:2.5rem">1st<br>Half</th>
+        <th class="text-end" style="width:2.5rem">2nd<br>Half</th>
+        <th class="text-end" style="width:2.5rem">Full<br>Year</th>
       </tr></thead>
       <tbody>
-      {% for i in range(standings | length) %}
-      {% set s1 = first_half_s[i] %}
-      {% set s2 = second_half_s[i] %}
-      {% set sy = standings[i] %}
+      {% for sy in standings %}
+      {% set fh_pts = first_half_map.get(sy['team'].id, 0) %}
+      {% set sh_pts = second_half_map.get(sy['team'].id, 0) %}
       <tr>
-        <td>{{ sy['team'].number }} — {{ sy['team'].name }}</td>
-        <td class="text-end fw-bold"{% if s1['points'] == fh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s1['points'] }}</td>
-        <td class="text-end fw-bold"{% if s2['points'] == sh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ s2['points'] }}</td>
+        <td>{{ sy['team'].name }}</td>
+        <td class="text-end fw-bold"{% if fh_pts == fh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ fh_pts }}</td>
+        <td class="text-end fw-bold"{% if sh_pts == sh_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ sh_pts }}</td>
         <td class="text-end fw-bold"{% if sy['points'] == fy_max %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>{{ sy['points'] }}</td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 
   {# Right: YTD leaders #}
-  <div class="col-12 col-xl-3">
+  <div class="col-12 col-xl">
     <div class="section-head">YTD Leaders Through Week {{ week.week_num }}</div>
     <div class="row g-2">
       {% set ytd_cats = [
@@ -175,9 +179,10 @@
   </form>
 </div>
 <h6 class="d-none d-print-block">High Averages{% if top10 %} — Top 10{% endif %} (min {{ min_games }} games)</h6>
+<div class="table-scroll">
 <table class="table table-sm table-bordered mb-3" style="max-width:500px">
   <thead class="table-dark"><tr>
-    <th>#</th><th>Bowler</th><th>T</th>
+    <th>#</th><th>Bowler</th><th>Team</th>
     <th class="text-end">G</th><th class="text-end">Ave</th><th class="text-end">Hcp</th>
   </tr></thead>
   <tbody>
@@ -185,7 +190,7 @@
   <tr>
     <td>{{ i + 1 }}</td>
     <td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler.id) }}" class="text-decoration-none text-body">{{ r.bowler.last_name }}</a></td>
-    <td>{{ r.team.number }}</td>
+    <td>{{ r.team.name }}</td>
     <td class="text-end">{{ r.games }}</td>
     <td class="text-end fw-bold">{{ r.average }}</td>
     <td class="text-end">{{ r.handicap if r.handicap is defined else '' }}</td>
@@ -195,6 +200,7 @@
   {% endfor %}
   </tbody>
 </table>
+</div>
 
 {# YTD leader boxes (screen only) #}
 <div class="row g-3 mt-1 no-print">
@@ -203,11 +209,11 @@
   <div class="col-12 col-md-6 col-xl-3">
     <h6>{{ label }}</h6>
     <table class="table table-sm table-bordered mb-0">
-      <thead><tr><th>#</th><th>Bowler</th><th>T</th><th class="text-end">Score</th></tr></thead>
+      <thead><tr><th>#</th><th>Bowler</th><th>Team</th><th class="text-end">Score</th></tr></thead>
       <tbody>
       {% for i, r in enumerate(leaders | sort(attribute=attr, reverse=True)) %}
       {% if i < 10 %}
-      <tr><td>{{ i+1 }}</td><td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler.id) }}" class="text-decoration-none text-body">{{ r.bowler.last_name }}</a></td><td>{{ r.team.number }}</td>
+      <tr><td>{{ i+1 }}</td><td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler.id) }}" class="text-decoration-none text-body">{{ r.bowler.last_name }}</a></td><td>{{ r.team.name }}</td>
           <td class="text-end">{{ r[attr] }}</td></tr>
       {% endif %}
       {% endfor %}
@@ -220,5 +226,31 @@
 <div class="no-print mt-3">
   <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}"
      class="btn btn-outline-secondary btn-sm">Back to Week</a>
+</div>
+
+{# Print section 2: YTD High Games (flows on same page, print only) #}
+<div class="print-page-2">
+  <div class="row g-2 mt-1">
+    {% for attr, label in [('high_game_scratch','High Game Scratch'),('high_game_hcp','High Game w/ Handicap'),
+                            ('high_series_scratch','High Series Scratch'),('high_series_hcp','High Series w/ Handicap')] %}
+    <div class="col-3">
+      <div class="section-head">{{ label }}</div>
+      <table class="table table-sm table-bordered">
+        <thead class="table-dark"><tr><th>#</th><th>Bowler</th><th class="text-end">Score</th></tr></thead>
+        <tbody>
+          {% for i, r in enumerate(leaders | sort(attribute=attr, reverse=True)) %}
+          {% if i < 10 %}
+          <tr>
+            <td>{{ i+1 }}</td>
+            <td>{{ r.bowler.last_name }}</td>
+            <td class="text-end">{{ r[attr] }}</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+  </div>
 </div>
 {% endblock %}
