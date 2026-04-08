@@ -141,13 +141,19 @@ Install [Homebrew](https://brew.sh) if not already present, then install system 
 
 ```bash
 brew install pango
-sudo ln -sf /opt/homebrew/lib/libgobject-2.0.0.dylib   /usr/local/lib/libgobject-2.0-0.dylib
-sudo ln -sf /opt/homebrew/lib/libpango-1.0.0.dylib      /usr/local/lib/libpango-1.0.0.dylib
-sudo ln -sf /opt/homebrew/lib/libpangocairo-1.0.0.dylib /usr/local/lib/libpangocairo-1.0.0.dylib
-sudo ln -sf /opt/homebrew/lib/libcairo.2.dylib          /usr/local/lib/libcairo.2.dylib
+ln -sf /opt/homebrew/lib/libgobject-2.0.0.dylib    /opt/homebrew/lib/libgobject-2.0-0.dylib
+ln -sf /opt/homebrew/lib/libpango-1.0.0.dylib       /opt/homebrew/lib/libpango-1.0-0.dylib
+ln -sf /opt/homebrew/lib/libpangocairo-1.0.0.dylib  /opt/homebrew/lib/libpangocairo-1.0-0.dylib
+ln -sf /opt/homebrew/lib/libcairo.2.dylib            /opt/homebrew/lib/libcairo-2.dylib
 ```
 
-> **Why symlinks?** WeasyPrint uses Linux library names (e.g. `libgobject-2.0-0`) but macOS Homebrew installs them with different names (e.g. `libgobject-2.0.0.dylib`). Setting `DYLD_LIBRARY_PATH` does not fix this because the filename mismatch means the linker still can't match the name WeasyPrint requests.
+Then add this to your `.env` file (see step 4):
+
+```
+DYLD_LIBRARY_PATH=/opt/homebrew/lib
+```
+
+> **Why both?** WeasyPrint uses Linux-style library names (e.g. `libgobject-2.0-0`) but macOS Homebrew installs them with macOS-style names (e.g. `libgobject-2.0.0.dylib`). The symlinks create the expected names inside `/opt/homebrew/lib`. `DYLD_LIBRARY_PATH` tells macOS's dynamic linker to search that directory — on macOS Sequoia only `/usr/lib` is searched by default, so `/usr/local/lib` symlinks don't work.
 
 Verify Python 3.11 or later is available:
 
