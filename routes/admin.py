@@ -1015,3 +1015,83 @@ def _generate_prizes_pdf(season_id, week_num):
 
     cdn_base = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/'
     return HTML(string=html_str, base_url=cdn_base).write_pdf()
+
+
+# ── Backup & Restore ──────────────────────────────────────────────────────────
+
+@admin_bp.route('/backup')
+def backup_restore():
+    import os
+    from datetime import datetime
+    from pathlib import Path
+    from flask import current_app
+    from config import get_db_path, get_backup_dir
+
+    db_path = get_db_path()
+    backup_dir = get_backup_dir()
+
+    try:
+        db_size_kb = round(os.path.getsize(db_path) / 1024, 1)
+    except OSError:
+        db_size_kb = '?'
+
+    raw = sorted(backup_dir.glob('league-*.db'), reverse=True)
+    backups = []
+    for p in raw:
+        try:
+            size_kb = round(os.path.getsize(p) / 1024, 1)
+            created = datetime.fromtimestamp(p.stat().st_mtime).strftime('%Y-%m-%d %H:%M')
+        except OSError:
+            size_kb, created = '?', '?'
+        backups.append({'filename': p.name, 'size_kb': size_kb, 'created': created})
+
+    return render_template('admin/backup_restore.html',
+                           db_path=db_path,
+                           db_size_kb=db_size_kb,
+                           backup_dir=backup_dir,
+                           backups=backups)
+
+
+@admin_bp.route('/backup/now', methods=['POST'])
+def backup_now():
+    import shutil
+    from datetime import datetime
+    from pathlib import Path
+    from config import get_db_path, get_backup_dir
+
+    db_path = get_db_path()
+    backup_dir = get_backup_dir()
+    stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    dest = backup_dir / f'league-{stamp}.db'
+    try:
+        shutil.copy2(db_path, dest)
+        flash(f'Backup created: {dest.name}', 'success')
+    except Exception as e:
+        flash(f'Backup failed: {e}', 'danger')
+    return redirect(url_for('admin.backup_restore'))
+
+
+@admin_bp.route('/backup/restore/<filename>', methods=['POST'])
+def restore_backup(filename):
+    import shutil
+    from datetime import datetime
+    from pathlib import Path
+    from config import get_db_path, get_backup_dir
+
+    backup_dir = get_backup_dir()
+    src = backup_dir / filename
+    if not src.exists() or not src.is_file():
+        flash('Backup file not found.', 'danger')
+        return redirect(url_for('admin.backup_restore'))
+
+    db_path = get_db_path()
+    # Save a pre-restore snapshot before overwriting
+    stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    pre = backup_dir / f'league-{stamp}-pre-restore.db'
+    try:
+        shutil.copy2(db_path, pre)
+        shutil.copy2(src, db_path)
+        flash(f'Restored from {filename}. Previous DB saved as {pre.name}.', 'success')
+    except Exception as e:
+        flash(f'Restore failed: {e}', 'danger')
+    return redirect(url_for('admin.backup_restore'))
