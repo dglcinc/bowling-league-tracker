@@ -797,13 +797,14 @@ def _get_above_average_bowlers(season_id, week_num, threshold=30):
         prior_avg = prior.get('running_avg') or 0
         if prior_avg == 0:
             continue
-        week_avg = entry.total_pins / entry.game_count
-        if week_avg - prior_avg >= threshold:
+        games = entry.scores  # list of individual game scores
+        best_game = max(games) if games else 0
+        if best_game - prior_avg >= threshold:
             results.append({
                 'bowler': entry.bowler,
-                'week_avg': round(week_avg, 1),
+                'best_game': best_game,
                 'prior_avg': prior_avg,
-                'diff': round(week_avg - prior_avg, 1),
+                'diff': best_game - prior_avg,
             })
     return sorted(results, key=lambda r: r['bowler'].last_name)
 
@@ -869,7 +870,7 @@ def email_compose(season_id, week_num):
             subject = f'[TEST] {subject}'
 
         # Build HTML email body
-        html_body = _build_email_html(body_text, prizes, above_avg, season, week)
+        html_body = _build_email_html(body_text, above_avg, season, week)
 
         # Build optional PDF attachment
         pdf_min_games = int(request.form.get('pdf_min_games', 9) or 9)
@@ -989,27 +990,9 @@ def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
         raise RuntimeError(f'Graph API error {e.code}: {body}')
 
 
-def _build_email_html(body_text, prizes, above_avg, season, week):
+def _build_email_html(body_text, above_avg, season, week):
     """Build the HTML email body from user narrative + auto-generated data."""
     import html as h
-
-    def prize_line(cat, label):
-        if not cat or not cat['winners']:
-            return f'<li>{h.escape(label)}: —</li>'
-        names = ' / '.join(w['bowler'].last_name for w in cat['winners'])
-        tie = ' (tie)' if len(cat['winners']) > 1 else ''
-        return f'<li>{h.escape(label)}: <strong>{h.escape(names)}</strong>{tie} — {cat["score"]}</li>'
-
-    prizes_html = ''
-    if prizes:
-        prizes_html = f'''
-<p><strong>Weekly Prizes:</strong></p>
-<ul>
-  {prize_line(prizes['hg_hcp'],    'High Game — Handicap')}
-  {prize_line(prizes['hg_scratch'],'High Game — Scratch')}
-  {prize_line(prizes['hs_hcp'],    'High Series — Handicap')}
-  {prize_line(prizes['hs_scratch'],'High Series — Scratch')}
-</ul>'''
 
     above_html = ''
     if above_avg:
@@ -1022,7 +1005,6 @@ def _build_email_html(body_text, prizes, above_avg, season, week):
 <p>Ladies and Gentlemen:</p>
 {body_html}
 {above_html}
-{prizes_html}
 </body></html>'''
 
 
