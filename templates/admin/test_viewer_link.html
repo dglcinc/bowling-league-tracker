@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Test Viewer Login — {{ bowler.display_name }}{% endblock %}
+
+{% block content %}
+<h4>Test Viewer Login — {{ bowler.display_name }}</h4>
+<p class="text-muted">
+  Copy the link below and paste it into an <strong>incognito / private window</strong>.
+  This logs you in as {{ bowler.first_name or bowler.last_name }} (viewer) without affecting your current editor session.
+  The link expires in 1 hour.
+</p>
+
+<div class="input-group mb-3" style="max-width:700px">
+  <input type="text" class="form-control font-monospace" id="tokenUrl"
+         value="{{ token_url }}" readonly>
+  <button class="btn btn-outline-secondary" type="button" onclick="copyLink()">Copy</button>
+</div>
+
+<p class="text-muted" style="font-size:0.85rem">
+  Or open it directly in this window (you'll be logged out as editor):
+  <a href="{{ token_url }}">click here</a>
+</p>
+
+<a href="{{ url_for('admin.seasons') }}" class="btn btn-outline-secondary btn-sm">Back to Admin</a>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyLink() {
+  var el = document.getElementById('tokenUrl');
+  el.select();
+  navigator.clipboard.writeText(el.value).then(function() {
+    var btn = el.nextElementSibling;
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+  });
+}
+</script>
+{% endblock %}

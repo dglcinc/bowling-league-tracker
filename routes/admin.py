@@ -3,7 +3,7 @@ Admin routes: season setup, roster management, schedule entry, season rollover.
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings
+from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission
 from datetime import date, timedelta
 import io
 
@@ -113,9 +113,71 @@ def season_detail(season_id):
                      .filter_by(season_id=season_id, is_entered=True)
                      .order_by(Week.week_num.desc())
                      .all())
+    # Build access map: bowler_id → most recent LinkedAccount (for Access column)
+    bowler_ids = [r.bowler_id for r in roster]
+    accounts = LinkedAccount.query.filter(LinkedAccount.bowler_id.in_(bowler_ids)).all()
+    access_map = {}
+    for a in accounts:
+        existing = access_map.get(a.bowler_id)
+        if not existing or (a.last_login and (not existing.last_login or a.last_login > existing.last_login)):
+            access_map[a.bowler_id] = a
     return render_template('admin/season_detail.html',
                            season=season, teams=teams, roster=roster,
-                           entered_weeks=entered_weeks)
+                           entered_weeks=entered_weeks, access_map=access_map)
+
+
+@admin_bp.route('/seasons/<int:season_id>/send-magic-links', methods=['POST'])
+def send_magic_links(season_id):
+    from routes.auth import send_magic_link
+    Season.query.get_or_404(season_id)
+    bowler_ids = request.form.getlist('bowler_ids', type=int)
+    if not bowler_ids:
+        flash('No bowlers selected.', 'warning')
+        return redirect(url_for('admin.season_detail', season_id=season_id))
+
+    settings = db.session.get(LeagueSettings, 1)
+    league_name = settings.league_name if settings else 'League Tracker'
+    is_registration = 'registration' in request.form
+    subject = (f'[{league_name}] App Registration'
+               if is_registration else
+               f'Your sign-in link — {league_name}')
+
+    sent = failed = no_email = 0
+    for bid in bowler_ids:
+        bowler = Bowler.query.get(bid)
+        if not bowler:
+            continue
+        if not bowler.email:
+            no_email += 1
+            continue
+        ok, _ = send_magic_link(bowler, subject=subject)
+        if ok:
+            sent += 1
+        else:
+            failed += 1
+
+    parts = []
+    if sent:
+        parts.append(f'{sent} link(s) sent')
+    if no_email:
+        parts.append(f'{no_email} skipped (no email on file)')
+    if failed:
+        parts.append(f'{failed} failed — check Graph API config')
+    flash(', '.join(parts) + '.', 'success' if not failed else 'warning')
+    return redirect(url_for('admin.season_detail', season_id=season_id))
+
+
+@admin_bp.route('/viewer-access', methods=['GET', 'POST'])
+def viewer_access():
+    if request.method == 'POST':
+        enabled = set(request.form.getlist('enabled'))
+        for perm in ViewerPermission.query.all():
+            perm.viewer_accessible = perm.endpoint in enabled
+        db.session.commit()
+        flash('Viewer access updated.', 'success')
+        return redirect(url_for('admin.viewer_access'))
+    perms = ViewerPermission.query.order_by(ViewerPermission.label).all()
+    return render_template('admin/viewer_access.html', perms=perms)
 
 
 # ---------------------------------------------------------------------------
@@ -231,6 +293,16 @@ def edit_bowler(bowler_id):
         bowler.first_name = request.form.get('first_name', '').strip() or None
         bowler.nickname = request.form.get('nickname', '').strip() or None
         bowler.email = request.form.get('email', '').strip() or None
+
+        new_is_editor = 'is_editor' in request.form
+        if bowler.is_editor and not new_is_editor:
+            editor_count = Bowler.query.filter_by(is_editor=True).count()
+            if editor_count <= 1:
+                flash('Cannot remove editor status — at least one editor must always exist.', 'danger')
+                return redirect(url_for('admin.edit_bowler', bowler_id=bowler_id,
+                                        **({'season_id': season_id} if season_id else {})))
+        bowler.is_editor = new_is_editor
+
         if roster:
             roster.team_id = int(request.form['team_id'])
             roster.prior_handicap = int(request.form.get('prior_handicap') or 0)
@@ -243,6 +315,44 @@ def edit_bowler(bowler_id):
 
     return render_template('admin/edit_bowler.html', bowler=bowler,
                            season=season, roster=roster, teams=teams)
+
+
+@admin_bp.route('/bowlers/<int:bowler_id>/test-login')
+def test_viewer_login(bowler_id):
+    """Create a magic link token and redirect straight to it — no email sent.
+    Editor-only (enforced by before_request). Use in an incognito window to
+    preview the app as a viewer without disturbing your own session."""
+    from routes.auth import send_magic_link as _send
+    import uuid
+    from datetime import datetime, timedelta
+    from models import MagicLinkToken
+
+    bowler = Bowler.query.get_or_404(bowler_id)
+    if bowler.is_editor:
+        flash(f'{bowler.display_name} is an editor — their view is the same as yours. '
+              'Pick a non-editor bowler to test viewer mode.', 'warning')
+        return redirect(request.referrer or url_for('admin.seasons'))
+
+    now = datetime.utcnow()
+    # Invalidate prior unused tokens
+    MagicLinkToken.query.filter_by(bowler_id=bowler.id, used_at=None).update({'used_at': now})
+    token_str = str(uuid.uuid4())
+    db.session.add(MagicLinkToken(
+        token=token_str,
+        bowler_id=bowler.id,
+        expires_at=now + timedelta(hours=1),
+        created_at=now,
+    ))
+    db.session.commit()
+
+    flash(f'Copy this URL into an incognito window to log in as {bowler.display_name} '
+          f'(viewer). The link expires in 1 hour.', 'info')
+    # Redirect to the token URL so clicking it here logs the editor in as that bowler.
+    # Better: show the URL so they can paste it into incognito instead.
+    from flask import request as req, url_for as _url
+    token_url = _url('auth.validate_token', token=token_str, _external=True)
+    return render_template('admin/test_viewer_link.html',
+                           bowler=bowler, token_url=token_url)
 
 
 @admin_bp.route('/seasons/<int:season_id>/roster/<int:roster_id>/toggle', methods=['POST'])

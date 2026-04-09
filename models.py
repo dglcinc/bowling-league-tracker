@@ -5,11 +5,12 @@ All stats are computed on the fly from matchup_entries — nothing derived is st
 
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
 
 db = SQLAlchemy()
 
 
-class Bowler(db.Model):
+class Bowler(UserMixin, db.Model):
     """A person who has ever bowled in the league. Never deleted."""
     __tablename__ = 'bowlers'
 
@@ -18,6 +19,7 @@ class Bowler(db.Model):
     first_name = db.Column(db.String(64))
     nickname = db.Column(db.String(64))
     email = db.Column(db.String(128))
+    is_editor = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     roster_entries = db.relationship('Roster', back_populates='bowler', lazy='dynamic')
@@ -301,6 +303,70 @@ class PayoutConfig(db.Model):
 
     def __repr__(self):
         return f'<PayoutConfig season={self.season_id}>'
+
+
+class LinkedAccount(db.Model):
+    """Tracks how a bowler has authenticated (magic link, Google, etc.)."""
+    __tablename__ = 'linked_accounts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    bowler_id = db.Column(db.Integer, db.ForeignKey('bowlers.id'), nullable=False)
+    auth_method = db.Column(db.String(32), nullable=False)  # 'magic_link', 'google'
+    auth_identifier = db.Column(db.String(256))             # email or OAuth sub
+    last_login = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    bowler = db.relationship('Bowler')
+
+    def __repr__(self):
+        return f'<LinkedAccount bowler={self.bowler_id} method={self.auth_method}>'
+
+
+class MagicLinkToken(db.Model):
+    """Single-use sign-in tokens sent via email."""
+    __tablename__ = 'magic_link_tokens'
+
+    token = db.Column(db.String(36), primary_key=True)  # UUID4 string
+    bowler_id = db.Column(db.Integer, db.ForeignKey('bowlers.id'), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    bowler = db.relationship('Bowler')
+
+    def __repr__(self):
+        return f'<MagicLinkToken bowler={self.bowler_id} used={self.used_at is not None}>'
+
+
+class ViewerPermission(db.Model):
+    """Controls which Flask endpoints non-editor (viewer) users may access."""
+    __tablename__ = 'viewer_permissions'
+
+    endpoint = db.Column(db.String(128), primary_key=True)  # Flask endpoint name
+    label = db.Column(db.String(128), nullable=False)
+    viewer_accessible = db.Column(db.Boolean, default=False)
+
+    def __repr__(self):
+        return f'<ViewerPermission {self.endpoint} accessible={self.viewer_accessible}>'
+
+
+class WebAuthnCredential(db.Model):
+    """Passkey / platform authenticator credential for Touch ID, Face ID, etc."""
+    __tablename__ = 'webauthn_credentials'
+
+    id = db.Column(db.Integer, primary_key=True)
+    bowler_id = db.Column(db.Integer, db.ForeignKey('bowlers.id'), nullable=False)
+    credential_id = db.Column(db.String(512), nullable=False, unique=True)  # base64url-encoded
+    public_key = db.Column(db.LargeBinary, nullable=False)
+    sign_count = db.Column(db.Integer, default=0)
+    device_name = db.Column(db.String(128), default='Passkey')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_used_at = db.Column(db.DateTime)
+
+    bowler = db.relationship('Bowler')
+
+    def __repr__(self):
+        return f'<WebAuthnCredential bowler={self.bowler_id} device={self.device_name}>'
 
 
 class Snapshot(db.Model):

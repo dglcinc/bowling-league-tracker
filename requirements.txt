@@ -1,7 +1,10 @@
 flask>=3.0.0
 flask-sqlalchemy>=3.1.0
+flask-login>=0.6.3
+flask-limiter>=3.5.0
 flask-mail>=0.10.0
 python-dotenv>=1.0.0
 openpyxl>=3.1.0
 weasyprint>=62.0
 msal>=1.29.0
+webauthn>=2.0.0

@@ -42,9 +42,11 @@
     </button>
     <div class="collapse navbar-collapse" id="navMenu">
       <ul class="navbar-nav me-auto">
+        {% if current_user.is_editor %}
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('entry.index') }}">Scores</a>
         </li>
+        {% endif %}
         {% if active_season %}
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('reports.team_points', season_id=active_season.id) }}">Points</a>
@@ -56,21 +58,34 @@
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('reports.week_prizes', season_id=active_season.id, week_num=current_week) }}">Prizes &amp; Standings</a>
         </li>
+        {% if current_user.is_editor %}
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('reports.print_batch', season_id=active_season.id, week_num=current_week) }}">Print Batch</a>
         </li>
+        {% endif %}
         {% endif %}
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('payout.payout_overview', season_id=active_season.id) }}">Payouts</a>
         </li>
         {% endif %}
+        {% if current_user.is_editor %}
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('admin.seasons') }}">Admin</a>
         </li>
+        {% endif %}
       </ul>
       <ul class="navbar-nav ms-auto">
         <li class="nav-item">
-          <button onclick="window.print()" class="btn btn-sm btn-outline-light my-1">Print</button>
+          <a class="nav-link text-light" href="#" id="installAppLink" style="display:none">Install App</a>
+        </li>
+        <li class="nav-item">
+          <button onclick="window.print()" class="btn btn-sm btn-outline-light my-1 me-2">Print</button>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('auth.passkeys') }}">Passkeys</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('auth.logout') }}">Sign out</a>
         </li>
       </ul>
     </div>
@@ -87,10 +102,137 @@
     {% endfor %}
   {% endwith %}
 
+  {% if current_user.is_authenticated and not has_passkey %}
+  <div class="alert alert-info alert-dismissible fade show no-print" id="passkeyBanner" role="alert" style="display:none!important">
+    🔑 <strong>Set up Touch ID / Face ID</strong> for faster sign-in —
+    no email link needed.
+    <button type="button" class="btn btn-sm btn-primary ms-2" id="setupPasskeyBtn">Set up now</button>
+    <span class="text-muted ms-2" style="font-size:0.8rem" id="passkeyHint"></span>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endif %}
+
   {% block content %}{% endblock %}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 {% block extra_js %}{% endblock %}
+<script>
+// Passkey registration banner — shown only when platform authenticator is available
+(function () {
+  var banner = document.getElementById('passkeyBanner');
+  var btn = document.getElementById('setupPasskeyBtn');
+  if (!banner || !btn) return;
+  if (!window.PublicKeyCredential) return;
+  PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (ok) {
+    if (!ok) return;
+    banner.style.removeProperty('display');
+    // Guide Chrome users on Mac to use Safari for direct Touch ID
+    var hint = document.getElementById('passkeyHint');
+    if (hint) {
+      var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      var isMac = /Mac/.test(navigator.userAgent) && !/iPhone|iPad/.test(navigator.userAgent);
+      if (isMac && !isSafari) {
+        hint.textContent = 'Tip: use Safari for direct Touch ID — Chrome may show extra options first.';
+      }
+    }
+
+    function b64urlToBuffer(b64url) {
+      var base64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+      while (base64.length % 4) base64 += '=';
+      var binary = atob(base64);
+      var buf = new ArrayBuffer(binary.length);
+      var view = new Uint8Array(buf);
+      for (var i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+      return buf;
+    }
+    function bufferToB64url(buf) {
+      var bytes = new Uint8Array(buf);
+      var binary = '';
+      for (var i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      btn.textContent = 'Setting up…';
+
+      fetch('/auth/webauthn/register/begin', {method: 'POST'})
+      .then(function (r) { return r.json(); })
+      .then(function (opts) {
+        if (opts.error) throw new Error(opts.error);
+        opts.challenge = b64urlToBuffer(opts.challenge);
+        opts.user.id   = b64urlToBuffer(opts.user.id);
+        if (opts.excludeCredentials) {
+          opts.excludeCredentials = opts.excludeCredentials.map(function (c) {
+            return Object.assign({}, c, {id: b64urlToBuffer(c.id)});
+          });
+        }
+        return navigator.credentials.create({publicKey: opts});
+      })
+      .then(function (cred) {
+        if (!cred) throw new Error('Cancelled');
+        var payload = {
+          device_name: (navigator.userAgent.indexOf('iPhone') > -1 || navigator.userAgent.indexOf('iPad') > -1)
+            ? 'iPhone / iPad' : (navigator.userAgent.indexOf('Mac') > -1 ? 'Mac' : 'Device'),
+          id: cred.id,
+          rawId: bufferToB64url(cred.rawId),
+          type: cred.type,
+          response: {
+            attestationObject: bufferToB64url(cred.response.attestationObject),
+            clientDataJSON:    bufferToB64url(cred.response.clientDataJSON),
+          },
+        };
+        return fetch('/auth/webauthn/register/complete', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload),
+        }).then(function (r) { return r.json(); });
+      })
+      .then(function (result) {
+        if (result && result.ok) {
+          banner.classList.remove('alert-info');
+          banner.classList.add('alert-success');
+          banner.innerHTML = '✅ Passkey set up! You can now sign in with Touch ID / Face ID. <button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+        } else {
+          throw new Error((result && result.error) || 'Setup failed');
+        }
+      })
+      .catch(function (err) {
+        if (err && err.name !== 'NotAllowedError') {
+          banner.classList.remove('alert-info');
+          banner.classList.add('alert-warning');
+          banner.innerHTML = '⚠️ Passkey setup failed: ' + err.message + ' <button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Set up now';
+        }
+      });
+    });
+  });
+})();
+</script>
+<script>
+// PWA install prompt — Android/desktop only (iOS requires manual Add to Home Screen)
+(function () {
+  if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) return;
+  var deferredPrompt;
+  var installLink = document.getElementById('installAppLink');
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (installLink) installLink.style.display = '';
+  });
+  if (installLink) {
+    installLink.addEventListener('click', function (e) {
+      e.preventDefault();
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function () { deferredPrompt = null; installLink.style.display = 'none'; });
+      }
+    });
+  }
+})();
+</script>
 </body>
 </html>

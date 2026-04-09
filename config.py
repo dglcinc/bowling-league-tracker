@@ -4,6 +4,7 @@ DB is stored in OneDrive for automatic backup.
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 
@@ -52,6 +53,20 @@ class Config:
     GRAPH_CLIENT_ID      = os.environ.get("GRAPH_CLIENT_ID", "")
     GRAPH_CLIENT_SECRET  = os.environ.get("GRAPH_CLIENT_SECRET", "")
     GRAPH_SENDER_EMAIL   = os.environ.get("GRAPH_SENDER_EMAIL", "")
+
+    # Auth / session
+    REMEMBER_COOKIE_DURATION = timedelta(days=30)
+    REMEMBER_COOKIE_SECURE = os.environ.get("REMEMBER_COOKIE_SECURE", "false").lower() == "true"
+    REMEMBER_COOKIE_HTTPONLY = True
+
+    # Cloudflare Turnstile CAPTCHA (leave blank to skip verification in dev)
+    TURNSTILE_SITE_KEY   = os.environ.get("TURNSTILE_SITE_KEY", "")
+    TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
+
+    # WebAuthn / Passkeys (Touch ID, Face ID, Windows Hello)
+    WEBAUTHN_RP_ID   = os.environ.get("WEBAUTHN_RP_ID",   "localhost")
+    WEBAUTHN_RP_NAME = os.environ.get("WEBAUTHN_RP_NAME", "League Tracker")
+    WEBAUTHN_ORIGIN  = os.environ.get("WEBAUTHN_ORIGIN",  "http://localhost:5001")
 
     # Outbound email via Exchange SMTP (legacy fallback — not recommended)
     MAIL_SERVER          = os.environ.get("MAIL_SERVER",  "smtp.office365.com")

@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign In — League Tracker</title>
+  <meta name="theme-color" content="#1b3a6b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Bowl Tracker">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  {% if turnstile_site_key %}
+  <script src="https://challenges.cloudflare.com/turnstile/v1/api.js" async defer></script>
+  {% endif %}
+  <style>
+    .or-divider { display:flex; align-items:center; gap:.75rem; color:#999; font-size:.85rem; margin:1rem 0; }
+    .or-divider::before, .or-divider::after { content:''; flex:1; border-top:1px solid #dee2e6; }
+  </style>
+  <style>
+    body { background: #f0f4f8; }
+    .login-card { max-width: 420px; margin: 60px auto 0; }
+    .brand-header {
+      background: #1b3a6b; color: #fff;
+      padding: 1.25rem 1.5rem;
+      border-radius: 0.5rem 0.5rem 0 0;
+      text-align: center;
+    }
+    .brand-header h1 { font-size: 1.4rem; margin: 0; }
+    .brand-header p  { margin: 0.25rem 0 0; opacity: 0.8; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+<div class="login-card">
+  <div class="brand-header">
+    <h1>🎳 League Tracker</h1>
+    <p>Mountain Lakes Men's Bowling League</p>
+  </div>
+  <div class="card border-top-0 rounded-top-0">
+    <div class="card-body p-4">
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} py-2">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <p class="text-muted mb-3" style="font-size:0.9rem">
+        Enter your email address and we'll send you a sign-in link.
+      </p>
+
+      <form method="post">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Email address</label>
+          <input type="email" name="email" class="form-control" required
+                 placeholder="you@example.com" autocomplete="email">
+        </div>
+
+        {% if turnstile_site_key %}
+        <div class="mb-3">
+          <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}"></div>
+        </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary w-100">Send me a sign-in link</button>
+      </form>
+
+      <div class="or-divider" id="passkeyDivider" style="display:none!important">or</div>
+      <button type="button" class="btn btn-outline-secondary w-100 mb-2"
+              id="passkeyBtn" style="display:none">
+        🔑 Sign in with Passkey (Touch ID / Face ID)
+      </button>
+      <div id="passkeyError" class="alert alert-danger py-2" style="display:none"></div>
+
+      <p class="mt-3 mb-0 text-muted" style="font-size:0.85rem">
+        Not registered? Contact the league manager to get access.
+      </p>
+    </div>
+  </div>
+
+  <!-- Install instructions (collapsible) -->
+  <div class="card mt-3">
+    <div class="card-header py-2" style="cursor:pointer" data-bs-toggle="collapse"
+         data-bs-target="#installHelp">
+      <small class="text-muted">📱 How to install this app on your phone</small>
+    </div>
+    <div class="collapse" id="installHelp">
+      <div class="card-body" style="font-size:0.85rem">
+
+        <div id="installIos">
+          <p class="fw-bold mb-1">iPhone / iPad <span class="text-danger">(Safari only)</span></p>
+          <ol class="mb-3">
+            <li>Open this page in <strong>Safari</strong> — not Chrome or Firefox</li>
+            <li>Tap the <strong>Share</strong> button at the bottom of the screen</li>
+            <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+            <li>Tap <strong>Add</strong> — the app icon appears on your home screen</li>
+          </ol>
+          <p class="text-muted mb-3" style="font-size:0.8rem">
+            iOS only supports installing web apps from Safari. Chrome and Firefox on iPhone do not have this option.
+          </p>
+        </div>
+
+        <div id="installAndroid">
+          <p class="fw-bold mb-1">Android (Chrome)</p>
+          <ol class="mb-3">
+            <li>Open this page in <strong>Chrome</strong></li>
+            <li>Tap the <strong>three-dot menu</strong> (⋮) in the top right</li>
+            <li>Tap <strong>"Add to Home Screen"</strong> or <strong>"Install app"</strong></li>
+            <li>Tap <strong>Add</strong> or <strong>Install</strong></li>
+          </ol>
+        </div>
+
+        <div id="installDesktop">
+          <p class="fw-bold mb-1">Desktop (Chrome or Edge)</p>
+          <ol class="mb-0">
+            <li>Look for the <strong>install icon</strong> (⊕) in the address bar</li>
+            <li>Click it and select <strong>Install</strong></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Hide install instructions that don't apply to this device
+(function () {
+  var ua = navigator.userAgent;
+  var isIos     = /iPhone|iPad|iPod/.test(ua);
+  var isAndroid = /Android/.test(ua);
+  var isDesktop = !isIos && !isAndroid;
+  if (!isIos)     document.getElementById('installIos').style.display     = 'none';
+  if (!isAndroid) document.getElementById('installAndroid').style.display = 'none';
+  if (!isDesktop) document.getElementById('installDesktop').style.display = 'none';
+  // Update the card header text to match
+  var hdr = document.querySelector('[data-bs-target="#installHelp"] small');
+  if (hdr) {
+    if (isIos)     hdr.textContent = '📱 How to install this app on your iPhone / iPad';
+    if (isAndroid) hdr.textContent = '📱 How to install this app on your Android';
+    if (isDesktop) hdr.textContent = '💻 How to install this app on your computer';
+  }
+})();
+</script>
+<script>
+(function () {
+  // Only show passkey button if the browser supports WebAuthn platform authenticators
+  if (!window.PublicKeyCredential) return;
+  PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (available) {
+    if (!available) return;
+    document.getElementById('passkeyBtn').style.display = '';
+    document.getElementById('passkeyDivider').style.removeProperty('display');
+  });
+
+  // base64url helpers — add padding so atob() is happy with unpadded strings
+  function b64urlToBuffer(b64url) {
+    var base64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) base64 += '=';
+    var binary = atob(base64);
+    var buf = new ArrayBuffer(binary.length);
+    var view = new Uint8Array(buf);
+    for (var i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+    return buf;
+  }
+  function bufferToB64url(buf) {
+    var bytes = new Uint8Array(buf);
+    var binary = '';
+    for (var i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  }
+
+  function showError(msg) {
+    var el = document.getElementById('passkeyError');
+    el.textContent = msg;
+    el.style.display = '';
+  }
+
+  document.getElementById('passkeyBtn').addEventListener('click', function () {
+    var email = document.querySelector('input[name="email"]').value.trim();
+    document.getElementById('passkeyError').style.display = 'none';
+
+    // Step 1: get authentication options from server
+    fetch('/auth/webauthn/authenticate/begin', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email: email}),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (opts) {
+      if (opts.error) { showError(opts.error); return; }
+
+      // Convert base64url fields to ArrayBuffers
+      opts.challenge = b64urlToBuffer(opts.challenge);
+      if (opts.allowCredentials) {
+        opts.allowCredentials = opts.allowCredentials.map(function (c) {
+          // include transports hint so browser prefers the internal (platform) authenticator
+          return Object.assign({}, c, {id: b64urlToBuffer(c.id), transports: ['internal']});
+        });
+      }
+
+      // Step 2: browser prompts Touch ID / Face ID
+      return navigator.credentials.get({publicKey: opts});
+    })
+    .then(function (assertion) {
+      if (!assertion) return;
+
+      // Step 3: send result to server
+      var payload = {
+        id: assertion.id,
+        rawId: bufferToB64url(assertion.rawId),
+        type: assertion.type,
+        response: {
+          authenticatorData: bufferToB64url(assertion.response.authenticatorData),
+          clientDataJSON:    bufferToB64url(assertion.response.clientDataJSON),
+          signature:         bufferToB64url(assertion.response.signature),
+          userHandle: assertion.response.userHandle
+            ? bufferToB64url(assertion.response.userHandle) : null,
+        },
+      };
+
+      return fetch('/auth/webauthn/authenticate/complete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      }).then(function (r) { return r.json(); });
+    })
+    .then(function (result) {
+      if (!result) return;
+      if (result.error) { showError(result.error); return; }
+      if (result.ok) window.location.href = result.redirect || '/';
+    })
+    .catch(function (err) {
+      // User cancelled the prompt — don't show an error
+      if (err && err.name !== 'NotAllowedError') showError('Sign-in failed: ' + err.message);
+    });
+  });
+})();
+</script>
+</body>
+</html>
