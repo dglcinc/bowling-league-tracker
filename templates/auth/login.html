@@ -86,36 +86,61 @@
     <div class="collapse" id="installHelp">
       <div class="card-body" style="font-size:0.85rem">
 
-        <p class="fw-bold mb-1">iPhone / iPad <span class="text-danger">(Safari only)</span></p>
-        <ol class="mb-3">
-          <li>Open this page in <strong>Safari</strong> — not Chrome or Firefox</li>
-          <li>Tap the <strong>Share</strong> button at the bottom of the screen</li>
-          <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
-          <li>Tap <strong>Add</strong> — the app icon appears on your home screen</li>
-        </ol>
-        <p class="text-muted mb-3" style="font-size:0.8rem">
-          iOS only supports installing web apps from Safari. Chrome and Firefox on iPhone do not have this option.
-        </p>
+        <div id="installIos">
+          <p class="fw-bold mb-1">iPhone / iPad <span class="text-danger">(Safari only)</span></p>
+          <ol class="mb-3">
+            <li>Open this page in <strong>Safari</strong> — not Chrome or Firefox</li>
+            <li>Tap the <strong>Share</strong> button at the bottom of the screen</li>
+            <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+            <li>Tap <strong>Add</strong> — the app icon appears on your home screen</li>
+          </ol>
+          <p class="text-muted mb-3" style="font-size:0.8rem">
+            iOS only supports installing web apps from Safari. Chrome and Firefox on iPhone do not have this option.
+          </p>
+        </div>
 
-        <p class="fw-bold mb-1">Android (Chrome)</p>
-        <ol class="mb-3">
-          <li>Open this page in <strong>Chrome</strong></li>
-          <li>Tap the <strong>three-dot menu</strong> (⋮) in the top right</li>
-          <li>Tap <strong>"Add to Home Screen"</strong> or <strong>"Install app"</strong></li>
-          <li>Tap <strong>Add</strong> or <strong>Install</strong></li>
-        </ol>
+        <div id="installAndroid">
+          <p class="fw-bold mb-1">Android (Chrome)</p>
+          <ol class="mb-3">
+            <li>Open this page in <strong>Chrome</strong></li>
+            <li>Tap the <strong>three-dot menu</strong> (⋮) in the top right</li>
+            <li>Tap <strong>"Add to Home Screen"</strong> or <strong>"Install app"</strong></li>
+            <li>Tap <strong>Add</strong> or <strong>Install</strong></li>
+          </ol>
+        </div>
 
-        <p class="fw-bold mb-1">Desktop (Chrome or Edge)</p>
-        <ol class="mb-0">
-          <li>Look for the <strong>install icon</strong> (⊕) in the address bar</li>
-          <li>Click it and select <strong>Install</strong></li>
-        </ol>
+        <div id="installDesktop">
+          <p class="fw-bold mb-1">Desktop (Chrome or Edge)</p>
+          <ol class="mb-0">
+            <li>Look for the <strong>install icon</strong> (⊕) in the address bar</li>
+            <li>Click it and select <strong>Install</strong></li>
+          </ol>
+        </div>
       </div>
     </div>
   </div>
 
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Hide install instructions that don't apply to this device
+(function () {
+  var ua = navigator.userAgent;
+  var isIos     = /iPhone|iPad|iPod/.test(ua);
+  var isAndroid = /Android/.test(ua);
+  var isDesktop = !isIos && !isAndroid;
+  if (!isIos)     document.getElementById('installIos').style.display     = 'none';
+  if (!isAndroid) document.getElementById('installAndroid').style.display = 'none';
+  if (!isDesktop) document.getElementById('installDesktop').style.display = 'none';
+  // Update the card header text to match
+  var hdr = document.querySelector('[data-bs-target="#installHelp"] small');
+  if (hdr) {
+    if (isIos)     hdr.textContent = '📱 How to install this app on your iPhone / iPad';
+    if (isAndroid) hdr.textContent = '📱 How to install this app on your Android';
+    if (isDesktop) hdr.textContent = '💻 How to install this app on your computer';
+  }
+})();
+</script>
 <script>
 (function () {
   // Only show passkey button if the browser supports WebAuthn platform authenticators
