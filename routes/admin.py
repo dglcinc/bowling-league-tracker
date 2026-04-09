@@ -1010,7 +1010,7 @@ def _build_email_html(body_text, above_avg, season, week):
 
         block = ''
         for g in groups:
-            block += f"<strong>{h.escape(g['team'].name)}:</strong><br>"
+            block += f"<br><strong>{h.escape(g['team'].name)}:</strong><br>"
             for r in g['bowlers']:
                 name = h.escape(r['bowler'].nickname or r['bowler'].last_name)
                 scores = '/'.join(str(s) for s in r['games'])
