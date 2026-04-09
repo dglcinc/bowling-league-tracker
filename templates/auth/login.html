@@ -9,6 +9,9 @@
   <meta name="apple-mobile-web-app-title" content="Bowl Tracker">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  {% if turnstile_site_key %}
+  <script src="https://challenges.cloudflare.com/turnstile/v1/api.js" async defer></script>
+  {% endif %}
   <style>
     body { background: #f0f4f8; }
     .login-card { max-width: 420px; margin: 60px auto 0; }
@@ -37,8 +40,28 @@
         {% endfor %}
       {% endwith %}
 
-      <p class="text-muted mb-0" style="font-size:0.95rem">
-        To access this app, contact the league manager — you'll receive an email with a sign-in link.
+      <p class="text-muted mb-3" style="font-size:0.9rem">
+        Enter your email address and we'll send you a sign-in link.
+      </p>
+
+      <form method="post">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Email address</label>
+          <input type="email" name="email" class="form-control" required
+                 placeholder="you@example.com" autocomplete="email">
+        </div>
+
+        {% if turnstile_site_key %}
+        <div class="mb-3">
+          <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}"></div>
+        </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary w-100">Send me a sign-in link</button>
+      </form>
+
+      <p class="mt-3 mb-0 text-muted" style="font-size:0.85rem">
+        Not registered? Contact the league manager to get access.
       </p>
     </div>
   </div>

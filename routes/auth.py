@@ -106,11 +106,41 @@ def send_magic_link(bowler, subject=None):
 # Routes
 # ---------------------------------------------------------------------------
 
-@auth_bp.route('/login')
+@auth_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit('5 per 15 minutes', methods=['POST'])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
-    return render_template('auth/login.html')
+
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+
+        # Verify Turnstile CAPTCHA
+        if not _verify_turnstile(request.form.get('cf-turnstile-response', '')):
+            flash('Security check failed. Please try again.', 'danger')
+            return redirect(url_for('auth.login'))
+
+        bowler = Bowler.query.filter(
+            db.func.lower(Bowler.email) == email
+        ).first()
+
+        if bowler:
+            # Per-email cooldown: suppress if a token was issued in the last 10 minutes
+            cutoff = datetime.utcnow() - timedelta(minutes=10)
+            recent = MagicLinkToken.query.filter(
+                MagicLinkToken.bowler_id == bowler.id,
+                MagicLinkToken.created_at >= cutoff,
+            ).first()
+            if not recent:
+                send_magic_link(bowler)
+
+        # Generic response — never confirm whether the email is registered
+        flash("If your email is registered, you'll receive a sign-in link shortly. "
+              "Check your inbox (and spam folder).", 'info')
+        return redirect(url_for('auth.login'))
+
+    site_key = current_app.config.get('TURNSTILE_SITE_KEY', '')
+    return render_template('auth/login.html', turnstile_site_key=site_key)
 
 
 @auth_bp.route('/magic/<token>')
