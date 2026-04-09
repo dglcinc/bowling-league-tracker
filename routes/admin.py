@@ -797,7 +797,7 @@ def _get_above_average_bowlers(season_id, week_num, threshold=30):
         prior_avg = prior.get('running_avg') or 0
         if prior_avg == 0:
             continue
-        games = entry.scores  # list of individual game scores
+        games = entry.all_games  # list of individual game scores
         best_game = max(games) if games else 0
         if best_game - prior_avg >= threshold:
             results.append({
