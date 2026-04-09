@@ -1020,7 +1020,6 @@ def _build_email_html(body_text, above_avg, season, week):
     body_html = body_text.replace('\n', '<br>\n') if body_text else ''
 
     return f'''<html><body style="font-family:Arial,sans-serif;font-size:14px">
-<p>Ladies and Gentlemen:</p>
 {body_html}
 {above_html}
 </body></html>'''
