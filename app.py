@@ -9,10 +9,12 @@ import time
 from dotenv import load_dotenv
 load_dotenv()  # loads .env from project root before Config reads os.environ
 
-from flask import Flask, redirect, url_for
+from flask import Flask, redirect, url_for, abort, render_template
+from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config
 from models import db
 from flask_mail import Mail
+from extensions import login_manager, limiter
 
 mail = Mail()
 
@@ -45,6 +47,17 @@ def _do_backup(app):
         pass  # never let backup errors surface to the user
 
 
+_VIEWER_DEFAULTS = [
+    ('reports.wkly_alpha',    'Weekly Alpha',        True),
+    ('reports.bowler_detail', 'Bowler Stats',        True),
+    ('reports.team_points',   'Points',              True),
+    ('reports.ytd_alpha',     'YTD Alpha',           True),
+    ('reports.week_prizes',   'Prizes & Standings',  True),
+    ('payout.payout_overview','Payout',              True),
+    ('reports.print_batch',   'Print Batch',         False),
+]
+
+
 def _migrate_db(db):
     """Add new columns to existing tables without dropping data."""
     from sqlalchemy import text
@@ -62,6 +75,9 @@ def _migrate_db(db):
         "ALTER TABLE payout_configs ADD COLUMN team_award_pcts_json TEXT DEFAULT '[40, 40, 20]'",
         "ALTER TABLE payout_configs ADD COLUMN team_place_pcts_json TEXT DEFAULT '[[35,25,20,20],[35,25,20,20],[60,40]]'",
         "ALTER TABLE payout_configs ADD COLUMN championship_start_week INTEGER DEFAULT 20",
+        # Auth
+        "ALTER TABLE bowlers ADD COLUMN is_editor BOOLEAN DEFAULT 0",
+        "UPDATE bowlers SET is_editor = 1 WHERE id = 34",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:
@@ -69,7 +85,18 @@ def _migrate_db(db):
                 conn.execute(text(sql))
                 conn.commit()
             except Exception:
-                pass  # column already exists
+                pass  # column already exists or constraint satisfied
+
+    # Seed viewer_permissions defaults (idempotent)
+    from models import ViewerPermission
+    for endpoint, label, accessible in _VIEWER_DEFAULTS:
+        if not ViewerPermission.query.get(endpoint):
+            db.session.add(ViewerPermission(
+                endpoint=endpoint,
+                label=label,
+                viewer_accessible=accessible,
+            ))
+    db.session.commit()
 
     # Backfill post-season tournament weeks for seasons that only have regular weeks
     from models import Season, Week
@@ -99,10 +126,20 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
+    # Trust proxy headers from Caddy so url_for(_external=True) uses https://
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
     db.init_app(app)
     mail.init_app(app)
+    login_manager.init_app(app)
+    limiter.init_app(app)
 
     app.jinja_env.globals['enumerate'] = enumerate
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        from models import Bowler
+        return db.session.get(Bowler, int(user_id))
 
     with app.app_context():
         db.create_all()
@@ -116,15 +153,53 @@ def create_app():
         _do_backup(app)
 
     # Register blueprints
+    from routes.auth import auth_bp
     from routes.admin import admin_bp
     from routes.entry import entry_bp
     from routes.reports import reports_bp
     from routes.payout import payout_bp
 
+    app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(entry_bp, url_prefix='/entry')
     app.register_blueprint(reports_bp, url_prefix='/reports')
     app.register_blueprint(payout_bp, url_prefix='/payout')
+
+    # Global auth enforcement — runs before every request
+    @app.before_request
+    def check_auth():
+        from flask import request as req
+        from flask_login import current_user
+        from models import ViewerPermission
+
+        ep = req.endpoint
+
+        # Let Flask serve static files and handle missing routes without interference
+        if ep is None or ep == 'static':
+            return
+
+        # Auth routes are always public
+        if ep.startswith('auth.'):
+            return
+
+        # Require login for everything else
+        if not current_user.is_authenticated:
+            return redirect(url_for('auth.login', next=req.url))
+
+        # Editors have full access
+        if current_user.is_editor:
+            return
+
+        # Viewers: check the permissions table
+        perm = ViewerPermission.query.get(ep)
+        if perm and perm.viewer_accessible:
+            return
+
+        abort(403)
+
+    @app.errorhandler(403)
+    def forbidden(e):
+        return render_template('errors/403.html'), 403
 
     @app.context_processor
     def inject_globals():

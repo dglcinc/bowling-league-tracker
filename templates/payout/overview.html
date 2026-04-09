@@ -4,6 +4,7 @@
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
   <h4 class="mb-0">Payouts — {{ season.name }} through Week {{ through_week }}</h4>
+  {% if current_user.is_editor %}
   <div class="d-flex gap-2">
     <a href="{{ url_for('payout.payout_config', season_id=season.id) }}"
        class="btn btn-outline-secondary btn-sm">Payout Config</a>
@@ -12,6 +13,7 @@
        class="btn btn-primary btn-sm">Payout Summary</a>
     {% endif %}
   </div>
+  {% endif %}
 </div>
 
 {# YTD prize totals per bowler #}

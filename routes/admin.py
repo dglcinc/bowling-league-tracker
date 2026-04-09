@@ -3,7 +3,7 @@ Admin routes: season setup, roster management, schedule entry, season rollover.
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings
+from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission
 from datetime import date, timedelta
 import io
 
@@ -113,9 +113,64 @@ def season_detail(season_id):
                      .filter_by(season_id=season_id, is_entered=True)
                      .order_by(Week.week_num.desc())
                      .all())
+    # Build access map: bowler_id → most recent LinkedAccount (for Access column)
+    bowler_ids = [r.bowler_id for r in roster]
+    accounts = LinkedAccount.query.filter(LinkedAccount.bowler_id.in_(bowler_ids)).all()
+    access_map = {}
+    for a in accounts:
+        existing = access_map.get(a.bowler_id)
+        if not existing or (a.last_login and (not existing.last_login or a.last_login > existing.last_login)):
+            access_map[a.bowler_id] = a
     return render_template('admin/season_detail.html',
                            season=season, teams=teams, roster=roster,
-                           entered_weeks=entered_weeks)
+                           entered_weeks=entered_weeks, access_map=access_map)
+
+
+@admin_bp.route('/seasons/<int:season_id>/send-magic-links', methods=['POST'])
+def send_magic_links(season_id):
+    from routes.auth import send_magic_link
+    Season.query.get_or_404(season_id)
+    bowler_ids = request.form.getlist('bowler_ids', type=int)
+    if not bowler_ids:
+        flash('No bowlers selected.', 'warning')
+        return redirect(url_for('admin.season_detail', season_id=season_id))
+
+    sent = failed = no_email = 0
+    for bid in bowler_ids:
+        bowler = Bowler.query.get(bid)
+        if not bowler:
+            continue
+        if not bowler.email:
+            no_email += 1
+            continue
+        ok, _ = send_magic_link(bowler)
+        if ok:
+            sent += 1
+        else:
+            failed += 1
+
+    parts = []
+    if sent:
+        parts.append(f'{sent} link(s) sent')
+    if no_email:
+        parts.append(f'{no_email} skipped (no email on file)')
+    if failed:
+        parts.append(f'{failed} failed — check Graph API config')
+    flash(', '.join(parts) + '.', 'success' if not failed else 'warning')
+    return redirect(url_for('admin.season_detail', season_id=season_id))
+
+
+@admin_bp.route('/viewer-access', methods=['GET', 'POST'])
+def viewer_access():
+    if request.method == 'POST':
+        enabled = set(request.form.getlist('enabled'))
+        for perm in ViewerPermission.query.all():
+            perm.viewer_accessible = perm.endpoint in enabled
+        db.session.commit()
+        flash('Viewer access updated.', 'success')
+        return redirect(url_for('admin.viewer_access'))
+    perms = ViewerPermission.query.order_by(ViewerPermission.label).all()
+    return render_template('admin/viewer_access.html', perms=perms)
 
 
 # ---------------------------------------------------------------------------
@@ -231,6 +286,16 @@ def edit_bowler(bowler_id):
         bowler.first_name = request.form.get('first_name', '').strip() or None
         bowler.nickname = request.form.get('nickname', '').strip() or None
         bowler.email = request.form.get('email', '').strip() or None
+
+        new_is_editor = 'is_editor' in request.form
+        if bowler.is_editor and not new_is_editor:
+            editor_count = Bowler.query.filter_by(is_editor=True).count()
+            if editor_count <= 1:
+                flash('Cannot remove editor status — at least one editor must always exist.', 'danger')
+                return redirect(url_for('admin.edit_bowler', bowler_id=bowler_id,
+                                        **({'season_id': season_id} if season_id else {})))
+        bowler.is_editor = new_is_editor
+
         if roster:
             roster.team_id = int(request.form['team_id'])
             roster.prior_handicap = int(request.form.get('prior_handicap') or 0)

@@ -58,14 +58,27 @@
 </div>
 
 <h5>Roster ({{ roster|selectattr('active')|list|length }} active, {{ roster|rejectattr('active')|list|length }} inactive)</h5>
+
+<form method="post" action="{{ url_for('admin.send_magic_links', season_id=season.id) }}" id="rosterForm">
+<div class="mb-2">
+  <button type="submit" class="btn btn-sm btn-outline-primary"
+          onclick="return document.querySelectorAll('[name=bowler_ids]:checked').length > 0 || (alert('Select at least one bowler.'), false)">
+    Send Magic Link to Selected
+  </button>
+  <button type="button" class="btn btn-sm btn-outline-secondary ms-1"
+          onclick="document.querySelectorAll('[name=bowler_ids]').forEach(function(cb){cb.checked=!cb.checked})">
+    Toggle All
+  </button>
+</div>
 <table class="table table-sm table-hover">
   <thead>
     <tr>
+      <th style="width:32px"></th>
       <th>Name</th>
       <th>First</th>
       <th>Nickname</th>
       <th>Team</th>
-      <th>Email</th>
+      <th>Email / Access</th>
       <th class="text-end">Prior Hcp</th>
       <th class="text-end">Joined Wk</th>
       <th>Status</th>
@@ -75,14 +88,33 @@
   <tbody>
     {% for r in roster %}
     <tr class="{{ '' if r.active else 'text-muted' }}">
-      <td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler_id) }}">{{ r.bowler.last_name }}</a></td>
+      <td>
+        {% if r.bowler.email %}
+        <input type="checkbox" name="bowler_ids" value="{{ r.bowler_id }}" class="form-check-input">
+        {% endif %}
+      </td>
+      <td>
+        <a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler_id) }}">{{ r.bowler.last_name }}</a>
+        {% if r.bowler.is_editor %}
+        <span class="badge bg-danger ms-1" style="font-size:0.65rem">Editor</span>
+        {% endif %}
+      </td>
       <td>{{ r.bowler.first_name or '' }}</td>
       <td>{{ r.bowler.nickname or '' }}</td>
       <td>{{ r.team.name }}</td>
       <td>
         {% if r.bowler.email %}
           <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id, season_id=season.id) }}"
-             class="text-decoration-none font-monospace" style="font-size:0.8rem">{{ r.bowler.email }}</a>
+             class="text-decoration-none font-monospace" style="font-size:0.75rem">{{ r.bowler.email }}</a>
+          {% set acct = access_map.get(r.bowler_id) %}
+          {% if acct %}
+          <br><span class="text-muted" style="font-size:0.7rem">
+            {{ acct.auth_method | replace('_', ' ') | title }}
+            — {{ acct.last_login.strftime('%b %d') if acct.last_login else 'never' }}
+          </span>
+          {% else %}
+          <br><span class="text-muted" style="font-size:0.7rem">— no access yet</span>
+          {% endif %}
         {% else %}
           <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id, season_id=season.id) }}"
              class="text-muted" style="font-size:0.8rem">— add email</a>
@@ -114,4 +146,5 @@
     {% endfor %}
   </tbody>
 </table>
+</form>
 {% endblock %}
