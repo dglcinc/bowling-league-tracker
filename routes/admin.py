@@ -837,7 +837,7 @@ def email_compose(season_id, week_num):
     standings = get_team_standings(season_id, through_week=week_num)
 
     week_date_str = week.date.strftime('%B %d, %Y') if week.date else f'Week {week_num}'
-    default_subject = f'{league_name} - Week {week_num} Standings'
+    default_subject = f'{league_name} Standings -- Week {week_num}'
 
     if request.method == 'POST':
         subject = request.form.get('subject', default_subject).strip()
