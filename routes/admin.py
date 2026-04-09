@@ -785,12 +785,6 @@ def _get_above_average_bowlers(season_id, week_num, threshold=30):
                .filter(MatchupEntry.bowler_id.isnot(None))
                .all())
     from calculations import get_bowler_stats
-    import sys
-    print(f"\n--- _get_above_average_bowlers season={season_id} week={week_num} ---", file=sys.stderr)
-    print(f"  raw entries found: {len(entries)}", file=sys.stderr)
-    for e in entries:
-        print(f"  entry id={e.id} bowler_id={e.bowler_id} name={e.bowler.last_name if e.bowler else '?'} "
-              f"week_num={e.week_num} games={e.games_night1} game_count={e.game_count}", file=sys.stderr)
     results = []
     seen = set()
     for entry in entries:
@@ -806,7 +800,6 @@ def _get_above_average_bowlers(season_id, week_num, threshold=30):
         games = entry.games_night1  # standard 3-game series only
         best_game = max(games) if games else 0
         diff = best_game - prior_avg
-        print(f"  checking {entry.bowler.last_name}: best_game={best_game} prior_avg={prior_avg} diff={diff}", file=sys.stderr)
         if diff >= threshold:
             results.append({
                 'bowler': entry.bowler,
@@ -817,7 +810,6 @@ def _get_above_average_bowlers(season_id, week_num, threshold=30):
                 'prior_avg': prior_avg,
                 'diff': diff,
             })
-    print(f"  qualifiers: {[r['bowler'].last_name for r in results]}", file=sys.stderr)
     return sorted(results, key=lambda r: r['bowler'].last_name)
 
 
