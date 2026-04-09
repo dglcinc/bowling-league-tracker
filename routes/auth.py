@@ -205,8 +205,9 @@ def logout():
 def webauthn_register_begin():
     from webauthn import generate_registration_options, options_to_json
     from webauthn.helpers.structs import (
-        AuthenticatorSelectionCriteria, ResidentKeyRequirement,
-        UserVerificationRequirement, PublicKeyCredentialDescriptor,
+        AuthenticatorSelectionCriteria, AuthenticatorAttachment,
+        ResidentKeyRequirement, UserVerificationRequirement,
+        PublicKeyCredentialDescriptor,
     )
     from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
 
@@ -223,6 +224,7 @@ def webauthn_register_begin():
         user_name=current_user.email or str(current_user.id),
         user_display_name=current_user.display_name,
         authenticator_selection=AuthenticatorSelectionCriteria(
+            authenticator_attachment=AuthenticatorAttachment.PLATFORM,
             resident_key=ResidentKeyRequirement.PREFERRED,
             user_verification=UserVerificationRequirement.PREFERRED,
         ),

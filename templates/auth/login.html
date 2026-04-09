@@ -194,6 +194,8 @@
           return Object.assign({}, c, {id: b64urlToBuffer(c.id)});
         });
       }
+      // Force platform authenticator (Touch ID / Face ID) — prevents QR code / cross-device flow
+      opts.authenticatorAttachment = 'platform';
 
       // Step 2: browser prompts Touch ID / Face ID
       return navigator.credentials.get({publicKey: opts});
