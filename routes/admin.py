@@ -802,6 +802,7 @@ def _get_above_average_bowlers(season_id, week_num, threshold=30):
         if best_game - prior_avg >= threshold:
             results.append({
                 'bowler': entry.bowler,
+                'team': entry.team,
                 'games': games,
                 'handicap': prior.get('display_handicap', 0),
                 'best_game': best_game,
@@ -998,11 +999,23 @@ def _build_email_html(body_text, above_avg, season, week):
 
     above_html = ''
     if above_avg:
-        lines = []
+        # Group by team, preserving team number order
+        teams_seen = {}
         for r in above_avg:
-            scores = '/'.join(str(g) for g in r['games'])
-            lines.append(f"&nbsp;&nbsp;{h.escape(r['bowler'].last_name)} ({scores}-{r['handicap']})")
-        above_html = '<p>Notable bowling (30+ above average):<br>' + '<br>'.join(lines) + '</p>'
+            tid = r['team'].id
+            if tid not in teams_seen:
+                teams_seen[tid] = {'team': r['team'], 'bowlers': []}
+            teams_seen[tid]['bowlers'].append(r)
+        groups = sorted(teams_seen.values(), key=lambda g: g['team'].number)
+
+        block = ''
+        for g in groups:
+            block += f"<strong>{h.escape(g['team'].name)}:</strong><br>"
+            for r in g['bowlers']:
+                name = h.escape(r['bowler'].nickname or r['bowler'].last_name)
+                scores = '/'.join(str(s) for s in r['games'])
+                block += f"&nbsp;&nbsp;{name} ({scores}-{r['handicap']})<br>"
+        above_html = f'<p>Notable bowling (30+ above average):<br>{block}</p>'
 
     body_html = body_text.replace('\n', '<br>\n') if body_text else ''
 
