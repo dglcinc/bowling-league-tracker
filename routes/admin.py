@@ -1090,7 +1090,7 @@ def _generate_prizes_pdf(season_id, week_num):
     sh_max = max(second_half_map.values(), default=0)
     fy_max = max((s['points'] for s in full_year), default=0)
 
-    html_str = rt('reports/week_prizes.html',
+    html_str = rt('reports/week_prizes_pdf.html',
                   season=season, week=week,
                   prizes=prizes, leaders=leaders,
                   standings=full_year,
@@ -1100,8 +1100,7 @@ def _generate_prizes_pdf(season_id, week_num):
                   total_wood=total_wood, player_count=player_count,
                   blind_games=blind_games)
 
-    cdn_base = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/'
-    return HTML(string=html_str, base_url=cdn_base).write_pdf()
+    return HTML(string=html_str).write_pdf()
 
 
 # ── Backup & Restore ──────────────────────────────────────────────────────────

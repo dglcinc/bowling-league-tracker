@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Prizes &amp; Standings — Week {{ week.week_num }}</title>
+<style>
+  @page {
+    size: landscape;
+    margin: 0.35in;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+    font-size: 7.5pt;
+    margin: 0;
+    color: #000;
+  }
+
+  /* ── Page header ── */
+  .page-header {
+    text-align: center;
+    font-size: 8pt;
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+
+  /* ── Three-column top section ── */
+  .top-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+
+  /* ── Section heading ── */
+  .section-head {
+    font-weight: 700;
+    font-size: 6.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    background: #343a40;
+    color: #fff;
+    padding: 1px 4px;
+    margin-bottom: 4px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ── Prize boxes ── */
+  .prizes-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+    margin-bottom: 4px;
+  }
+
+  .prize-box {
+    border: 1px solid #dee2e6;
+    border-radius: 2px;
+    padding: 2px 4px;
+  }
+
+  .prize-label {
+    font-size: 6pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6c757d;
+  }
+
+  .prize-name {
+    font-size: 8pt;
+    font-weight: 700;
+    background-color: #ffff99;
+    padding: 1px 3px;
+    border-radius: 2px;
+    display: inline-block;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .prize-score {
+    font-size: 9pt;
+    font-weight: 700;
+    color: #0d6efd;
+  }
+
+  .prize-tie {
+    font-size: 6pt;
+    color: #6c757d;
+  }
+
+  .prize-empty {
+    color: #6c757d;
+  }
+
+  /* ── Summary stats row ── */
+  .stats-row {
+    display: flex;
+    gap: 12px;
+    font-size: 7pt;
+    margin-top: 3px;
+  }
+
+  .stats-row .label { color: #6c757d; }
+
+  /* ── Tables ── */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 7.5pt;
+  }
+
+  th, td {
+    border: 1px solid #dee2e6;
+    padding: 1px 3px;
+    line-height: 1.2;
+  }
+
+  th {
+    background: #343a40;
+    color: #fff;
+    font-weight: 700;
+    font-size: 7pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .text-end { text-align: right; }
+  .fw-bold  { font-weight: 700; }
+
+  .cell-highlight {
+    background-color: #ffff99;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* standings table — fixed narrow columns */
+  .standings-table th:not(:first-child),
+  .standings-table td:not(:first-child) {
+    width: 2rem;
+    text-align: right;
+  }
+
+  /* ── Averages section ── */
+  hr {
+    border: none;
+    border-top: 1px solid #dee2e6;
+    margin: 5px 0;
+  }
+
+  .avg-section-head {
+    font-size: 7pt;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+
+  .avg-table {
+    max-width: 400px;
+  }
+
+  /* ── YTD leaders (print page 2 area) ── */
+  .ytd-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+{# Page header #}
+<div class="page-header">
+  Mountain Lakes Men's Bowling League &nbsp;|&nbsp; {{ season.name }}
+  &nbsp;|&nbsp; Week {{ week.week_num }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
+  {% if week.is_position_night %}&nbsp;&#9733; Position Night{% endif %}
+</div>
+
+{# Three-column top row #}
+<div class="top-row">
+
+  {# Left: weekly prizes #}
+  <div>
+    <div class="section-head">Week {{ week.week_num }} Prizes</div>
+    <div class="prizes-grid">
+
+      {% macro prize_box(cat, label) %}
+      <div class="prize-box">
+        <div class="prize-label">{{ label }}</div>
+        {% if cat %}
+        <div class="prize-name">
+          {% for w in cat['winners'] %}{{ w['bowler'].last_name }}{% if w['bowler'].nickname %} ({{ w['bowler'].nickname }}){% endif %}{% if not loop.last %} / {% endif %}{% endfor %}
+          {% if cat['winners']|length > 1 %}<span class="prize-tie">(tie)</span>{% endif %}
+        </div>
+        <div class="prize-score">{{ cat['score'] }}</div>
+        {% else %}
+        <div class="prize-empty">—</div>
+        {% endif %}
+      </div>
+      {% endmacro %}
+
+      {{ prize_box(prizes['hg_hcp']    if prizes else none, 'High Game — Handicap') }}
+      {{ prize_box(prizes['hg_scratch'] if prizes else none, 'High Game — Scratch') }}
+      {{ prize_box(prizes['hs_hcp']    if prizes else none, 'High Series — Handicap') }}
+      {{ prize_box(prizes['hs_scratch'] if prizes else none, 'High Series — Scratch') }}
+    </div>
+    <div class="stats-row">
+      <div><span class="label">Total Wood (w/Hcp):</span> <strong>{{ total_wood }}</strong></div>
+      <div><span class="label">Players:</span> <strong>{{ player_count }}</strong></div>
+      <div><span class="label">Blind Games:</span> <strong>{{ blind_games }}</strong></div>
+    </div>
+  </div>
+
+  {# Middle: team standings #}
+  <div>
+    <div class="section-head">Team Standings — Week {{ week.week_num }}</div>
+    <table class="standings-table">
+      <thead><tr>
+        <th>Team</th>
+        <th class="text-end">1st<br>Half</th>
+        <th class="text-end">2nd<br>Half</th>
+        <th class="text-end">Full<br>Year</th>
+      </tr></thead>
+      <tbody>
+      {% for sy in standings %}
+      {% set fh_pts = first_half_map.get(sy['team'].id, 0) %}
+      {% set sh_pts = second_half_map.get(sy['team'].id, 0) %}
+      <tr>
+        <td>{{ sy['team'].name }}</td>
+        <td class="text-end fw-bold{% if fh_pts == fh_max %} cell-highlight{% endif %}">{{ fh_pts }}</td>
+        <td class="text-end fw-bold{% if sh_pts == sh_max %} cell-highlight{% endif %}">{{ sh_pts }}</td>
+        <td class="text-end fw-bold{% if sy['points'] == fy_max %} cell-highlight{% endif %}">{{ sy['points'] }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# Right: YTD leaders (top prize in each category) #}
+  <div>
+    <div class="section-head">YTD Leaders Through Week {{ week.week_num }}</div>
+    <div class="prizes-grid">
+      {% set ytd_cats = [
+        ('high_game_hcp',      'YTD High Game — Handicap'),
+        ('high_game_scratch',  'YTD High Game — Scratch'),
+        ('high_series_hcp',    'YTD High Series — Handicap'),
+        ('high_series_scratch','YTD High Series — Scratch'),
+      ] %}
+      {% for attr, label in ytd_cats %}
+      {% set top = leaders | sort(attribute=attr, reverse=True) | first %}
+      <div class="prize-box">
+        <div class="prize-label">{{ label }}</div>
+        {% if top %}
+        <div class="prize-name">{{ top['bowler'].last_name }}{% if top['bowler'].nickname %} ({{ top['bowler'].nickname }}){% endif %}</div>
+        <div class="prize-score">{{ top[attr] }}</div>
+        {% else %}<div class="prize-empty">—</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>{# /top-row #}
+
+{# High averages #}
+<hr>
+<div class="avg-section-head">High Averages (min {{ min_games }} games)</div>
+<table class="avg-table">
+  <thead><tr>
+    <th>#</th><th>Bowler</th><th>Team</th>
+    <th class="text-end">G</th><th class="text-end">Ave</th><th class="text-end">Hcp</th>
+  </tr></thead>
+  <tbody>
+  {% for i, r in enumerate(avg_rows) %}
+  <tr>
+    <td>{{ i + 1 }}</td>
+    <td>{{ r['bowler'].last_name }}</td>
+    <td>{{ r['team'].name }}</td>
+    <td class="text-end">{{ r['games'] }}</td>
+    <td class="text-end fw-bold">{{ r['average'] }}</td>
+    <td class="text-end">{{ r['handicap'] }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6" style="text-align:center;color:#6c757d">No bowlers with ≥ {{ min_games }} games.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{# YTD leader detail tables #}
+<div class="ytd-grid">
+  {% for attr, label in [('high_game_scratch','High Game Scratch'),('high_game_hcp','High Game w/ Handicap'),
+                          ('high_series_scratch','High Series Scratch'),('high_series_hcp','High Series w/ Handicap')] %}
+  <div>
+    <div class="section-head">{{ label }}</div>
+    <table>
+      <thead><tr><th>#</th><th>Bowler</th><th class="text-end">Score</th></tr></thead>
+      <tbody>
+      {% for i, r in enumerate(leaders | sort(attribute=attr, reverse=True)) %}
+      {% if i < 10 %}
+      <tr>
+        <td>{{ i+1 }}</td>
+        <td>{{ r['bowler'].last_name }}</td>
+        <td class="text-end">{{ r[attr] }}</td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+</div>
+
+</body>
+</html>
