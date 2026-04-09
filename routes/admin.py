@@ -972,7 +972,7 @@ def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
             'contentBytes': base64.b64encode(pdf_attachment).decode('utf-8'),
         }]
 
-    payload = json.dumps({'message': message, 'saveToSentItems': False}).encode('utf-8')
+    payload = json.dumps({'message': message, 'saveToSentItems': True}).encode('utf-8')
 
     url = f'https://graph.microsoft.com/v1.0/users/{sender_email}/sendMail'
     req = urllib.request.Request(
