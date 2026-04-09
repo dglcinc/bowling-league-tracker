@@ -207,7 +207,8 @@ def create_app():
 
     @app.context_processor
     def inject_globals():
-        from models import Season, Week, LeagueSettings
+        from models import Season, Week, LeagueSettings, WebAuthnCredential
+        from flask_login import current_user
         active = Season.query.filter_by(is_active=True).first()
         current_week = 0
         if active:
@@ -217,7 +218,17 @@ def create_app():
                     .first())
             current_week = last.week_num if last else 0
         settings = db.session.get(LeagueSettings, 1)
-        return {'active_season': active, 'current_week': current_week, 'league_settings': settings}
+        has_passkey = False
+        if current_user.is_authenticated:
+            has_passkey = WebAuthnCredential.query.filter_by(
+                bowler_id=current_user.id
+            ).first() is not None
+        return {
+            'active_season': active,
+            'current_week': current_week,
+            'league_settings': settings,
+            'has_passkey': has_passkey,
+        }
 
     @app.route('/')
     def index():

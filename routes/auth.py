@@ -10,11 +10,11 @@ import urllib.parse
 from datetime import datetime, timedelta
 
 from flask import (Blueprint, render_template, request, redirect,
-                   url_for, flash, current_app)
-from flask_login import login_user, logout_user, current_user
+                   url_for, flash, current_app, session, jsonify)
+from flask_login import login_user, logout_user, current_user, login_required
 
 from extensions import limiter
-from models import db, Bowler, MagicLinkToken, LinkedAccount
+from models import db, Bowler, MagicLinkToken, LinkedAccount, WebAuthnCredential
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -194,3 +194,172 @@ def logout():
     logout_user()
     flash('You have been signed out.', 'info')
     return redirect(url_for('auth.login'))
+
+
+# ---------------------------------------------------------------------------
+# WebAuthn / Passkey routes (Touch ID, Face ID, Windows Hello)
+# ---------------------------------------------------------------------------
+
+@auth_bp.route('/webauthn/register/begin', methods=['POST'])
+@login_required
+def webauthn_register_begin():
+    from webauthn import generate_registration_options, options_to_json
+    from webauthn.helpers.structs import (
+        AuthenticatorSelectionCriteria, ResidentKeyRequirement,
+        UserVerificationRequirement, PublicKeyCredentialDescriptor,
+    )
+    from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
+
+    existing = WebAuthnCredential.query.filter_by(bowler_id=current_user.id).all()
+    exclude = [
+        PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
+        for c in existing
+    ]
+
+    options = generate_registration_options(
+        rp_id=current_app.config['WEBAUTHN_RP_ID'],
+        rp_name=current_app.config['WEBAUTHN_RP_NAME'],
+        user_id=str(current_user.id).encode(),
+        user_name=current_user.email or str(current_user.id),
+        user_display_name=current_user.display_name,
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            resident_key=ResidentKeyRequirement.PREFERRED,
+            user_verification=UserVerificationRequirement.PREFERRED,
+        ),
+        exclude_credentials=exclude,
+    )
+
+    session['webauthn_reg_challenge'] = bytes_to_base64url(options.challenge)
+    return current_app.response_class(
+        response=options_to_json(options), mimetype='application/json'
+    )
+
+
+@auth_bp.route('/webauthn/register/complete', methods=['POST'])
+@login_required
+def webauthn_register_complete():
+    from webauthn import verify_registration_response
+    from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
+
+    challenge_b64 = session.pop('webauthn_reg_challenge', None)
+    if not challenge_b64:
+        return jsonify({'error': 'Session expired — try again'}), 400
+
+    data = request.get_json(force=True)
+    device_name = data.pop('device_name', 'Passkey') if isinstance(data, dict) else 'Passkey'
+
+    try:
+        verified = verify_registration_response(
+            credential=data,
+            expected_challenge=base64url_to_bytes(challenge_b64),
+            expected_rp_id=current_app.config['WEBAUTHN_RP_ID'],
+            expected_origin=current_app.config['WEBAUTHN_ORIGIN'],
+        )
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    cred = WebAuthnCredential(
+        bowler_id=current_user.id,
+        credential_id=bytes_to_base64url(verified.credential_id),
+        public_key=verified.credential_public_key,
+        sign_count=verified.sign_count,
+        device_name=device_name or 'Passkey',
+    )
+    db.session.add(cred)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@auth_bp.route('/webauthn/authenticate/begin', methods=['POST'])
+def webauthn_authenticate_begin():
+    from webauthn import generate_authentication_options, options_to_json
+    from webauthn.helpers.structs import (
+        UserVerificationRequirement, PublicKeyCredentialDescriptor,
+    )
+    from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
+
+    data = request.get_json(force=True) or {}
+    email = (data.get('email') or '').strip().lower()
+
+    allow_credentials = []
+    bowler_id = None
+
+    if email:
+        bowler = Bowler.query.filter(db.func.lower(Bowler.email) == email).first()
+        if bowler:
+            bowler_id = bowler.id
+            creds = WebAuthnCredential.query.filter_by(bowler_id=bowler.id).all()
+            allow_credentials = [
+                PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
+                for c in creds
+            ]
+
+    options = generate_authentication_options(
+        rp_id=current_app.config['WEBAUTHN_RP_ID'],
+        allow_credentials=allow_credentials,
+        user_verification=UserVerificationRequirement.PREFERRED,
+    )
+
+    session['webauthn_auth_challenge'] = bytes_to_base64url(options.challenge)
+    session['webauthn_auth_bowler_id'] = bowler_id
+    return current_app.response_class(
+        response=options_to_json(options), mimetype='application/json'
+    )
+
+
+@auth_bp.route('/webauthn/authenticate/complete', methods=['POST'])
+def webauthn_authenticate_complete():
+    from webauthn import verify_authentication_response
+    from webauthn.helpers import base64url_to_bytes
+
+    challenge_b64 = session.pop('webauthn_auth_challenge', None)
+    session.pop('webauthn_auth_bowler_id', None)
+
+    if not challenge_b64:
+        return jsonify({'error': 'Session expired — try again'}), 400
+
+    data = request.get_json(force=True)
+
+    # Look up the credential record by its ID
+    cred_id_b64 = data.get('id', '')
+    cred_record = WebAuthnCredential.query.filter_by(credential_id=cred_id_b64).first()
+    if not cred_record:
+        return jsonify({'error': 'Passkey not recognised'}), 400
+
+    bowler = db.session.get(Bowler, cred_record.bowler_id)
+    if not bowler:
+        return jsonify({'error': 'Account not found'}), 400
+
+    try:
+        verified = verify_authentication_response(
+            credential=data,
+            expected_challenge=base64url_to_bytes(challenge_b64),
+            expected_rp_id=current_app.config['WEBAUTHN_RP_ID'],
+            expected_origin=current_app.config['WEBAUTHN_ORIGIN'],
+            credential_public_key=cred_record.public_key,
+            credential_current_sign_count=cred_record.sign_count,
+        )
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    now = datetime.utcnow()
+    cred_record.sign_count = verified.new_sign_count
+    cred_record.last_used_at = now
+
+    # Upsert LinkedAccount
+    acct = LinkedAccount.query.filter_by(
+        bowler_id=bowler.id, auth_method='webauthn'
+    ).first()
+    if acct:
+        acct.last_login = now
+    else:
+        db.session.add(LinkedAccount(
+            bowler_id=bowler.id,
+            auth_method='webauthn',
+            auth_identifier=cred_record.credential_id,
+            last_login=now,
+        ))
+
+    db.session.commit()
+    login_user(bowler, remember=True)
+    return jsonify({'ok': True, 'redirect': url_for('index')})

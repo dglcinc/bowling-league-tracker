@@ -350,6 +350,25 @@ class ViewerPermission(db.Model):
         return f'<ViewerPermission {self.endpoint} accessible={self.viewer_accessible}>'
 
 
+class WebAuthnCredential(db.Model):
+    """Passkey / platform authenticator credential for Touch ID, Face ID, etc."""
+    __tablename__ = 'webauthn_credentials'
+
+    id = db.Column(db.Integer, primary_key=True)
+    bowler_id = db.Column(db.Integer, db.ForeignKey('bowlers.id'), nullable=False)
+    credential_id = db.Column(db.String(512), nullable=False, unique=True)  # base64url-encoded
+    public_key = db.Column(db.LargeBinary, nullable=False)
+    sign_count = db.Column(db.Integer, default=0)
+    device_name = db.Column(db.String(128), default='Passkey')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_used_at = db.Column(db.DateTime)
+
+    bowler = db.relationship('Bowler')
+
+    def __repr__(self):
+        return f'<WebAuthnCredential bowler={self.bowler_id} device={self.device_name}>'
+
+
 class Snapshot(db.Model):
     """Weekly JSON snapshot of all stats, auto-saved after entry."""
     __tablename__ = 'snapshots'

@@ -63,6 +63,11 @@ class Config:
     TURNSTILE_SITE_KEY   = os.environ.get("TURNSTILE_SITE_KEY", "")
     TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
 
+    # WebAuthn / Passkeys (Touch ID, Face ID, Windows Hello)
+    WEBAUTHN_RP_ID   = os.environ.get("WEBAUTHN_RP_ID",   "localhost")
+    WEBAUTHN_RP_NAME = os.environ.get("WEBAUTHN_RP_NAME", "League Tracker")
+    WEBAUTHN_ORIGIN  = os.environ.get("WEBAUTHN_ORIGIN",  "http://localhost:5001")
+
     # Outbound email via Exchange SMTP (legacy fallback — not recommended)
     MAIL_SERVER          = os.environ.get("MAIL_SERVER",  "smtp.office365.com")
     MAIL_PORT            = int(os.environ.get("MAIL_PORT", "587"))
