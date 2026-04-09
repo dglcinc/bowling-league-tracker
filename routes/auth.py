@@ -190,6 +190,29 @@ def logout():
 
 
 # ---------------------------------------------------------------------------
+# Passkey management
+# ---------------------------------------------------------------------------
+
+@auth_bp.route('/passkeys')
+@login_required
+def passkeys():
+    creds = WebAuthnCredential.query.filter_by(bowler_id=current_user.id).all()
+    return render_template('auth/passkeys.html', creds=creds)
+
+
+@auth_bp.route('/passkeys/<int:cred_id>/delete', methods=['POST'])
+@login_required
+def delete_passkey(cred_id):
+    cred = WebAuthnCredential.query.filter_by(
+        id=cred_id, bowler_id=current_user.id
+    ).first_or_404()
+    db.session.delete(cred)
+    db.session.commit()
+    flash('Passkey removed. You can set up a new one after signing in.', 'info')
+    return redirect(url_for('auth.passkeys'))
+
+
+# ---------------------------------------------------------------------------
 # WebAuthn / Passkey routes (Touch ID, Face ID, Windows Hello)
 # ---------------------------------------------------------------------------
 
