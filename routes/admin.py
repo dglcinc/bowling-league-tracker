@@ -797,13 +797,18 @@ def _get_above_average_bowlers(season_id, week_num, threshold=30):
         prior_avg = prior.get('running_avg') or 0
         if prior_avg == 0:
             continue
-        week_avg = entry.total_pins / entry.game_count
-        if week_avg - prior_avg >= threshold:
+        games = entry.games_night1  # standard 3-game series only
+        best_game = max(games) if games else 0
+        diff = best_game - prior_avg
+        if diff >= threshold:
             results.append({
                 'bowler': entry.bowler,
-                'week_avg': round(week_avg, 1),
+                'team': entry.team,
+                'games': games,
+                'handicap': prior.get('display_handicap', 0),
+                'best_game': best_game,
                 'prior_avg': prior_avg,
-                'diff': round(week_avg - prior_avg, 1),
+                'diff': diff,
             })
     return sorted(results, key=lambda r: r['bowler'].last_name)
 
@@ -837,7 +842,7 @@ def email_compose(season_id, week_num):
     standings = get_team_standings(season_id, through_week=week_num)
 
     week_date_str = week.date.strftime('%B %d, %Y') if week.date else f'Week {week_num}'
-    default_subject = f'{league_name} - Week {week_num} Standings'
+    default_subject = f'{league_name} Standings -- Week {week_num}'
 
     if request.method == 'POST':
         subject = request.form.get('subject', default_subject).strip()
@@ -869,13 +874,16 @@ def email_compose(season_id, week_num):
             subject = f'[TEST] {subject}'
 
         # Build HTML email body
-        html_body = _build_email_html(body_text, prizes, above_avg, standings, season, week)
+        html_body = _build_email_html(body_text, above_avg, season, week)
 
         # Build optional PDF attachment
+        pdf_min_games = int(request.form.get('pdf_min_games', 9) or 9)
+        pdf_top10 = request.form.get('pdf_top10') == '1'
         pdf_bytes = None
         if attach_pdf:
             try:
-                pdf_bytes = _generate_prizes_pdf(season_id, week_num)
+                pdf_bytes = _generate_prizes_pdf(season_id, week_num,
+                                                 min_games=pdf_min_games, top10=pdf_top10)
             except Exception as pdf_err:
                 flash(f'PDF generation failed (email sent without attachment): {pdf_err}', 'warning')
 
@@ -986,58 +994,41 @@ def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
         raise RuntimeError(f'Graph API error {e.code}: {body}')
 
 
-def _build_email_html(body_text, prizes, above_avg, standings, season, week):
+def _build_email_html(body_text, above_avg, season, week):
     """Build the HTML email body from user narrative + auto-generated data."""
     import html as h
 
-    def prize_line(cat, label):
-        if not cat or not cat['winners']:
-            return f'<li>{h.escape(label)}: —</li>'
-        names = ' / '.join(w['bowler'].last_name for w in cat['winners'])
-        tie = ' (tie)' if len(cat['winners']) > 1 else ''
-        return f'<li>{h.escape(label)}: <strong>{h.escape(names)}</strong>{tie} — {cat["score"]}</li>'
-
-    prizes_html = ''
-    if prizes:
-        prizes_html = f'''
-<p><strong>Weekly Prizes:</strong></p>
-<ul>
-  {prize_line(prizes['hg_hcp'],    'High Game — Handicap')}
-  {prize_line(prizes['hg_scratch'],'High Game — Scratch')}
-  {prize_line(prizes['hs_hcp'],    'High Series — Handicap')}
-  {prize_line(prizes['hs_scratch'],'High Series — Scratch')}
-</ul>'''
-
     above_html = ''
     if above_avg:
-        names = ', '.join(r['bowler'].last_name for r in above_avg)
-        above_html = f'<p>Notable bowling (30+ above average): {h.escape(names)}.</p>'
+        # Group by team, preserving team number order
+        teams_seen = {}
+        for r in above_avg:
+            tid = r['team'].id
+            if tid not in teams_seen:
+                teams_seen[tid] = {'team': r['team'], 'bowlers': []}
+            teams_seen[tid]['bowlers'].append(r)
+        groups = sorted(teams_seen.values(), key=lambda g: g['team'].number)
 
-    standings_html = ''
-    if standings:
-        rows = ''.join(
-            f'<tr><td>{h.escape(s["team"].name)}</td><td align="right">{s["points"]}</td></tr>'
-            for s in standings
-        )
-        standings_html = f'''
-<p><strong>Standings through Week {week.week_num}:</strong></p>
-<table cellpadding="4" border="1" style="border-collapse:collapse">
-  <tr><th>Team</th><th>Points</th></tr>
-  {rows}
-</table>'''
+        block = ''
+        for g in groups:
+            block += f"<br><strong>{h.escape(g['team'].name)}:</strong><br>"
+            for r in g['bowlers']:
+                b = r['bowler']
+                full = h.escape(f"{b.first_name} {b.last_name}" if b.first_name else b.last_name)
+                nick = f" - {h.escape(b.nickname)}" if b.nickname else ""
+                scores = '/'.join(str(s) for s in r['games'])
+                block += f"&nbsp;&nbsp;{full}{nick} - {r['diff']} ({scores}-{r['handicap']})<br>"
+        above_html = f'<p>Notable bowling (30+ above average):<br>{block}</p>'
 
     body_html = body_text.replace('\n', '<br>\n') if body_text else ''
 
     return f'''<html><body style="font-family:Arial,sans-serif;font-size:14px">
-<p>Ladies and Gentlemen:</p>
 {body_html}
 {above_html}
-{prizes_html}
-{standings_html}
 </body></html>'''
 
 
-def _generate_prizes_pdf(season_id, week_num):
+def _generate_prizes_pdf(season_id, week_num, min_games=9, top10=False):
     """Render the prizes/standings page to PDF bytes via WeasyPrint."""
     from weasyprint import HTML
     from flask import current_app, render_template as rt
@@ -1079,27 +1070,31 @@ def _generate_prizes_pdf(season_id, week_num):
             'high_series_hcp':     stats['ytd_high_series_hcp'],
         })
 
-    avg_rows = sorted([l for l in leaders if l['games'] >= 9],
+    avg_rows = sorted([l for l in leaders if l['games'] >= min_games],
                       key=lambda x: (-x['average'], x['bowler'].last_name))
-    full_year    = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
-    first_half_s = sorted(get_team_standings(season_id, half=1, through_week=week_num), key=lambda s: s['team'].number)
-    second_half_s= sorted(get_team_standings(season_id, half=2, through_week=week_num), key=lambda s: s['team'].number)
-    fh_max = max((s['points'] for s in first_half_s),  default=0)
-    sh_max = max((s['points'] for s in second_half_s), default=0)
-    fy_max = max((s['points'] for s in full_year),     default=0)
+    if top10:
+        top10_hcps = set(sorted({r['handicap'] for r in avg_rows})[:10])
+        avg_rows = [r for r in avg_rows if r['handicap'] in top10_hcps]
+    full_year       = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
+    fh_list         = get_team_standings(season_id, half=1, through_week=week_num)
+    sh_list         = get_team_standings(season_id, half=2, through_week=week_num)
+    first_half_map  = {s['team'].id: s['points'] for s in fh_list}
+    second_half_map = {s['team'].id: s['points'] for s in sh_list}
+    fh_max = max(first_half_map.values(),  default=0)
+    sh_max = max(second_half_map.values(), default=0)
+    fy_max = max((s['points'] for s in full_year), default=0)
 
-    html_str = rt('reports/week_prizes.html',
+    html_str = rt('reports/week_prizes_pdf.html',
                   season=season, week=week,
                   prizes=prizes, leaders=leaders,
                   standings=full_year,
-                  first_half_s=first_half_s, second_half_s=second_half_s,
+                  first_half_map=first_half_map, second_half_map=second_half_map,
                   fh_max=fh_max, sh_max=sh_max, fy_max=fy_max,
-                  avg_rows=avg_rows, min_games=9, top10=False,
+                  avg_rows=avg_rows, min_games=min_games, top10=top10,
                   total_wood=total_wood, player_count=player_count,
                   blind_games=blind_games)
 
-    cdn_base = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/'
-    return HTML(string=html_str, base_url=cdn_base).write_pdf()
+    return HTML(string=html_str).write_pdf()
 
 
 # ── Backup & Restore ──────────────────────────────────────────────────────────

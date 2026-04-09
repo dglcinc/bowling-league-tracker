@@ -65,6 +65,7 @@
       <th>First</th>
       <th>Nickname</th>
       <th>Team</th>
+      <th>Email</th>
       <th class="text-end">Prior Hcp</th>
       <th class="text-end">Joined Wk</th>
       <th>Status</th>
@@ -78,6 +79,15 @@
       <td>{{ r.bowler.first_name or '' }}</td>
       <td>{{ r.bowler.nickname or '' }}</td>
       <td>{{ r.team.name }}</td>
+      <td>
+        {% if r.bowler.email %}
+          <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id, season_id=season.id) }}"
+             class="text-decoration-none font-monospace" style="font-size:0.8rem">{{ r.bowler.email }}</a>
+        {% else %}
+          <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id, season_id=season.id) }}"
+             class="text-muted" style="font-size:0.8rem">— add email</a>
+        {% endif %}
+      </td>
       <td class="text-end">{{ r.prior_handicap or 0 }}</td>
       <td class="text-end">{{ r.joined_week }}</td>
       <td>

@@ -1,6 +1,28 @@
 {% extends "base.html" %}
 {% block title %}Send Weekly Email — Week {{ week_num }}{% endblock %}
 
+{% block extra_head %}
+<script>
+(function() {
+  var LS_MG  = 'bowling_prizes_min_games';
+  var LS_T10 = 'bowling_prizes_top10';
+  document.addEventListener('DOMContentLoaded', function() {
+    var mgInput  = document.getElementById('pdfMinGames');
+    var t10Input = document.getElementById('pdfTop10chk');
+    if (!mgInput) return;
+    // Restore saved values
+    var mg  = localStorage.getItem(LS_MG);
+    var t10 = localStorage.getItem(LS_T10);
+    if (mg  !== null) mgInput.value = mg;
+    if (t10 !== null) t10Input.checked = (t10 === '1');
+    // Save on change
+    mgInput.addEventListener('change',  function() { localStorage.setItem(LS_MG,  mgInput.value); });
+    t10Input.addEventListener('change', function() { localStorage.setItem(LS_T10, t10Input.checked ? '1' : '0'); });
+  });
+})();
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4>Send Weekly Email — Week {{ week_num }}</h4>
@@ -64,12 +86,25 @@
         </div>
       </div>
 
-      <div class="mb-3 form-check">
-        <input type="checkbox" class="form-check-input" name="attach_pdf" value="1"
-               id="attachPdf" checked>
-        <label class="form-check-label" for="attachPdf">
-          Attach Prizes &amp; Standings PDF (Week {{ week_num }})
-        </label>
+      <div class="mb-3">
+        <div class="form-check mb-1">
+          <input type="checkbox" class="form-check-input" name="attach_pdf" value="1"
+                 id="attachPdf" checked>
+          <label class="form-check-label" for="attachPdf">
+            Attach Prizes &amp; Standings PDF (Week {{ week_num }})
+          </label>
+        </div>
+        <div class="d-flex align-items-center gap-3 ms-4">
+          <div class="d-flex align-items-center gap-1">
+            <label class="form-label mb-0 small text-muted">Min games:</label>
+            <input type="number" name="pdf_min_games" id="pdfMinGames" value="9" min="0" max="99"
+                   class="form-control form-control-sm" style="width:65px">
+          </div>
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" name="pdf_top10" value="1" id="pdfTop10chk">
+            <label class="form-check-label small text-muted" for="pdfTop10chk">Top 10 only</label>
+          </div>
+        </div>
       </div>
 
       <input type="hidden" name="test_only" value="0" id="testOnlyFlag">
