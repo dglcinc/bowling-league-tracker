@@ -5,7 +5,7 @@
 <title>Prizes &amp; Standings — Week {{ week.week_num }}</title>
 <style>
   @page {
-    size: landscape;
+    size: letter portrait;
     margin: 0.35in;
   }
 
@@ -26,14 +26,6 @@
     margin-bottom: 6px;
   }
 
-  /* ── Three-column top section ── */
-  .top-row {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: 12px;
-    margin-bottom: 6px;
-  }
-
   /* ── Section heading ── */
   .section-head {
     font-weight: 700;
@@ -48,7 +40,15 @@
     print-color-adjust: exact;
   }
 
-  /* ── Prize boxes ── */
+  /* ── Top row: prizes (left) + standings (right) ── */
+  .top-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  /* ── Prize boxes: 2×2 grid ── */
   .prizes-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -91,9 +91,7 @@
     color: #6c757d;
   }
 
-  .prize-empty {
-    color: #6c757d;
-  }
+  .prize-empty { color: #6c757d; }
 
   /* ── Summary stats row ── */
   .stats-row {
@@ -136,18 +134,26 @@
     print-color-adjust: exact;
   }
 
-  /* standings table — fixed narrow columns */
+  /* standings table — narrow numeric columns */
   .standings-table th:not(:first-child),
   .standings-table td:not(:first-child) {
     width: 2rem;
     text-align: right;
   }
 
+  /* ── YTD leader boxes: 4 across ── */
+  .ytd-boxes {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+
   /* ── Averages section ── */
   hr {
     border: none;
     border-top: 1px solid #dee2e6;
-    margin: 5px 0;
+    margin: 6px 0;
   }
 
   .avg-section-head {
@@ -157,14 +163,14 @@
   }
 
   .avg-table {
-    max-width: 400px;
+    max-width: 440px;
   }
 
-  /* ── YTD leaders (print page 2 area) ── */
+  /* ── YTD detail tables: 2 columns ── */
   .ytd-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr;
-    gap: 8px;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
     margin-top: 8px;
   }
 </style>
@@ -178,32 +184,32 @@
   {% if week.is_position_night %}&nbsp;&#9733; Position Night{% endif %}
 </div>
 
-{# Three-column top row #}
+{# Macro for a prize box #}
+{% macro prize_box(cat, label) %}
+<div class="prize-box">
+  <div class="prize-label">{{ label }}</div>
+  {% if cat %}
+  <div class="prize-name">
+    {% for w in cat['winners'] %}{{ w['bowler'].last_name }}{% if w['bowler'].nickname %} ({{ w['bowler'].nickname }}){% endif %}{% if not loop.last %} / {% endif %}{% endfor %}
+    {% if cat['winners']|length > 1 %}<span class="prize-tie">(tie)</span>{% endif %}
+  </div>
+  <div class="prize-score">{{ cat['score'] }}</div>
+  {% else %}
+  <div class="prize-empty">—</div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{# Top row: prizes (left) + standings (right) #}
 <div class="top-row">
 
-  {# Left: weekly prizes #}
+  {# Left: this week's prizes + stats #}
   <div>
     <div class="section-head">Week {{ week.week_num }} Prizes</div>
     <div class="prizes-grid">
-
-      {% macro prize_box(cat, label) %}
-      <div class="prize-box">
-        <div class="prize-label">{{ label }}</div>
-        {% if cat %}
-        <div class="prize-name">
-          {% for w in cat['winners'] %}{{ w['bowler'].last_name }}{% if w['bowler'].nickname %} ({{ w['bowler'].nickname }}){% endif %}{% if not loop.last %} / {% endif %}{% endfor %}
-          {% if cat['winners']|length > 1 %}<span class="prize-tie">(tie)</span>{% endif %}
-        </div>
-        <div class="prize-score">{{ cat['score'] }}</div>
-        {% else %}
-        <div class="prize-empty">—</div>
-        {% endif %}
-      </div>
-      {% endmacro %}
-
-      {{ prize_box(prizes['hg_hcp']    if prizes else none, 'High Game — Handicap') }}
+      {{ prize_box(prizes['hg_hcp']     if prizes else none, 'High Game — Handicap') }}
       {{ prize_box(prizes['hg_scratch'] if prizes else none, 'High Game — Scratch') }}
-      {{ prize_box(prizes['hs_hcp']    if prizes else none, 'High Series — Handicap') }}
+      {{ prize_box(prizes['hs_hcp']     if prizes else none, 'High Series — Handicap') }}
       {{ prize_box(prizes['hs_scratch'] if prizes else none, 'High Series — Scratch') }}
     </div>
     <div class="stats-row">
@@ -213,7 +219,7 @@
     </div>
   </div>
 
-  {# Middle: team standings #}
+  {# Right: team standings #}
   <div>
     <div class="section-head">Team Standings — Week {{ week.week_num }}</div>
     <table class="standings-table">
@@ -238,34 +244,32 @@
     </table>
   </div>
 
-  {# Right: YTD leaders (top prize in each category) #}
-  <div>
-    <div class="section-head">YTD Leaders Through Week {{ week.week_num }}</div>
-    <div class="prizes-grid">
-      {% set ytd_cats = [
-        ('high_game_hcp',      'YTD High Game — Handicap'),
-        ('high_game_scratch',  'YTD High Game — Scratch'),
-        ('high_series_hcp',    'YTD High Series — Handicap'),
-        ('high_series_scratch','YTD High Series — Scratch'),
-      ] %}
-      {% for attr, label in ytd_cats %}
-      {% set top = leaders | sort(attribute=attr, reverse=True) | first %}
-      <div class="prize-box">
-        <div class="prize-label">{{ label }}</div>
-        {% if top %}
-        <div class="prize-name">{{ top['bowler'].last_name }}{% if top['bowler'].nickname %} ({{ top['bowler'].nickname }}){% endif %}</div>
-        <div class="prize-score">{{ top[attr] }}</div>
-        {% else %}<div class="prize-empty">—</div>{% endif %}
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-
 </div>{# /top-row #}
+
+{# YTD leader boxes — 4 across full width #}
+<div class="section-head">YTD Leaders Through Week {{ week.week_num }}</div>
+<div class="ytd-boxes">
+  {% set ytd_cats = [
+    ('high_game_hcp',      'High Game — Handicap'),
+    ('high_game_scratch',  'High Game — Scratch'),
+    ('high_series_hcp',    'High Series — Handicap'),
+    ('high_series_scratch','High Series — Scratch'),
+  ] %}
+  {% for attr, label in ytd_cats %}
+  {% set top = leaders | sort(attribute=attr, reverse=True) | first %}
+  <div class="prize-box">
+    <div class="prize-label">YTD {{ label }}</div>
+    {% if top %}
+    <div class="prize-name">{{ top['bowler'].last_name }}{% if top['bowler'].nickname %} ({{ top['bowler'].nickname }}){% endif %}</div>
+    <div class="prize-score">{{ top[attr] }}</div>
+    {% else %}<div class="prize-empty">—</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
 
 {# High averages #}
 <hr>
-<div class="avg-section-head">High Averages (min {{ min_games }} games)</div>
+<div class="avg-section-head">High Averages (min {{ min_games }} games{% if top10 %} — Top 10{% endif %})</div>
 <table class="avg-table">
   <thead><tr>
     <th>#</th><th>Bowler</th><th>Team</th>
@@ -287,7 +291,7 @@
   </tbody>
 </table>
 
-{# YTD leader detail tables #}
+{# YTD leader detail tables — 2 columns #}
 <div class="ytd-grid">
   {% for attr, label in [('high_game_scratch','High Game Scratch'),('high_game_hcp','High Game w/ Handicap'),
                           ('high_series_scratch','High Series Scratch'),('high_series_hcp','High Series w/ Handicap')] %}
