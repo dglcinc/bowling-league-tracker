@@ -1085,7 +1085,8 @@ def _generate_prizes_pdf(season_id, week_num, min_games=9, top10=False):
     avg_rows = sorted([l for l in leaders if l['games'] >= min_games],
                       key=lambda x: (-x['average'], x['bowler'].last_name))
     if top10:
-        avg_rows = avg_rows[:10]
+        top10_hcps = set(sorted({r['handicap'] for r in avg_rows})[:10])
+        avg_rows = [r for r in avg_rows if r['handicap'] in top10_hcps]
     full_year       = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
     fh_list         = get_team_standings(season_id, half=1, through_week=week_num)
     sh_list         = get_team_standings(season_id, half=2, through_week=week_num)
