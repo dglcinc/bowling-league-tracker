@@ -797,7 +797,7 @@ def _get_above_average_bowlers(season_id, week_num, threshold=30):
         prior_avg = prior.get('running_avg') or 0
         if prior_avg == 0:
             continue
-        games = entry.all_games  # list of individual game scores
+        games = entry.games_night1  # standard 3-game series only
         best_game = max(games) if games else 0
         if best_game - prior_avg >= threshold:
             results.append({
@@ -1014,7 +1014,7 @@ def _build_email_html(body_text, above_avg, season, week):
             for r in g['bowlers']:
                 name = h.escape(r['bowler'].nickname or r['bowler'].last_name)
                 scores = '/'.join(str(s) for s in r['games'])
-                block += f"&nbsp;&nbsp;{name} ({scores}-{r['handicap']})<br>"
+                block += f"&nbsp;&nbsp;{name} - {r['diff']} ({scores}-{r['handicap']})<br>"
         above_html = f'<p>Notable bowling (30+ above average):<br>{block}</p>'
 
     body_html = body_text.replace('\n', '<br>\n') if body_text else ''
