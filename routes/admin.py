@@ -869,7 +869,7 @@ def email_compose(season_id, week_num):
             subject = f'[TEST] {subject}'
 
         # Build HTML email body
-        html_body = _build_email_html(body_text, prizes, above_avg, standings, season, week)
+        html_body = _build_email_html(body_text, prizes, above_avg, season, week)
 
         # Build optional PDF attachment
         pdf_min_games = int(request.form.get('pdf_min_games', 9) or 9)
@@ -989,7 +989,7 @@ def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
         raise RuntimeError(f'Graph API error {e.code}: {body}')
 
 
-def _build_email_html(body_text, prizes, above_avg, standings, season, week):
+def _build_email_html(body_text, prizes, above_avg, season, week):
     """Build the HTML email body from user narrative + auto-generated data."""
     import html as h
 
@@ -1016,19 +1016,6 @@ def _build_email_html(body_text, prizes, above_avg, standings, season, week):
         names = ', '.join(r['bowler'].last_name for r in above_avg)
         above_html = f'<p>Notable bowling (30+ above average): {h.escape(names)}.</p>'
 
-    standings_html = ''
-    if standings:
-        rows = ''.join(
-            f'<tr><td>{h.escape(s["team"].name)}</td><td align="right">{s["points"]}</td></tr>'
-            for s in standings
-        )
-        standings_html = f'''
-<p><strong>Standings through Week {week.week_num}:</strong></p>
-<table cellpadding="4" border="1" style="border-collapse:collapse">
-  <tr><th>Team</th><th>Points</th></tr>
-  {rows}
-</table>'''
-
     body_html = body_text.replace('\n', '<br>\n') if body_text else ''
 
     return f'''<html><body style="font-family:Arial,sans-serif;font-size:14px">
@@ -1036,7 +1023,6 @@ def _build_email_html(body_text, prizes, above_avg, standings, season, week):
 {body_html}
 {above_html}
 {prizes_html}
-{standings_html}
 </body></html>'''
 
 
