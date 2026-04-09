@@ -126,6 +126,7 @@
 
     function b64urlToBuffer(b64url) {
       var base64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+      while (base64.length % 4) base64 += '=';
       var binary = atob(base64);
       var buf = new ArrayBuffer(binary.length);
       var view = new Uint8Array(buf);

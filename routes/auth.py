@@ -125,18 +125,11 @@ def login():
         ).first()
 
         if bowler:
-            # Per-email cooldown: suppress if a token was issued in the last 10 minutes
-            cutoff = datetime.utcnow() - timedelta(minutes=10)
-            recent = MagicLinkToken.query.filter(
-                MagicLinkToken.bowler_id == bowler.id,
-                MagicLinkToken.created_at >= cutoff,
-            ).first()
-            if not recent:
-                send_magic_link(bowler)
+            send_magic_link(bowler)
 
         # Generic response — never confirm whether the email is registered
         flash("If your email is registered, you'll receive a sign-in link shortly. "
-              "Check your inbox (and spam folder).", 'info')
+              "Check your inbox (and spam folder). Links expire after 24 hours.", 'info')
         return redirect(url_for('auth.login'))
 
     site_key = current_app.config.get('TURNSTILE_SITE_KEY', '')
@@ -283,18 +276,25 @@ def webauthn_authenticate_begin():
     data = request.get_json(force=True) or {}
     email = (data.get('email') or '').strip().lower()
 
-    allow_credentials = []
-    bowler_id = None
+    if not email:
+        return jsonify({'error': 'Enter your email address first, then click the passkey button.'}), 400
 
-    if email:
-        bowler = Bowler.query.filter(db.func.lower(Bowler.email) == email).first()
-        if bowler:
-            bowler_id = bowler.id
-            creds = WebAuthnCredential.query.filter_by(bowler_id=bowler.id).all()
-            allow_credentials = [
-                PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
-                for c in creds
-            ]
+    bowler = Bowler.query.filter(db.func.lower(Bowler.email) == email).first()
+    if not bowler:
+        # Don't reveal whether email is registered — same generic flow
+        return jsonify({'error': 'No passkey found for this email. '
+                        'Sign in with an email link first, then set up a passkey from the banner that appears.'}), 400
+
+    creds = WebAuthnCredential.query.filter_by(bowler_id=bowler.id).all()
+    if not creds:
+        return jsonify({'error': 'No passkey registered yet for this account. '
+                        'Sign in with an email link first, then set up a passkey from the banner that appears.'}), 400
+
+    allow_credentials = [
+        PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
+        for c in creds
+    ]
+    bowler_id = bowler.id
 
     options = generate_authentication_options(
         rp_id=current_app.config['WEBAUTHN_RP_ID'],
@@ -303,7 +303,7 @@ def webauthn_authenticate_begin():
     )
 
     session['webauthn_auth_challenge'] = bytes_to_base64url(options.challenge)
-    session['webauthn_auth_bowler_id'] = bowler_id
+    session['webauthn_auth_bowler_id'] = bowler_id  # unused in complete() but kept for future use
     return current_app.response_class(
         response=options_to_json(options), mimetype='application/json'
     )
