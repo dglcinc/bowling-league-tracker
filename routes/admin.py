@@ -872,10 +872,13 @@ def email_compose(season_id, week_num):
         html_body = _build_email_html(body_text, prizes, above_avg, standings, season, week)
 
         # Build optional PDF attachment
+        pdf_min_games = int(request.form.get('pdf_min_games', 9) or 9)
+        pdf_top10 = request.form.get('pdf_top10') == '1'
         pdf_bytes = None
         if attach_pdf:
             try:
-                pdf_bytes = _generate_prizes_pdf(season_id, week_num)
+                pdf_bytes = _generate_prizes_pdf(season_id, week_num,
+                                                 min_games=pdf_min_games, top10=pdf_top10)
             except Exception as pdf_err:
                 flash(f'PDF generation failed (email sent without attachment): {pdf_err}', 'warning')
 
@@ -1037,7 +1040,7 @@ def _build_email_html(body_text, prizes, above_avg, standings, season, week):
 </body></html>'''
 
 
-def _generate_prizes_pdf(season_id, week_num):
+def _generate_prizes_pdf(season_id, week_num, min_games=9, top10=False):
     """Render the prizes/standings page to PDF bytes via WeasyPrint."""
     from weasyprint import HTML
     from flask import current_app, render_template as rt
@@ -1079,8 +1082,10 @@ def _generate_prizes_pdf(season_id, week_num):
             'high_series_hcp':     stats['ytd_high_series_hcp'],
         })
 
-    avg_rows = sorted([l for l in leaders if l['games'] >= 9],
+    avg_rows = sorted([l for l in leaders if l['games'] >= min_games],
                       key=lambda x: (-x['average'], x['bowler'].last_name))
+    if top10:
+        avg_rows = avg_rows[:10]
     full_year       = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
     fh_list         = get_team_standings(season_id, half=1, through_week=week_num)
     sh_list         = get_team_standings(season_id, half=2, through_week=week_num)
@@ -1096,7 +1101,7 @@ def _generate_prizes_pdf(season_id, week_num):
                   standings=full_year,
                   first_half_map=first_half_map, second_half_map=second_half_map,
                   fh_max=fh_max, sh_max=sh_max, fy_max=fy_max,
-                  avg_rows=avg_rows, min_games=9, top10=False,
+                  avg_rows=avg_rows, min_games=min_games, top10=top10,
                   total_wood=total_wood, player_count=player_count,
                   blind_games=blind_games)
 
