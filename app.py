@@ -178,7 +178,7 @@ def create_app():
         if ep is None or ep == 'static':
             return
 
-        # Auth routes are always public
+        # Auth routes and root index are always public or universally accessible
         if ep.startswith('auth.'):
             return
 
@@ -188,6 +188,10 @@ def create_app():
 
         # Editors have full access
         if current_user.is_editor:
+            return
+
+        # Root index just redirects — allow all authenticated users
+        if ep == 'index':
             return
 
         # Viewers: check the permissions table

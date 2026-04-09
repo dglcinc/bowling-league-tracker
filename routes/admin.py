@@ -135,6 +135,13 @@ def send_magic_links(season_id):
         flash('No bowlers selected.', 'warning')
         return redirect(url_for('admin.season_detail', season_id=season_id))
 
+    settings = db.session.get(LeagueSettings, 1)
+    league_name = settings.league_name if settings else 'League Tracker'
+    is_registration = 'registration' in request.form
+    subject = (f'[{league_name}] App Registration'
+               if is_registration else
+               f'Your sign-in link — {league_name}')
+
     sent = failed = no_email = 0
     for bid in bowler_ids:
         bowler = Bowler.query.get(bid)
@@ -143,7 +150,7 @@ def send_magic_links(season_id):
         if not bowler.email:
             no_email += 1
             continue
-        ok, _ = send_magic_link(bowler)
+        ok, _ = send_magic_link(bowler, subject=subject)
         if ok:
             sent += 1
         else:

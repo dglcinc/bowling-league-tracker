@@ -44,9 +44,10 @@ def _verify_turnstile(cf_token):
         return False
 
 
-def send_magic_link(bowler):
+def send_magic_link(bowler, subject=None):
     """Create a fresh token (invalidating all prior ones) and email the sign-in link.
-    Returns (True, None) on success or (False, error_str) on failure."""
+    Returns (True, None) on success or (False, error_str) on failure.
+    Pass a custom subject for registration invitations vs. regular sign-in links."""
     from routes.admin import _send_via_graph
 
     now = datetime.utcnow()
@@ -70,7 +71,8 @@ def send_magic_link(bowler):
     link = url_for('auth.validate_token', token=token_str, _external=True)
     name = bowler.first_name or bowler.last_name
 
-    subject = 'Your sign-in link — League Tracker'
+    if subject is None:
+        subject = 'Your sign-in link — League Tracker'
     html_body = f"""
 <p>Hello {name},</p>
 <p>Click the button below to sign in to the Bowling League Tracker.
@@ -104,43 +106,11 @@ def send_magic_link(bowler):
 # Routes
 # ---------------------------------------------------------------------------
 
-@auth_bp.route('/login', methods=['GET', 'POST'])
-@limiter.limit('5 per 15 minutes', methods=['POST'])
+@auth_bp.route('/login')
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
-
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-
-        # Verify Turnstile CAPTCHA
-        cf_token = request.form.get('cf-turnstile-response', '')
-        if not _verify_turnstile(cf_token):
-            flash('Security check failed. Please try again.', 'danger')
-            return redirect(url_for('auth.login'))
-
-        # Look up bowler by email (case-insensitive)
-        bowler = Bowler.query.filter(
-            db.func.lower(Bowler.email) == email
-        ).first()
-
-        if bowler:
-            # Per-email cooldown: don't send if a token was issued in the last 10 minutes
-            cutoff = datetime.utcnow() - timedelta(minutes=10)
-            recent = MagicLinkToken.query.filter(
-                MagicLinkToken.bowler_id == bowler.id,
-                MagicLinkToken.created_at >= cutoff,
-            ).first()
-            if not recent:
-                send_magic_link(bowler)
-
-        # Always show the same message — never reveal whether email is in DB
-        flash("If your email is registered, you'll receive a sign-in link shortly. "
-              "Check your inbox (and spam folder).", 'info')
-        return redirect(url_for('auth.login'))
-
-    site_key = current_app.config.get('TURNSTILE_SITE_KEY', '')
-    return render_template('auth/login.html', turnstile_site_key=site_key)
+    return render_template('auth/login.html')
 
 
 @auth_bp.route('/magic/<token>')

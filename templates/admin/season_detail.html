@@ -60,12 +60,18 @@
 <h5>Roster ({{ roster|selectattr('active')|list|length }} active, {{ roster|rejectattr('active')|list|length }} inactive)</h5>
 
 <form method="post" action="{{ url_for('admin.send_magic_links', season_id=season.id) }}" id="rosterForm">
-<div class="mb-2">
+<div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
   <button type="submit" class="btn btn-sm btn-outline-primary"
           onclick="return document.querySelectorAll('[name=bowler_ids]:checked').length > 0 || (alert('Select at least one bowler.'), false)">
     Send Magic Link to Selected
   </button>
-  <button type="button" class="btn btn-sm btn-outline-secondary ms-1"
+  <div class="form-check mb-0">
+    <input type="checkbox" class="form-check-input" name="registration" id="regInvite" value="1">
+    <label class="form-check-label" for="regInvite" style="font-size:0.85rem">
+      Registration invite <span class="text-muted">(subject: [League Name] App Registration)</span>
+    </label>
+  </div>
+  <button type="button" class="btn btn-sm btn-outline-secondary"
           onclick="document.querySelectorAll('[name=bowler_ids]').forEach(function(cb){cb.checked=!cb.checked})">
     Toggle All
   </button>
