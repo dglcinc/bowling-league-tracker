@@ -1001,7 +1001,7 @@ def _build_email_html(body_text, above_avg, season, week):
         parts = []
         for r in above_avg:
             scores = '/'.join(str(g) for g in r['games'])
-            parts.append(f"{h.escape(r['bowler'].last_name)} ({scores}-hcp{r['handicap']})")
+            parts.append(f"{h.escape(r['bowler'].last_name)} ({scores}-{r['handicap']})")
         above_html = f'<p>Notable bowling (30+ above average): {", ".join(parts)}.</p>'
 
     body_html = body_text.replace('\n', '<br>\n') if body_text else ''
