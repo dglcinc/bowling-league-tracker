@@ -101,9 +101,10 @@
 
   {% if current_user.is_authenticated and not has_passkey %}
   <div class="alert alert-info alert-dismissible fade show no-print" id="passkeyBanner" role="alert" style="display:none!important">
-    🔑 <strong>Set up Touch ID / Face ID</strong> for faster sign-in next time —
+    🔑 <strong>Set up Touch ID / Face ID</strong> for faster sign-in —
     no email link needed.
     <button type="button" class="btn btn-sm btn-primary ms-2" id="setupPasskeyBtn">Set up now</button>
+    <span class="text-muted ms-2" style="font-size:0.8rem" id="passkeyHint"></span>
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
   {% endif %}
@@ -123,6 +124,15 @@
   PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (ok) {
     if (!ok) return;
     banner.style.removeProperty('display');
+    // Guide Chrome users on Mac to use Safari for direct Touch ID
+    var hint = document.getElementById('passkeyHint');
+    if (hint) {
+      var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      var isMac = /Mac/.test(navigator.userAgent) && !/iPhone|iPad/.test(navigator.userAgent);
+      if (isMac && !isSafari) {
+        hint.textContent = 'Tip: use Safari for direct Touch ID — Chrome may show extra options first.';
+      }
+    }
 
     function b64urlToBuffer(b64url) {
       var base64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
