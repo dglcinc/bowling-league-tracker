@@ -310,6 +310,44 @@ def edit_bowler(bowler_id):
                            season=season, roster=roster, teams=teams)
 
 
+@admin_bp.route('/bowlers/<int:bowler_id>/test-login')
+def test_viewer_login(bowler_id):
+    """Create a magic link token and redirect straight to it — no email sent.
+    Editor-only (enforced by before_request). Use in an incognito window to
+    preview the app as a viewer without disturbing your own session."""
+    from routes.auth import send_magic_link as _send
+    import uuid
+    from datetime import datetime, timedelta
+    from models import MagicLinkToken
+
+    bowler = Bowler.query.get_or_404(bowler_id)
+    if bowler.is_editor:
+        flash(f'{bowler.display_name} is an editor — their view is the same as yours. '
+              'Pick a non-editor bowler to test viewer mode.', 'warning')
+        return redirect(request.referrer or url_for('admin.seasons'))
+
+    now = datetime.utcnow()
+    # Invalidate prior unused tokens
+    MagicLinkToken.query.filter_by(bowler_id=bowler.id, used_at=None).update({'used_at': now})
+    token_str = str(uuid.uuid4())
+    db.session.add(MagicLinkToken(
+        token=token_str,
+        bowler_id=bowler.id,
+        expires_at=now + timedelta(hours=1),
+        created_at=now,
+    ))
+    db.session.commit()
+
+    flash(f'Copy this URL into an incognito window to log in as {bowler.display_name} '
+          f'(viewer). The link expires in 1 hour.', 'info')
+    # Redirect to the token URL so clicking it here logs the editor in as that bowler.
+    # Better: show the URL so they can paste it into incognito instead.
+    from flask import request as req, url_for as _url
+    token_url = _url('auth.validate_token', token=token_str, _external=True)
+    return render_template('admin/test_viewer_link.html',
+                           bowler=bowler, token_url=token_url)
+
+
 @admin_bp.route('/seasons/<int:season_id>/roster/<int:roster_id>/toggle', methods=['POST'])
 def toggle_active(season_id, roster_id):
     r = Roster.query.get_or_404(roster_id)

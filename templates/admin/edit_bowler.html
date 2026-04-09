@@ -56,13 +56,17 @@
     {% endif %}
   </div>
 
-  <div class="d-flex gap-2">
+  <div class="d-flex gap-2 flex-wrap">
     <button type="submit" class="btn btn-primary">Save</button>
     {% if season %}
     <a href="{{ url_for('admin.season_detail', season_id=season.id) }}"
        class="btn btn-outline-secondary">Back to Roster</a>
     {% else %}
     <a href="{{ url_for('admin.seasons') }}" class="btn btn-outline-secondary">Back</a>
+    {% endif %}
+    {% if not bowler.is_editor %}
+    <a href="{{ url_for('admin.test_viewer_login', bowler_id=bowler.id) }}"
+       class="btn btn-outline-info btn-sm ms-auto">Test as Viewer (incognito)</a>
     {% endif %}
   </div>
 </form>
