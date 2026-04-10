@@ -1,6 +1,6 @@
 # Bowling League Tracker
 
-A Flask web application for managing a recreational ten-pin bowling league. Replaces a hand-maintained Excel workbook with a proper application for score entry, handicap calculation, standings, prize tracking, and printable weekly reports.
+A Flask web application for managing a recreational ten-pin bowling league. Replaces a hand-maintained Excel workbook with a proper application for score entry, handicap calculation, standings, prize tracking, and printable weekly reports. This is for a specific league that bowls on 8 lanes with some hard-coded post season tournaments. You can fork and modify for your own league. The advantage of this app rather than using the standard league software at the alley is you can have bowlers come and go week to week and bowl on different lanes, so it's more flexible and chill. The alley we go to runs the lanes with league format (two lane matches with lane swaps each frame) but it allows us to enter bowlers free-form each week.
 
 ## Features
 
