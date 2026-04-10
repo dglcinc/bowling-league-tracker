@@ -43,6 +43,26 @@ Four tournament weeks are automatically appended to each season after the regula
 
 The individual tournament entry form shows live rankings that update as scores are typed.
 
+### Authentication and Access Control
+The app uses passwordless authentication — no passwords stored.
+
+- **Magic links**: bowlers request a sign-in link by email; the link is single-use and expires in 24 hours
+- **Passkeys**: after signing in, bowlers can register a passkey (Touch ID, Face ID, or hardware key) for one-tap sign-in
+- **Two roles**: `editor` (full access to score entry and admin) and `viewer` (read-only access to configurable subset of pages)
+- **Viewer permissions**: admin UI at `/admin/viewer-access` controls which pages viewer-role users can reach
+- **Cloudflare Turnstile**: optional bot protection on the login page (configure `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` in `.env`; skipped in dev if keys are absent)
+- **Rate limiting**: login endpoint is rate-limited via Flask-Limiter
+
+Admin can send magic links in bulk to all bowlers on a season from the season detail page.
+
+### End-of-Season Payout
+Full payout calculator with printable output for the end-of-season banquet.
+
+- **Config**: admin sets total available funds and configures prize rates (tournament places, weekly wins, YTD categories, trophy deduction, team place percentages)
+- **Waterfall calculation**: tournament awards → weekly/YTD individual prizes → trophy deduction → team remainder distributed by place finish
+- **Payout summary**: three-section printable totals sheet — individual payouts (itemized), team payouts by place, and a currency breakdown showing exact bill inventory to pull from the bank
+- **Award pages**: one printable certificate per recipient, designed for handing out at the banquet (ornamental border, formal typography)
+
 ### Reports
 
 | Report | URL | Description |
@@ -54,7 +74,9 @@ The individual tournament entry form shows live rankings that update as scores a
 | High Games & Averages | `/reports/season/<id>/high-games` | Average leaders and top-10 lists for HG/HS scratch and handicap; filterable by minimum games |
 | Per-Week Prizes | `/reports/season/<id>/week/<week>/prizes` | Four prize categories with tie handling; team standings; YTD leaders |
 | Bowler Detail | `/reports/season/<id>/bowler/<id>` | Individual bowler week-by-week breakdown |
-| Payout Overview | `/payout/season/<id>` | YTD prize counts, weekly prize history, Iron Man candidates, Most Improved |
+| Payout Overview | `/payout/season/<id>` | YTD prize counts, weekly prize history, Most Improved |
+| Payout Summary | `/payout/season/<id>/summary` | Full end-of-season payout calculation with currency breakdown |
+| Award Pages | `/payout/season/<id>/award/all` | Printable award certificates for all recipients |
 
 ### Print Batch
 A single page (`/reports/season/<id>/print-batch/<week>`) assembles all weekly print materials:
@@ -71,6 +93,14 @@ A single page (`/reports/season/<id>/print-batch/<week>`) assembles all weekly p
 - XLS import: upload an end-of-season spreadsheet to seed a full historical season (roster, scores, standings)
 - Assign Matchups tool: for each week, assign bowlers to lane pair A or B — useful for correcting historical data
 - Per-bowler Stats link in the roster table for quick access to the bowler detail report
+- League Settings (`/admin/settings`): configure league name, nickname display, and captain name display
+- Viewer Permissions (`/admin/viewer-access`): control which pages viewer-role users can access
+- Payout Config: linked from each season's admin page; set prize rates before running the end-of-season payout
+- Send Magic Links: bulk-send sign-in email invitations to all bowlers on a season
+- Mailing List: export or email a weekly results summary to the season's roster
+
+### PWA / Mobile App
+The app ships a web app manifest and service worker so it can be installed as a Progressive Web App on iOS, Android, and desktop Chrome. The home screen icon is a 🎳 emoji rendered at full resolution.
 
 ## Data Model
 
@@ -81,7 +111,14 @@ Season  ──< Team ──< Roster ──> Bowler
         ──< MatchupEntry      (one bowler's scores for one matchup)
         ──< TeamPoints        (points earned per team per matchup)
         ──< TournamentEntry   (individual tournament scores, not in season stats)
+        ──< PayoutConfig      (end-of-season prize configuration)
         ──< Snapshot          (weekly JSON snapshot for backup)
+
+LeagueSettings               (single row — league name, display options)
+MagicLinkToken ──> Bowler    (single-use sign-in tokens)
+LinkedAccount  ──> Bowler    (tracks auth method per bowler)
+WebAuthnCredential ──> Bowler (registered passkeys)
+ViewerPermission             (per-endpoint viewer access flags)
 ```
 
 All statistics (averages, handicaps, high games, standings) are computed on the fly from `MatchupEntry` rows. Nothing derived is stored.
@@ -102,12 +139,20 @@ All statistics (averages, handicaps, high games, standings) are computed on the 
 
 **TeamPoints** — `points_earned` is Float to support 0.5-point ties.
 
+**PayoutConfig** — one row per season; stores all prize rates, team payout percentages, and final week number for the payout calculation.
+
 ## Tech Stack
 
 - **Python 3** / **Flask** — web framework and routing (port 5001)
 - **SQLAlchemy** — ORM; SQLite database stored in OneDrive folder for automatic cloud backup
+- **Flask-Login** — session management and user authentication
+- **Flask-Limiter** — rate limiting on auth endpoints
 - **Jinja2** — templating
 - **Bootstrap 5** — responsive layout and print utilities
+- **MSAL + Microsoft Graph API** — email delivery (replaces SMTP; uses client credentials flow)
+- **python-webauthn** — passkey/WebAuthn registration and authentication
+- **WeasyPrint** — PDF generation (optional; requires system Pango library)
+- **python-dotenv** — `.env` file support for local development
 - No JavaScript frameworks — vanilla JS for blind auto-fill, date cascade, live tournament rankings, and print group isolation
 
 ## Project Layout
@@ -116,20 +161,28 @@ All statistics (averages, handicaps, high games, standings) are computed on the 
 bowling-league-tracker/
 ├── app.py                  # App factory, blueprint registration, DB migration
 ├── config.py               # DB path (OneDrive-backed), snapshot dir
+├── extensions.py           # Shared Flask extensions (db, login_manager, limiter)
 ├── models.py               # SQLAlchemy models
 ├── calculations.py         # All stat computation (pure functions, no DB writes)
 ├── snapshots.py            # Weekly JSON snapshot writer
 ├── routes/
-│   ├── admin.py            # Season, team, roster, week, schedule, XLS import
+│   ├── admin.py            # Season, team, roster, week, schedule, XLS import, email
+│   ├── auth.py             # Login, magic link, passkey (WebAuthn), logout
 │   ├── entry.py            # Score entry, matchup forms, tournament entry, points calculation
 │   ├── reports.py          # All report views
-│   └── payout.py           # Prize payout overview
+│   └── payout.py           # Prize payout overview, config, summary, award pages
+├── static/
+│   ├── manifest.json       # PWA manifest
+│   ├── sw.js               # Service worker
+│   └── icons/              # PWA icons (192px, 512px)
 ├── templates/
 │   ├── base.html
-│   ├── admin/              # Season/roster/schedule admin pages
+│   ├── admin/              # Season/roster/schedule/settings admin pages
+│   ├── auth/               # Login and passkey management pages
 │   ├── entry/              # Score entry and tournament entry pages
 │   ├── reports/            # Report and print pages
-│   └── payout/
+│   └── payout/             # Payout config, summary, and award certificate pages
+├── docs/                   # Implementation plans and design notes
 └── seed_*.py               # One-time data import scripts (historical XLS import)
 ```
 
@@ -138,15 +191,46 @@ bowling-league-tracker/
 ### Requirements
 
 ```
-flask
-flask-sqlalchemy
-openpyxl          # only needed for XLS import (seed scripts and web import)
+flask>=3.0.0
+flask-sqlalchemy>=3.1.0
+flask-login>=0.6.3
+flask-limiter>=3.5.0
+flask-mail>=0.10.0
+python-dotenv>=1.0.0
+openpyxl>=3.1.0
+weasyprint>=62.0
+msal>=1.29.0
+webauthn>=2.0.0
 ```
 
 Install:
 ```bash
-pip install flask flask-sqlalchemy openpyxl
+pip install -r requirements.txt
 ```
+
+### Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# Microsoft Graph API (email delivery)
+GRAPH_TENANT_ID=your-tenant-id
+GRAPH_CLIENT_ID=your-client-id
+GRAPH_CLIENT_SECRET=your-client-secret
+GRAPH_SENDER_EMAIL=sender@yourdomain.com
+
+# Cloudflare Turnstile (optional bot protection on login page)
+TURNSTILE_SITE_KEY=your-site-key
+TURNSTILE_SECRET_KEY=your-secret-key
+
+# WeasyPrint on Apple Silicon (if using PDF generation)
+DYLD_LIBRARY_PATH=/opt/homebrew/lib
+
+# Flask secret key
+SECRET_KEY=a-long-random-string
+```
+
+Email delivery requires an Azure AD app registration with `Mail.Send` permission using client credentials flow. If Graph API credentials are not configured, magic link emails will fail silently in development — use `gen_magic_link.py` to generate a link directly from the command line.
 
 ### Running
 
@@ -162,6 +246,7 @@ The app runs on port 5001. The SQLite database is created automatically on first
 2. Add bowlers to the roster under Admin → Season
 3. Set up the weekly schedule (lane assignments) under Admin → Schedule
 4. Set week dates under Admin → Week Dates — enter the first date and subsequent weeks auto-fill at weekly intervals
+5. Configure league name and display options at `/admin/settings`
 
 Four post-season tournament weeks are created automatically; their order can be adjusted by changing the tournament type dropdown in Week Dates.
 
@@ -169,6 +254,19 @@ Four post-season tournament weeks are created automatically; their order can be 
 
 Use `/admin/import_season` to upload an existing Excel workbook. The import reads `wkly alpha` for roster, individual bowler sheets for game scores, and `team scoring` for team standings.
 
+### WeasyPrint on Apple Silicon
+
+WeasyPrint requires the Pango text rendering library. On an Apple Silicon Mac:
+
+```bash
+brew install pango
+# Create Linux-compatible symlinks expected by WeasyPrint
+ln -s /opt/homebrew/lib/libpango-1.0.dylib /opt/homebrew/lib/libpango-1.0.so.0
+# (repeat for other Pango/Cairo libs as needed)
+```
+
+Set `DYLD_LIBRARY_PATH=/opt/homebrew/lib` in your `.env`.
+
 ## Configuring for a Different League
 
-All configuration (team count, number of weeks, handicap formula, blind scores, bowling format) is per-season in the admin UI. The handicap formula defaults (base 200, factor 0.9) can be adjusted for different league rules.
+All configuration (team count, number of weeks, handicap formula, blind scores, bowling format) is per-season in the admin UI. The handicap formula defaults (base 200, factor 0.9) can be adjusted for different league rules. League name and display options are in Admin → League Settings.
