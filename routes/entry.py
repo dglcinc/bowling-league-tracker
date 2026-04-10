@@ -2,7 +2,7 @@
 Score entry routes: weekly matchup entry, blind management, points calculation.
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
                     TeamPoints, Roster, Bowler, TournamentEntry)
 from calculations import (score_matchup, score_position_night, calculate_handicap,
@@ -148,6 +148,61 @@ def week_entry(season_id, week_num):
                            prev_week_num=prev_week_num,
                            next_week_num=next_week_num,
                            tournament_labels=_TOURNAMENT_LABELS)
+
+
+@entry_bp.route('/season/<int:season_id>/week/<int:week_num>/clear-tournament-entries', methods=['POST'])
+def clear_tournament_entries(season_id, week_num):
+    from flask_login import current_user
+    if not current_user.is_editor:
+        abort(403)
+    TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
+    db.session.commit()
+    flash(f'Tournament entries for week {week_num} cleared.', 'info')
+    return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+
+@entry_bp.route('/season/<int:season_id>/week/<int:week_num>/generate-test-entries', methods=['POST'])
+def generate_test_entries(season_id, week_num):
+    from flask_login import current_user
+    if not current_user.is_editor:
+        abort(403)
+    import random
+    season = Season.query.get_or_404(season_id)
+    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
+
+    if not week.tournament_type or week.tournament_type == 'club_championship':
+        flash('Test entries only apply to individual tournament weeks.', 'warning')
+        return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+    TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
+
+    is_harry = week.tournament_type == 'harry_russell'
+    num_games = 5 if is_harry else 3
+
+    roster = (Roster.query
+              .filter_by(season_id=season_id, active=True)
+              .join(Bowler)
+              .order_by(Bowler.last_name)
+              .all())
+
+    for r in roster:
+        hcp = 0 if is_harry else calculate_handicap(r.bowler_id, season_id, week_num)
+        games = [random.randint(130, 220) for _ in range(num_games)]
+        db.session.add(TournamentEntry(
+            season_id=season_id,
+            week_num=week_num,
+            bowler_id=r.bowler_id,
+            handicap=hcp,
+            game1=games[0],
+            game2=games[1],
+            game3=games[2],
+            game4=games[3] if num_games > 3 else None,
+            game5=games[4] if num_games > 4 else None,
+        ))
+
+    db.session.commit()
+    flash(f'Generated test entries for {len(roster)} bowlers.', 'success')
+    return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
 
 def _auto_assign_position_night(season_id, position_week_num):
