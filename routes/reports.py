@@ -72,11 +72,8 @@ def week_prizes(season_id, week_num):
     season = Season.query.get_or_404(season_id)
     week   = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
 
-    if week.tournament_type:
-        return _week_prizes_tournament(season, week)
-
+    # Regular weekly stats — always computed (tournament weeks show these too)
     prizes = get_weekly_prizes(season_id, week_num)
-
     all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
     total_wood = sum(
         e.total_pins + (
@@ -89,7 +86,6 @@ def week_prizes(season_id, week_num):
     player_count = sum(1 for e in all_entries if not e.is_blind)
     blind_games  = sum(e.game_count for e in all_entries if e.is_blind)
 
-    # YTD high game/series leaders through this week
     min_games = request.args.get('min_games', 9, type=int)
     top10 = request.args.get('top10', 0, type=int)
     roster_entries = (Roster.query
@@ -111,7 +107,6 @@ def week_prizes(season_id, week_num):
             'high_series_hcp':     stats['ytd_high_series_hcp'],
         })
 
-    # Averages table: filter by min_games, sort by avg desc
     avg_rows = sorted(
         [l for l in leaders if l['games'] >= min_games],
         key=lambda x: (-x['average'], x['bowler'].last_name)
@@ -129,6 +124,50 @@ def week_prizes(season_id, week_num):
     sh_max = max(second_half_map.values(), default=0)
     fy_max = max((s['points'] for s in full_year), default=0)
 
+    # Tournament results (post-season weeks only)
+    tt = week.tournament_type
+    tournament_results = None
+    payout = None
+    if tt == 'club_championship':
+        team_data = {}
+        for e in all_entries:
+            tid = e.team_id
+            if tid not in team_data:
+                team_data[tid] = {'team': e.team, 'g1': 0, 'g2': 0, 'g3': 0,
+                                  'total_scratch': 0, 'total_wood': 0}
+            hcp = (season.blind_handicap if e.is_blind
+                   else calculate_handicap(e.bowler_id, season_id, week_num))
+            g1, g2, g3 = e.game1 or 0, e.game2 or 0, e.game3 or 0
+            team_data[tid]['g1'] += g1
+            team_data[tid]['g2'] += g2
+            team_data[tid]['g3'] += g3
+            team_data[tid]['total_scratch'] += g1 + g2 + g3
+            team_data[tid]['total_wood']    += g1 + g2 + g3 + hcp * e.game_count
+        tournament_results = sorted(team_data.values(), key=lambda x: -x['total_wood'])
+        for i, r in enumerate(tournament_results):
+            r['placement'] = i + 1
+    elif tt in ('harry_russell', 'chad_harris', 'shep_belyea'):
+        t_entries = TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+        results = []
+        for e in t_entries:
+            games = [e.game1, e.game2, e.game3, e.game4, e.game5]
+            scratch = sum(g for g in games if g is not None)
+            total_wood = scratch if tt == 'harry_russell' else e.total_with_hcp
+            results.append({
+                'name':      e.bowler.last_name if e.bowler else e.guest_name,
+                'nickname':  e.bowler.nickname  if e.bowler else '',
+                'bowler_id': e.bowler_id,
+                'games':     games,
+                'scratch':   scratch,
+                'handicap':  e.handicap,
+                'total_wood': total_wood,
+            })
+        results.sort(key=lambda x: -x['total_wood'])
+        for i, r in enumerate(results):
+            r['placement'] = i + 1
+        tournament_results = results
+        payout = PayoutConfig.query.filter_by(season_id=season_id).first()
+
     return render_template('reports/week_prizes.html',
                            season=season, week=week,
                            prizes=prizes,
@@ -142,80 +181,10 @@ def week_prizes(season_id, week_num):
                            top10=top10,
                            total_wood=total_wood,
                            player_count=player_count,
-                           blind_games=blind_games)
-
-
-def _week_prizes_tournament(season, week):
-    """Render week_prizes for tournament weeks (23–26)."""
-    tt = week.tournament_type
-
-    if tt == 'club_championship':
-        entries = MatchupEntry.query.filter_by(
-            season_id=season.id, week_num=week.week_num
-        ).all()
-
-        team_data = {}
-        for e in entries:
-            tid = e.team_id
-            if tid not in team_data:
-                team_data[tid] = {
-                    'team': e.team,
-                    'g1': 0, 'g2': 0, 'g3': 0,
-                    'total_scratch': 0, 'total_wood': 0,
-                }
-            hcp = (season.blind_handicap if e.is_blind
-                   else calculate_handicap(e.bowler_id, season.id, week.week_num))
-            g1 = e.game1 or 0
-            g2 = e.game2 or 0
-            g3 = e.game3 or 0
-            team_data[tid]['g1'] += g1
-            team_data[tid]['g2'] += g2
-            team_data[tid]['g3'] += g3
-            team_data[tid]['total_scratch'] += g1 + g2 + g3
-            team_data[tid]['total_wood'] += g1 + g2 + g3 + hcp * e.game_count
-
-        results = sorted(team_data.values(), key=lambda x: -x['total_wood'])
-        for i, r in enumerate(results):
-            r['placement'] = i + 1
-
-        return render_template('reports/week_prizes.html',
-                               season=season, week=week,
-                               tournament_type=tt,
-                               tournament_results=results,
-                               payout=None)
-
-    else:
-        # harry_russell (5 games scratch), chad_harris / shep_belyea (3 games handicap)
-        entries = TournamentEntry.query.filter_by(
-            season_id=season.id, week_num=week.week_num
-        ).all()
-
-        results = []
-        for e in entries:
-            games = [e.game1, e.game2, e.game3, e.game4, e.game5]
-            scratch = sum(g for g in games if g is not None)
-            total_wood = scratch if tt == 'harry_russell' else e.total_with_hcp
-            results.append({
-                'name':      e.bowler.last_name if e.bowler else e.guest_name,
-                'nickname':  e.bowler.nickname  if e.bowler else '',
-                'bowler_id': e.bowler_id,
-                'games':     games,
-                'scratch':   scratch,
-                'handicap':  e.handicap,
-                'total_wood': total_wood,
-            })
-
-        results.sort(key=lambda x: -x['total_wood'])
-        for i, r in enumerate(results):
-            r['placement'] = i + 1
-
-        payout = PayoutConfig.query.filter_by(season_id=season.id).first()
-
-        return render_template('reports/week_prizes.html',
-                               season=season, week=week,
-                               tournament_type=tt,
-                               tournament_results=results,
-                               payout=payout)
+                           blind_games=blind_games,
+                           tournament_type=tt,
+                           tournament_results=tournament_results,
+                           payout=payout)
 
 
 @reports_bp.route('/season/<int:season_id>/points')

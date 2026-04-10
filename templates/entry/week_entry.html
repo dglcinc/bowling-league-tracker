@@ -54,10 +54,24 @@
   <strong>{{ tournament_labels.get(week.tournament_type, week.tournament_type) }}:</strong>
   Individual competition — use the tournament entry form.
 </div>
-<a href="{{ url_for('entry.tournament_entry', season_id=season.id, week_num=week.week_num) }}"
-   class="btn btn-primary mb-3">
-  {{ 'Edit Tournament Scores' if week.is_entered else 'Enter Tournament Scores' }}
-</a>
+<div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
+  <a href="{{ url_for('entry.tournament_entry', season_id=season.id, week_num=week.week_num) }}"
+     class="btn btn-primary">
+    {{ 'Edit Tournament Scores' if week.is_entered else 'Enter Tournament Scores' }}
+  </a>
+  {% if current_user.is_editor %}
+  <form method="post"
+        action="{{ url_for('entry.clear_tournament_entries', season_id=season.id, week_num=week.week_num) }}"
+        onsubmit="return confirm('Delete all tournament entries for this week?')">
+    <button class="btn btn-outline-danger btn-sm">Clear Entries</button>
+  </form>
+  <form method="post"
+        action="{{ url_for('entry.generate_test_entries', season_id=season.id, week_num=week.week_num) }}"
+        onsubmit="return confirm('Replace existing entries with random test data?')">
+    <button class="btn btn-outline-secondary btn-sm">Generate Test Entries</button>
+  </form>
+  {% endif %}
+</div>
 {% endif %}
 
 {% if week.is_position_night %}
