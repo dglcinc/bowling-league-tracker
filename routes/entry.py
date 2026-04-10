@@ -204,6 +204,7 @@ def generate_test_entries(season_id, week_num):
                         game3=games[2],
                     ))
                     count += 1
+        week.is_entered = True
         db.session.commit()
         flash(f'Generated test entries for {count} bowler slots.', 'success')
         return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
@@ -235,6 +236,7 @@ def generate_test_entries(season_id, week_num):
             game5=games[4] if num_games > 4 else None,
         ))
 
+    week.is_entered = True
     db.session.commit()
     flash(f'Generated test entries for {len(roster)} bowlers.', 'success')
     return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
