@@ -432,7 +432,8 @@ def matchup_entry(season_id, week_num, matchup_num):
     return render_template('entry/matchup_entry.html',
                            season=season, week=week, sched=sched,
                            teams=teams, team_entries=team_entries,
-                           roster_data=roster_data, breakdown=breakdown)
+                           roster_data=roster_data, breakdown=breakdown,
+                           tournament_labels=_TOURNAMENT_LABELS)
 
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/position/<int:pairing_num>',
