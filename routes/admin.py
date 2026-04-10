@@ -2,7 +2,7 @@
 Admin routes: season setup, roster management, schedule entry, season rollover.
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission
 from datetime import date, timedelta
 import io
@@ -138,9 +138,9 @@ def send_magic_links(season_id):
     settings = db.session.get(LeagueSettings, 1)
     league_name = settings.league_name if settings else 'League Tracker'
     is_registration = 'registration' in request.form
-    subject = (f'[{league_name}] App Registration'
+    subject = (f'{league_name}: App Registration'
                if is_registration else
-               f'Your sign-in link — {league_name}')
+               f'{league_name}: Sign-In Instructions')
 
     sent = failed = no_email = 0
     for bid in bowler_ids:
@@ -1205,6 +1205,21 @@ def _generate_prizes_pdf(season_id, week_num, min_games=9, top10=False):
                   blind_games=blind_games)
 
     return HTML(string=html_str).write_pdf()
+
+
+# ── Tournament entry management ───────────────────────────────────────────────
+
+@admin_bp.route('/seasons/<int:season_id>/week/<int:week_num>/clear-tournament-entries',
+                methods=['POST'])
+def clear_tournament_entries(season_id, week_num):
+    from models import TournamentEntry
+    from flask_login import current_user
+    if not current_user.is_editor:
+        abort(403)
+    TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
+    db.session.commit()
+    flash(f'Tournament entries for week {week_num} cleared.', 'info')
+    return redirect(url_for('reports.week_prizes', season_id=season_id, week_num=week_num))
 
 
 # ── Backup & Restore ──────────────────────────────────────────────────────────

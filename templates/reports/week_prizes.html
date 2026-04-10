@@ -88,6 +88,127 @@
 </div>
 {% endmacro %}
 
+{% if tournament_type %}
+
+{# ── Tournament display ──────────────────────────────────────────────────── #}
+{% set tt_labels = {
+  'club_championship': 'Club Championship',
+  'harry_russell':     'Harry E. Russell Championship',
+  'chad_harris':       'Chad Harris Memorial Bowl',
+  'shep_belyea':       'Shep Belyea Open',
+} %}
+
+<div class="section-head mb-3">{{ tt_labels.get(tournament_type, tournament_type) }}</div>
+
+{% if tournament_type == 'club_championship' %}
+<table class="table table-sm table-bordered" style="max-width:600px">
+  <thead class="table-dark"><tr>
+    <th>#</th><th>Team</th>
+    <th class="text-end">G1</th><th class="text-end">G2</th><th class="text-end">G3</th>
+    <th class="text-end">Scratch</th><th class="text-end">Total Wood</th>
+  </tr></thead>
+  <tbody>
+  {% for r in tournament_results %}
+  <tr{% if loop.index <= 2 %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>
+    <td class="fw-bold">{{ loop.index }}</td>
+    <td>{{ r.team.name }}</td>
+    <td class="text-end">{{ r.g1 }}</td>
+    <td class="text-end">{{ r.g2 }}</td>
+    <td class="text-end">{{ r.g3 }}</td>
+    <td class="text-end">{{ r.total_scratch }}</td>
+    <td class="text-end fw-bold">{{ r.total_wood }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="7" class="text-muted text-center">No entries yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% elif tournament_type == 'harry_russell' %}
+{# Scratch only, 5 games #}
+<table class="table table-sm table-bordered" style="max-width:700px">
+  <thead class="table-dark"><tr>
+    <th>#</th><th>Name</th><th>Nick</th>
+    <th class="text-end">G1</th><th class="text-end">G2</th><th class="text-end">G3</th>
+    <th class="text-end">G4</th><th class="text-end">G5</th>
+    <th class="text-end">Total</th>
+  </tr></thead>
+  <tbody>
+  {% for r in tournament_results %}
+  <tr{% if r.placement <= 3 %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>
+    <td class="fw-bold">
+      {{ r.placement }}{% if r.placement == 1 and payout and payout.tournament_prize_1 %}
+        <span class="text-muted" style="font-size:0.75em"> (${{ payout.tournament_prize_1|int }})</span>{% endif %}
+      {% if r.placement == 2 and payout and payout.tournament_prize_2 %}
+        <span class="text-muted" style="font-size:0.75em"> (${{ payout.tournament_prize_2|int }})</span>{% endif %}
+      {% if r.placement == 3 and payout and payout.tournament_prize_3 %}
+        <span class="text-muted" style="font-size:0.75em"> (${{ payout.tournament_prize_3|int }})</span>{% endif %}
+    </td>
+    <td>{{ r.name }}</td>
+    <td>{{ r.nickname or '' }}</td>
+    {% for g in r.games %}
+    <td class="text-end">{{ g if g is not none else '—' }}</td>
+    {% endfor %}
+    {% for _ in range(5 - r.games|length) %}<td class="text-end text-muted">—</td>{% endfor %}
+    <td class="text-end fw-bold">{{ r.total_wood }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="9" class="text-muted text-center">No entries yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% else %}
+{# Chad Harris / Shep Belyea: handicap, 3 games #}
+<table class="table table-sm table-bordered" style="max-width:650px">
+  <thead class="table-dark"><tr>
+    <th>#</th><th>Name</th><th>Nick</th>
+    <th class="text-end">G1</th><th class="text-end">G2</th><th class="text-end">G3</th>
+    <th class="text-end">Scratch</th><th class="text-end">Hcp</th><th class="text-end">Total Wood</th>
+  </tr></thead>
+  <tbody>
+  {% for r in tournament_results %}
+  <tr{% if r.placement <= 3 %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>
+    <td class="fw-bold">
+      {{ r.placement }}{% if r.placement == 1 and payout and payout.tournament_prize_1 %}
+        <span class="text-muted" style="font-size:0.75em"> (${{ payout.tournament_prize_1|int }})</span>{% endif %}
+      {% if r.placement == 2 and payout and payout.tournament_prize_2 %}
+        <span class="text-muted" style="font-size:0.75em"> (${{ payout.tournament_prize_2|int }})</span>{% endif %}
+      {% if r.placement == 3 and payout and payout.tournament_prize_3 %}
+        <span class="text-muted" style="font-size:0.75em"> (${{ payout.tournament_prize_3|int }})</span>{% endif %}
+    </td>
+    <td>{{ r.name }}</td>
+    <td>{{ r.nickname or '' }}</td>
+    {% for g in r.games[:3] %}
+    <td class="text-end">{{ g if g is not none else '—' }}</td>
+    {% endfor %}
+    {% for _ in range(3 - [r.games|length, 3]|min) %}<td class="text-end text-muted">—</td>{% endfor %}
+    <td class="text-end">{{ r.scratch }}</td>
+    <td class="text-end">{{ r.handicap }}</td>
+    <td class="text-end fw-bold">{{ r.total_wood }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="9" class="text-muted text-center">No entries yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<div class="no-print mt-3 d-flex gap-2">
+  <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}"
+     class="btn btn-outline-secondary btn-sm">Back to Week</a>
+  {% if current_user.is_editor %}
+  <form method="post"
+        action="{{ url_for('admin.clear_tournament_entries', season_id=season.id, week_num=week.week_num) }}"
+        onsubmit="return confirm('Delete all tournament entries for this week?')">
+    <button class="btn btn-outline-danger btn-sm">Clear Entries</button>
+  </form>
+  {% endif %}
+</div>
+
+{% else %}
+
+{# ── Regular week display ────────────────────────────────────────────────── #}
 <div class="row g-3">
 
   {# Left: this week's prizes (2 columns per category pair) #}
@@ -255,4 +376,6 @@
     {% endfor %}
   </div>
 </div>
+
+{% endif %}
 {% endblock %}
