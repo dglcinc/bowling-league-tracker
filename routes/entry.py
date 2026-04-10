@@ -161,6 +161,7 @@ def clear_tournament_entries(season_id, week_num):
         TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).delete()
     else:
         TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
+    week.is_entered = False
     db.session.commit()
     flash(f'Tournament entries for week {week_num} cleared.', 'info')
     return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
