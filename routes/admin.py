@@ -422,17 +422,24 @@ def save_schedule(season_id):
         updates.setdefault((wn, mn), {})[field] = val
 
     for (wn, mn), fields in updates.items():
+        t1 = int(fields['t1']) if fields.get('t1') else None
+        t2 = int(fields['t2']) if fields.get('t2') else None
+
         entry = ScheduleEntry.query.filter_by(
             season_id=season_id, week_num=wn, matchup_num=mn
         ).first()
         if not entry:
+            # Don't create a new entry without both team IDs — tournament weeks
+            # may submit a lane pair with no team dropdowns filled.
+            if not (t1 and t2):
+                continue
             entry = ScheduleEntry(season_id=season_id, week_num=wn, matchup_num=mn)
             db.session.add(entry)
 
-        if fields.get('t1'):
-            entry.team1_id = int(fields['t1'])
-        if fields.get('t2'):
-            entry.team2_id = int(fields['t2'])
+        if t1:
+            entry.team1_id = t1
+        if t2:
+            entry.team2_id = t2
         if fields.get('lane'):
             entry.lane_pair = fields['lane'].strip()
 
