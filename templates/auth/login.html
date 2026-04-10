@@ -33,7 +33,7 @@
 <div class="login-card">
   <div class="brand-header">
     <h1>🎳 League Tracker</h1>
-    <p>Mountain Lakes Men's Bowling League</p>
+    <p>{{ league_settings.league_name if league_settings else 'Bowling League' }}</p>
   </div>
   <div class="card border-top-0 rounded-top-0">
     <div class="card-body p-4">

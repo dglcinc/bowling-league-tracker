@@ -299,7 +299,7 @@
   {# ── Certificate content ────────────────────────────────── #}
   <div class="cert-content">
 
-    <div class="cert-league">Mountain Lakes Men's Bowling League</div>
+    <div class="cert-league">{{ league_settings.league_name if league_settings else 'Bowling League' }}</div>
     <div class="cert-season">{{ season.name }} Season</div>
 
     <hr class="orange-rule">
@@ -359,7 +359,7 @@
     {% endfor %}
 
     <div class="cert-footer">
-      Presented by the Mountain Lakes Men's Bowling League &nbsp;&mdash;&nbsp; {{ season.name }}
+      Presented by the {{ league_settings.league_name if league_settings else 'Bowling League' }} &nbsp;&mdash;&nbsp; {{ season.name }}
     </div>
 
   </div>

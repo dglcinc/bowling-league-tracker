@@ -81,7 +81,7 @@
 </div>
 
 <div class="text-center mb-2" style="font-size:0.9rem">
-  <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp; {{ season.name }}
+  <strong>{{ league_settings.league_name if league_settings else 'Bowling League' }}</strong> &nbsp;|&nbsp; {{ season.name }}
   &nbsp;|&nbsp; {{ week_label(week) }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% else %}{% endif %}
 </div>
 

@@ -41,7 +41,7 @@
 </div>
 
 <div class="text-center mb-1" style="font-size:0.9rem">
-  <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp;
+  <strong>{{ league_settings.league_name if league_settings else 'Bowling League' }}</strong> &nbsp;|&nbsp;
   {{ season.name }} &nbsp;|&nbsp;
   YTD Alpha — Week {{ week_num }}{% if week and week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
   {% if week and week.is_position_night %}&nbsp;&#9733; Position Night{% endif %}

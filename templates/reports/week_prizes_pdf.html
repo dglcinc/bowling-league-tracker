@@ -171,7 +171,7 @@
 
 {# Page header #}
 <div class="page-header">
-  Mountain Lakes Men's Bowling League &nbsp;|&nbsp; {{ season.name }}
+  {{ league_settings.league_name if league_settings else 'Bowling League' }} &nbsp;|&nbsp; {{ season.name }}
   &nbsp;|&nbsp; Week {{ week.week_num }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
   {% if week.is_position_night %}&nbsp;&#9733; Position Night{% endif %}
 </div>
