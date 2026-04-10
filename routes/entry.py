@@ -2,7 +2,7 @@
 Score entry routes: weekly matchup entry, blind management, points calculation.
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
                     TeamPoints, Roster, Bowler, TournamentEntry)
 from calculations import (score_matchup, score_position_night, calculate_handicap,
@@ -136,6 +136,15 @@ def week_entry(season_id, week_num):
         recon = {'player_count': player_count, 'blind_games': blind_games,
                  'total_wood': total_wood, 'prizes': prizes}
 
+    # Tournament score summary for individual post-season events
+    tournament_entries = []
+    if week.tournament_type and week.tournament_type != 'club_championship':
+        tournament_entries = (TournamentEntry.query
+                              .filter_by(season_id=season_id, week_num=week_num)
+                              .join(Bowler, TournamentEntry.bowler_id == Bowler.id, isouter=True)
+                              .order_by(Bowler.last_name)
+                              .all())
+
     return render_template('entry/week_entry.html',
                            season=season, week=week,
                            matchups=matchups,
@@ -147,7 +156,100 @@ def week_entry(season_id, week_num):
                            breakdown_by_pairing=breakdown_by_pairing,
                            prev_week_num=prev_week_num,
                            next_week_num=next_week_num,
-                           tournament_labels=_TOURNAMENT_LABELS)
+                           tournament_labels=_TOURNAMENT_LABELS,
+                           tournament_entries=tournament_entries)
+
+
+@entry_bp.route('/season/<int:season_id>/week/<int:week_num>/clear-tournament-entries', methods=['POST'])
+def clear_tournament_entries(season_id, week_num):
+    from flask_login import current_user
+    if not current_user.is_editor:
+        abort(403)
+    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
+    if week.tournament_type == 'club_championship':
+        MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
+        TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).delete()
+    else:
+        TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
+    week.is_entered = False
+    db.session.commit()
+    flash(f'Tournament entries for week {week_num} cleared.', 'info')
+    return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+
+@entry_bp.route('/season/<int:season_id>/week/<int:week_num>/generate-test-entries', methods=['POST'])
+def generate_test_entries(season_id, week_num):
+    from flask_login import current_user
+    if not current_user.is_editor:
+        abort(403)
+    import random
+    season = Season.query.get_or_404(season_id)
+    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
+
+    if not week.tournament_type:
+        flash('Test entries only apply to post-season tournament weeks.', 'warning')
+        return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+    if week.tournament_type == 'club_championship':
+        # Clear and regenerate MatchupEntry rows from the schedule
+        MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
+        TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).delete()
+        schedules = ScheduleEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+        count = 0
+        for sched in schedules:
+            for team_id in (sched.team1_id, sched.team2_id):
+                bowlers = (Roster.query
+                           .filter_by(season_id=season_id, team_id=team_id, active=True)
+                           .all())
+                for r in bowlers:
+                    games = [random.randint(130, 220) for _ in range(3)]
+                    db.session.add(MatchupEntry(
+                        season_id=season_id,
+                        week_num=week_num,
+                        matchup_num=sched.matchup_num,
+                        team_id=team_id,
+                        bowler_id=r.bowler_id,
+                        game1=games[0],
+                        game2=games[1],
+                        game3=games[2],
+                    ))
+                    count += 1
+        week.is_entered = True
+        db.session.commit()
+        flash(f'Generated test entries for {count} bowler slots.', 'success')
+        return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+    # Individual tournament (harry_russell, chad_harris, shep_belyea)
+    TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
+
+    is_harry = week.tournament_type == 'harry_russell'
+    num_games = 5 if is_harry else 3
+
+    roster = (Roster.query
+              .filter_by(season_id=season_id, active=True)
+              .join(Bowler)
+              .order_by(Bowler.last_name)
+              .all())
+
+    for r in roster:
+        hcp = 0 if is_harry else calculate_handicap(r.bowler_id, season_id, week_num)
+        games = [random.randint(130, 220) for _ in range(num_games)]
+        db.session.add(TournamentEntry(
+            season_id=season_id,
+            week_num=week_num,
+            bowler_id=r.bowler_id,
+            handicap=hcp,
+            game1=games[0],
+            game2=games[1],
+            game3=games[2],
+            game4=games[3] if num_games > 3 else None,
+            game5=games[4] if num_games > 4 else None,
+        ))
+
+    week.is_entered = True
+    db.session.commit()
+    flash(f'Generated test entries for {len(roster)} bowlers.', 'success')
+    return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
 
 def _auto_assign_position_night(season_id, position_week_num):
@@ -343,7 +445,8 @@ def matchup_entry(season_id, week_num, matchup_num):
     return render_template('entry/matchup_entry.html',
                            season=season, week=week, sched=sched,
                            teams=teams, team_entries=team_entries,
-                           roster_data=roster_data, breakdown=breakdown)
+                           roster_data=roster_data, breakdown=breakdown,
+                           tournament_labels=_TOURNAMENT_LABELS)
 
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/position/<int:pairing_num>',

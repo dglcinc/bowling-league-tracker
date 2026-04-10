@@ -57,20 +57,32 @@
 </style>
 {% endblock %}
 
+{% set _tt_labels = {
+  'club_championship': 'Club Championship',
+  'harry_russell':     'Harry E. Russell Championship',
+  'chad_harris':       'Chad Harris Memorial Bowl',
+  'shep_belyea':       'Shep Belyea Open',
+} %}
+{% macro week_label(wk) %}{% if wk.tournament_type %}{{ _tt_labels.get(wk.tournament_type, 'Week ' + wk.week_num|string) }}{% else %}Week {{ wk.week_num }}{% if wk.is_position_night %} ★{% endif %}{% endif %}{% if wk.date %} — {{ wk.date.strftime('%b %d') }}{% endif %}{% endmacro %}
+
 {% block content %}
-<div class="no-print mb-2">
-  <nav aria-label="breadcrumb">
-    <ol class="breadcrumb mb-0">
-      <li class="breadcrumb-item"><a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}">Week {{ week.week_num }}</a></li>
-      <li class="breadcrumb-item active">Prizes &amp; Standings</li>
-    </ol>
-  </nav>
+<div class="d-flex justify-content-between align-items-center mb-2 no-print">
+  <h6 class="mb-0">Prizes &amp; Standings</h6>
+  <div class="d-flex gap-2">
+    <select class="form-select form-select-sm w-auto"
+            onchange="location='{{ url_for('reports.week_prizes', season_id=season.id, week_num=0) }}'.replace('/0','/'+ this.value)">
+      {% for wk in weeks %}
+      <option value="{{ wk.week_num }}" {% if wk.week_num == week.week_num %}selected{% endif %}>
+        {{ week_label(wk) }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
 </div>
 
 <div class="text-center mb-2" style="font-size:0.9rem">
   <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp; {{ season.name }}
-  &nbsp;|&nbsp; Week {{ week.week_num }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
-  {% if week.is_position_night %}&nbsp;&#9733; Position Night{% endif %}
+  &nbsp;|&nbsp; {{ week_label(week) }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% else %}{% endif %}
 </div>
 
 {% macro prize_box(cat, label) %}
@@ -88,9 +100,92 @@
 </div>
 {% endmacro %}
 
-<div class="row g-3">
+{# ── Tournament results (post-season weeks only) ─────────────────────────── #}
+{% if tournament_type %}
+<div class="section-head mb-3">{{ _tt_labels.get(tournament_type, tournament_type) }}</div>
 
-  {# Left: this week's prizes (2 columns per category pair) #}
+{% if tournament_type == 'club_championship' %}
+<table class="table table-sm table-bordered mb-3" style="max-width:600px">
+  <thead class="table-dark"><tr>
+    <th style="width:3rem">#</th><th>Team</th>
+    <th class="text-end">G1</th><th class="text-end">G2</th><th class="text-end">G3</th>
+    <th class="text-end">Scratch</th><th class="text-end">Total Wood</th>
+  </tr></thead>
+  <tbody>
+  {% for r in tournament_results %}
+  <tr{% if loop.index <= 2 %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>
+    <td class="fw-bold">{{ loop.index }}</td>
+    <td>{{ r.team.name }}</td>
+    <td class="text-end">{{ r.g1 }}</td>
+    <td class="text-end">{{ r.g2 }}</td>
+    <td class="text-end">{{ r.g3 }}</td>
+    <td class="text-end">{{ r.total_scratch }}</td>
+    <td class="text-end fw-bold">{{ r.total_wood }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="7" class="text-muted text-center">No entries yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% elif tournament_type == 'harry_russell' %}
+<table class="table table-sm table-bordered mb-3" style="max-width:700px">
+  <thead class="table-dark"><tr>
+    <th style="width:3rem">#</th><th>Name</th><th>Nick</th>
+    <th class="text-end">G1</th><th class="text-end">G2</th><th class="text-end">G3</th>
+    <th class="text-end">G4</th><th class="text-end">G5</th>
+    <th class="text-end">Total</th>
+  </tr></thead>
+  <tbody>
+  {% for r in tournament_results %}
+  <tr{% if r.placement <= 3 %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>
+    <td class="fw-bold">{{ r.placement }}{% if r.placement <= 3 and payout %}
+      {% set prize = [payout.tournament_prize_1, payout.tournament_prize_2, payout.tournament_prize_3][r.placement - 1] %}
+      {% if prize %}<span class="text-muted" style="font-size:0.75em"> (${{ prize|int }})</span>{% endif %}
+    {% endif %}</td>
+    <td>{{ r.name }}</td><td>{{ r.nickname or '' }}</td>
+    {% for g in r.games %}<td class="text-end">{{ g if g is not none else '—' }}</td>{% endfor %}
+    {% for _ in range(5 - r.games|length) %}<td class="text-end text-muted">—</td>{% endfor %}
+    <td class="text-end fw-bold">{{ r.total_wood }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="9" class="text-muted text-center">No entries yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% else %}{# chad_harris / shep_belyea #}
+<table class="table table-sm table-bordered mb-3" style="max-width:650px">
+  <thead class="table-dark"><tr>
+    <th style="width:3rem">#</th><th>Name</th><th>Nick</th>
+    <th class="text-end">G1</th><th class="text-end">G2</th><th class="text-end">G3</th>
+    <th class="text-end">Scratch</th><th class="text-end">Hcp</th><th class="text-end">Total Wood</th>
+  </tr></thead>
+  <tbody>
+  {% for r in tournament_results %}
+  <tr{% if r.placement <= 3 %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>
+    <td class="fw-bold">{{ r.placement }}{% if r.placement <= 3 and payout %}
+      {% set prize = [payout.tournament_prize_1, payout.tournament_prize_2, payout.tournament_prize_3][r.placement - 1] %}
+      {% if prize %}<span class="text-muted" style="font-size:0.75em"> (${{ prize|int }})</span>{% endif %}
+    {% endif %}</td>
+    <td>{{ r.name }}</td><td>{{ r.nickname or '' }}</td>
+    {% for g in r.games[:3] %}<td class="text-end">{{ g if g is not none else '—' }}</td>{% endfor %}
+    {% for _ in range(3 - [r.games|length, 3]|min) %}<td class="text-end text-muted">—</td>{% endfor %}
+    <td class="text-end">{{ r.scratch }}</td>
+    <td class="text-end">{{ r.handicap }}</td>
+    <td class="text-end fw-bold">{{ r.total_wood }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="9" class="text-muted text-center">No entries yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endif %}{# end tournament block #}
+
+{# ── Weekly prize boxes (regular weeks only) ─────────────────────────────── #}
+{% if not tournament_type %}
+<div class="row g-3">
   <div class="col-12 col-xl">
     <div class="section-head">Week {{ week.week_num }} Prizes</div>
     <div class="row g-2">
@@ -99,19 +194,20 @@
       <div class="col-6">{{ prize_box(prizes.hs_hcp if prizes else none, 'High Series — Handicap') }}</div>
       <div class="col-6">{{ prize_box(prizes.hs_scratch if prizes else none, 'High Series — Scratch') }}</div>
     </div>
-
-    {# Total wood + recon #}
     <div class="d-flex gap-3 mt-2" style="font-size:0.85rem">
       <div><span class="text-muted">Total Wood (w/Hcp):</span> <strong>{{ total_wood }}</strong></div>
       <div><span class="text-muted">Players:</span> <strong>{{ player_count }}</strong></div>
       <div><span class="text-muted">Blind Games:</span> <strong>{{ blind_games }}</strong></div>
     </div>
   </div>
+{% else %}
+<div class="row g-3">
+{% endif %}
 
-  {# Middle: team standings #}
+  {# Team standings — always shown #}
   <div class="col-12 col-xl-auto">
     <div style="width:fit-content">
-    <div class="section-head">Team Standings — Week {{ week.week_num }}</div>
+    <div class="section-head">Team Standings{% if not tournament_type %} — Week {{ week.week_num }}{% endif %}</div>
     <table class="table table-sm table-bordered mb-0">
       <thead><tr>
         <th>Team</th>
@@ -135,7 +231,7 @@
     </div>
   </div>
 
-  {# Right: YTD leaders #}
+  {# YTD leaders — always shown #}
   <div class="col-12 col-xl">
     <div class="section-head">YTD Leaders Through Week {{ week.week_num }}</div>
     <div class="row g-2">
@@ -162,7 +258,7 @@
 
 </div>
 
-{# High averages section #}
+{# High averages — always shown #}
 <hr>
 <div class="d-flex align-items-center gap-3 mb-2 no-print">
   <h6 class="mb-0">High Averages</h6>
@@ -202,7 +298,7 @@
 </table>
 </div>
 
-{# YTD leader boxes (screen only) #}
+{# YTD leader boxes (screen only) — always shown #}
 <div class="row g-3 mt-1 no-print">
   {% for attr, label in [('high_game_scratch','HG Scratch'),('high_game_hcp','HG Handicap'),
                           ('high_series_scratch','HS Scratch'),('high_series_hcp','HS Handicap')] %}
@@ -226,11 +322,13 @@
 <div class="no-print mt-3 d-flex gap-2">
   <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}"
      class="btn btn-outline-secondary btn-sm">Back to Week</a>
+  {% if not tournament_type %}
   <a href="{{ url_for('admin.email_compose', season_id=season.id, week_num=week.week_num) }}"
      class="btn btn-outline-primary btn-sm">Send Weekly Email</a>
+  {% endif %}
 </div>
 
-{# Print section 2: YTD High Games (flows on same page, print only) #}
+{# Print section 2: YTD High Games (print only) #}
 <div class="print-page-2">
   <div class="row g-2 mt-1">
     {% for attr, label in [('high_game_scratch','High Game Scratch'),('high_game_hcp','High Game w/ Handicap'),
@@ -242,11 +340,7 @@
         <tbody>
           {% for i, r in enumerate(leaders | sort(attribute=attr, reverse=True)) %}
           {% if i < 10 %}
-          <tr>
-            <td>{{ i+1 }}</td>
-            <td>{{ r.bowler.last_name }}</td>
-            <td class="text-end">{{ r[attr] }}</td>
-          </tr>
+          <tr><td>{{ i+1 }}</td><td>{{ r.bowler.last_name }}</td><td class="text-end">{{ r[attr] }}</td></tr>
           {% endif %}
           {% endfor %}
         </tbody>

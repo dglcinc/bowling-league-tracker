@@ -138,9 +138,9 @@ def send_magic_links(season_id):
     settings = db.session.get(LeagueSettings, 1)
     league_name = settings.league_name if settings else 'League Tracker'
     is_registration = 'registration' in request.form
-    subject = (f'[{league_name}] App Registration'
+    subject = (f'{league_name}: App Registration'
                if is_registration else
-               f'Your sign-in link — {league_name}')
+               f'{league_name}: Sign-In Instructions')
 
     sent = failed = no_email = 0
     for bid in bowler_ids:

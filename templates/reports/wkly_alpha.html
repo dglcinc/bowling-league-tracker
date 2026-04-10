@@ -24,6 +24,12 @@
 </style>
 {% endblock %}
 
+{% set _tt_short = {
+  'club_championship': 'Club Champ.',
+  'harry_russell':     'Harry Russell',
+  'chad_harris':       'Chad Harris',
+  'shep_belyea':       'Shep Belyea',
+} %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-2 no-print">
   <h2>Wkly Alpha — {{ season.name }}</h2>
@@ -32,8 +38,7 @@
             onchange="location='{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=0) }}'.replace('/0', '/'+this.value)+'{{ ('?team='+team_filter) if team_filter else '' }}'">
       {% for wk in weeks %}
       <option value="{{ wk.week_num }}" {% if wk.week_num == week_num %}selected{% endif %}>
-        Week {{ wk.week_num }}{% if wk.date %} — {{ wk.date.strftime('%b %d') }}{% endif %}
-        {% if wk.is_position_night %}★{% endif %}
+        {% if wk.tournament_type %}{{ _tt_short.get(wk.tournament_type, 'Week ' + wk.week_num|string) }}{% else %}Week {{ wk.week_num }}{% if wk.is_position_night %} ★{% endif %}{% endif %}{% if wk.date %} — {{ wk.date.strftime('%b %d') }}{% endif %}
       </option>
       {% endfor %}
     </select>

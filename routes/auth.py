@@ -72,7 +72,10 @@ def send_magic_link(bowler, subject=None):
     name = bowler.first_name or bowler.last_name
 
     if subject is None:
-        subject = 'Your sign-in link — League Tracker'
+        from models import LeagueSettings
+        settings = db.session.get(LeagueSettings, 1)
+        league_name = settings.league_name if settings else 'League Tracker'
+        subject = f'{league_name}: Sign-In Instructions'
     html_body = f"""
 <p>Hello {name},</p>
 <p>Click the button below to sign in to the Bowling League Tracker.
