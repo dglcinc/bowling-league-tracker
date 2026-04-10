@@ -127,8 +127,10 @@ def week_prizes(season_id, week_num):
     sh_max = max(second_half_map.values(), default=0)
     fy_max = max((s['points'] for s in full_year), default=0)
 
+    weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
+
     return render_template('reports/week_prizes.html',
-                           season=season, week=week,
+                           season=season, week=week, weeks=weeks,
                            prizes=prizes,
                            leaders=leaders,
                            standings=full_year,

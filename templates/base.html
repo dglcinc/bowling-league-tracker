@@ -75,6 +75,26 @@
         {% endif %}
       </ul>
       <ul class="navbar-nav ms-auto">
+        {% if all_seasons | length > 1 %}
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+            {{ active_season.name if active_season else 'Season' }}
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            {% for s in all_seasons %}
+            {% set wn = latest_entered.get(s.id, 0) %}
+            {% if wn %}
+            <li>
+              <a class="dropdown-item {% if active_season and s.id == active_season.id %}active{% endif %}"
+                 href="{{ url_for('reports.week_prizes', season_id=s.id, week_num=wn) }}">
+                {{ s.name }}{% if s.is_active %} &#9679;{% endif %}
+              </a>
+            </li>
+            {% endif %}
+            {% endfor %}
+          </ul>
+        </li>
+        {% endif %}
         <li class="nav-item">
           <a class="nav-link text-light" href="#" id="installAppLink" style="display:none">Install App</a>
         </li>
