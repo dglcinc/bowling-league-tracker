@@ -168,8 +168,10 @@ def week_prizes(season_id, week_num):
         tournament_results = results
         payout = PayoutConfig.query.filter_by(season_id=season_id).first()
 
+    weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
+
     return render_template('reports/week_prizes.html',
-                           season=season, week=week,
+                           season=season, week=week, weeks=weeks,
                            prizes=prizes,
                            leaders=leaders,
                            standings=full_year,

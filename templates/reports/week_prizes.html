@@ -57,20 +57,32 @@
 </style>
 {% endblock %}
 
+{% set _tt_labels = {
+  'club_championship': 'Club Championship',
+  'harry_russell':     'Harry E. Russell Championship',
+  'chad_harris':       'Chad Harris Memorial Bowl',
+  'shep_belyea':       'Shep Belyea Open',
+} %}
+{% macro week_label(wk) %}{% if wk.tournament_type %}{{ _tt_labels.get(wk.tournament_type, 'Week ' + wk.week_num|string) }}{% else %}Week {{ wk.week_num }}{% if wk.is_position_night %} ★{% endif %}{% endif %}{% if wk.date %} — {{ wk.date.strftime('%b %d') }}{% endif %}{% endmacro %}
+
 {% block content %}
-<div class="no-print mb-2">
-  <nav aria-label="breadcrumb">
-    <ol class="breadcrumb mb-0">
-      <li class="breadcrumb-item"><a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}">Week {{ week.week_num }}</a></li>
-      <li class="breadcrumb-item active">Prizes &amp; Standings</li>
-    </ol>
-  </nav>
+<div class="d-flex justify-content-between align-items-center mb-2 no-print">
+  <h6 class="mb-0">Prizes &amp; Standings</h6>
+  <div class="d-flex gap-2">
+    <select class="form-select form-select-sm w-auto"
+            onchange="location='{{ url_for('reports.week_prizes', season_id=season.id, week_num=0) }}'.replace('/0','/'+ this.value)">
+      {% for wk in weeks %}
+      <option value="{{ wk.week_num }}" {% if wk.week_num == week.week_num %}selected{% endif %}>
+        {{ week_label(wk) }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
 </div>
 
 <div class="text-center mb-2" style="font-size:0.9rem">
   <strong>Mountain Lakes Men's Bowling League</strong> &nbsp;|&nbsp; {{ season.name }}
-  &nbsp;|&nbsp; Week {{ week.week_num }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% endif %}
-  {% if week.is_position_night %}&nbsp;&#9733; Position Night{% endif %}
+  &nbsp;|&nbsp; {{ week_label(week) }}{% if week.date %} — {{ week.date.strftime('%B %d, %Y') }}{% else %}{% endif %}
 </div>
 
 {% macro prize_box(cat, label) %}
@@ -88,16 +100,9 @@
 </div>
 {% endmacro %}
 
-{% set tt_labels = {
-  'club_championship': 'Club Championship',
-  'harry_russell':     'Harry E. Russell Championship',
-  'chad_harris':       'Chad Harris Memorial Bowl',
-  'shep_belyea':       'Shep Belyea Open',
-} %}
-
 {# ── Tournament results (post-season weeks only) ─────────────────────────── #}
 {% if tournament_type %}
-<div class="section-head mb-3">{{ tt_labels.get(tournament_type, tournament_type) }}</div>
+<div class="section-head mb-3">{{ _tt_labels.get(tournament_type, tournament_type) }}</div>
 
 {% if tournament_type == 'club_championship' %}
 <table class="table table-sm table-bordered mb-3" style="max-width:600px">

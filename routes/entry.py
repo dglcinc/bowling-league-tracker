@@ -155,7 +155,12 @@ def clear_tournament_entries(season_id, week_num):
     from flask_login import current_user
     if not current_user.is_editor:
         abort(403)
-    TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
+    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
+    if week.tournament_type == 'club_championship':
+        MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
+        TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).delete()
+    else:
+        TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
     db.session.commit()
     flash(f'Tournament entries for week {week_num} cleared.', 'info')
     return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
@@ -170,10 +175,39 @@ def generate_test_entries(season_id, week_num):
     season = Season.query.get_or_404(season_id)
     week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
 
-    if not week.tournament_type or week.tournament_type == 'club_championship':
-        flash('Test entries only apply to individual tournament weeks.', 'warning')
+    if not week.tournament_type:
+        flash('Test entries only apply to post-season tournament weeks.', 'warning')
         return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
+    if week.tournament_type == 'club_championship':
+        # Clear and regenerate MatchupEntry rows from the schedule
+        MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
+        TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).delete()
+        schedules = ScheduleEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+        count = 0
+        for sched in schedules:
+            for team_id in (sched.team1_id, sched.team2_id):
+                bowlers = (Roster.query
+                           .filter_by(season_id=season_id, team_id=team_id, active=True)
+                           .all())
+                for r in bowlers:
+                    games = [random.randint(130, 220) for _ in range(3)]
+                    db.session.add(MatchupEntry(
+                        season_id=season_id,
+                        week_num=week_num,
+                        matchup_num=sched.matchup_num,
+                        team_id=team_id,
+                        bowler_id=r.bowler_id,
+                        game1=games[0],
+                        game2=games[1],
+                        game3=games[2],
+                    ))
+                    count += 1
+        db.session.commit()
+        flash(f'Generated test entries for {count} bowler slots.', 'success')
+        return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+    # Individual tournament (harry_russell, chad_harris, shep_belyea)
     TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
 
     is_harry = week.tournament_type == 'harry_russell'

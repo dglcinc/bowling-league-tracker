@@ -223,11 +223,23 @@ def create_app():
             has_passkey = WebAuthnCredential.query.filter_by(
                 bowler_id=current_user.id
             ).first() is not None
+        all_seasons = Season.query.order_by(Season.name.desc()).all()
+        latest_entered = {}
+        for s in all_seasons:
+            lw = (Week.query
+                  .filter_by(season_id=s.id, is_entered=True)
+                  .order_by(Week.week_num.desc())
+                  .first())
+            latest_entered[s.id] = lw.week_num if lw else 0
+        seasons_with_data = [s for s in all_seasons if latest_entered.get(s.id, 0) > 0]
         return {
             'active_season': active,
             'current_week': current_week,
             'league_settings': settings,
             'has_passkey': has_passkey,
+            'all_seasons': all_seasons,
+            'latest_entered': latest_entered,
+            'seasons_with_data': seasons_with_data,
         }
 
     @app.route('/')

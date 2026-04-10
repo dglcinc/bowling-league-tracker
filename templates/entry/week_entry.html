@@ -72,6 +72,19 @@
   </form>
   {% endif %}
 </div>
+{% elif week.tournament_type == 'club_championship' and current_user.is_editor %}
+<div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
+  <form method="post"
+        action="{{ url_for('entry.clear_tournament_entries', season_id=season.id, week_num=week.week_num) }}"
+        onsubmit="return confirm('Delete all Club Championship scores for this week?')">
+    <button class="btn btn-outline-danger btn-sm">Clear Entries</button>
+  </form>
+  <form method="post"
+        action="{{ url_for('entry.generate_test_entries', season_id=season.id, week_num=week.week_num) }}"
+        onsubmit="return confirm('Replace existing scores with random test data?')">
+    <button class="btn btn-outline-secondary btn-sm">Generate Test Entries</button>
+  </form>
+</div>
 {% endif %}
 
 {% if week.is_position_night %}
