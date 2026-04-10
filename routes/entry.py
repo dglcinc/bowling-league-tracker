@@ -136,6 +136,15 @@ def week_entry(season_id, week_num):
         recon = {'player_count': player_count, 'blind_games': blind_games,
                  'total_wood': total_wood, 'prizes': prizes}
 
+    # Tournament score summary for individual post-season events
+    tournament_entries = []
+    if week.tournament_type and week.tournament_type != 'club_championship':
+        tournament_entries = (TournamentEntry.query
+                              .filter_by(season_id=season_id, week_num=week_num)
+                              .join(Bowler, TournamentEntry.bowler_id == Bowler.id, isouter=True)
+                              .order_by(Bowler.last_name)
+                              .all())
+
     return render_template('entry/week_entry.html',
                            season=season, week=week,
                            matchups=matchups,
@@ -147,7 +156,8 @@ def week_entry(season_id, week_num):
                            breakdown_by_pairing=breakdown_by_pairing,
                            prev_week_num=prev_week_num,
                            next_week_num=next_week_num,
-                           tournament_labels=_TOURNAMENT_LABELS)
+                           tournament_labels=_TOURNAMENT_LABELS,
+                           tournament_entries=tournament_entries)
 
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/clear-tournament-entries', methods=['POST'])

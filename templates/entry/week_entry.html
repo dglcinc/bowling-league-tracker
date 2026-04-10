@@ -72,6 +72,40 @@
   </form>
   {% endif %}
 </div>
+{% if tournament_entries %}
+<div class="table-scroll">
+<table class="table table-sm table-bordered mb-3" style="max-width:600px">
+  <thead class="table-dark"><tr>
+    <th>Name</th>
+    {% if week.tournament_type != 'harry_russell' %}<th class="text-end" style="width:3.5rem">Hcp</th>{% endif %}
+    <th class="text-end" style="width:3.5rem">G1</th>
+    <th class="text-end" style="width:3.5rem">G2</th>
+    <th class="text-end" style="width:3.5rem">G3</th>
+    {% if week.tournament_type == 'harry_russell' %}
+    <th class="text-end" style="width:3.5rem">G4</th>
+    <th class="text-end" style="width:3.5rem">G5</th>
+    {% endif %}
+    <th class="text-end" style="width:4rem">Total</th>
+  </tr></thead>
+  <tbody>
+  {% for e in tournament_entries %}
+  <tr>
+    <td>{{ e.bowler.last_name if e.bowler else e.guest_name or '—' }}</td>
+    {% if week.tournament_type != 'harry_russell' %}<td class="text-end">{{ e.handicap or 0 }}</td>{% endif %}
+    <td class="text-end">{{ e.game1 or '—' }}</td>
+    <td class="text-end">{{ e.game2 or '—' }}</td>
+    <td class="text-end">{{ e.game3 or '—' }}</td>
+    {% if week.tournament_type == 'harry_russell' %}
+    <td class="text-end">{{ e.game4 or '—' }}</td>
+    <td class="text-end">{{ e.game5 or '—' }}</td>
+    {% endif %}
+    <td class="text-end fw-bold">{{ e.total_with_hcp }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
 {% elif week.tournament_type == 'club_championship' and current_user.is_editor %}
 <div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
   <form method="post"
