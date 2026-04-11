@@ -47,7 +47,7 @@
       <ul class="navbar-nav me-auto">
         {% if current_user.is_editor %}
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('entry.index') }}">Scores</a>
+          <a class="nav-link" href="{{ url_for('entry.week_list', season_id=nav_s.id) if nav_s else url_for('entry.index') }}">Scores</a>
         </li>
         {% endif %}
         {% if nav_s %}
