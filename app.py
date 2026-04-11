@@ -89,6 +89,9 @@ def _migrate_db(db):
         "ALTER TABLE seasons ADD COLUMN name_indiv_scratch VARCHAR(128) DEFAULT 'Harry E. Russell Championship'",
         "ALTER TABLE seasons ADD COLUMN name_indiv_hcp_1 VARCHAR(128) DEFAULT 'Chad Harris Memorial Bowl'",
         "ALTER TABLE seasons ADD COLUMN name_indiv_hcp_2 VARCHAR(128) DEFAULT 'Shep Belyea Open'",
+        # Venue distinction: which bowling alley was used for each season
+        "ALTER TABLE seasons ADD COLUMN venue VARCHAR(32) DEFAULT 'boonton_lanes'",
+        "UPDATE seasons SET venue = 'mountain_lakes_club' WHERE name < '2024-2025'",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:

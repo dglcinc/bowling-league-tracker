@@ -5,6 +5,7 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4>Seasons</h4>
   <div class="d-flex gap-2">
+    <a href="{{ url_for('admin.all_bowlers') }}" class="btn btn-outline-secondary btn-sm">All Bowlers</a>
     <a href="{{ url_for('admin.league_settings') }}" class="btn btn-outline-secondary btn-sm">League Settings</a>
     <a href="{{ url_for('admin.viewer_access') }}" class="btn btn-outline-secondary btn-sm">Viewer Access</a>
     <a href="{{ url_for('admin.backup_restore') }}" class="btn btn-outline-secondary btn-sm">Backup &amp; Restore</a>

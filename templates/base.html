@@ -47,7 +47,7 @@
       <ul class="navbar-nav me-auto">
         {% if current_user.is_editor %}
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('entry.index') }}">Scores</a>
+          <a class="nav-link" href="{{ url_for('entry.week_list', season_id=nav_s.id) if nav_s else url_for('entry.index') }}">Scores</a>
         </li>
         {% endif %}
         {% if nav_s %}
@@ -73,6 +73,9 @@
         {% endif %}
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('records.records') }}">Records</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('records.bowler_dir') }}">Bowlers</a>
         </li>
         {% if current_user.is_editor %}
         <li class="nav-item">
@@ -283,8 +286,11 @@ if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw
         return;
       }
 
-      // Replace trailing week number segment, if present
-      updated = updated.replace(/\/\d+$/, '/' + newWk);
+      // Replace trailing week number only for routes that end with a week number
+      // (alpha, ytd-alpha, print-batch). Do NOT replace for /bowler/<id> or similar.
+      if (/\/(alpha|ytd-alpha|print-batch)\/\d+$/.test(updated)) {
+        updated = updated.replace(/\/\d+$/, '/' + newWk);
+      }
 
       window.location.href = updated;
     });

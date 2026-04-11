@@ -3,7 +3,7 @@ Records route: all-time leaderboards and season comparison table.
 """
 
 from collections import defaultdict
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request
 from models import (db, Season, Week, Bowler, MatchupEntry)
 from calculations import get_bowler_stats, get_team_standings
 
@@ -181,12 +181,22 @@ def _season_comparison(seasons, summaries):
     return rows
 
 
+_VENUE_LABELS = {
+    'mountain_lakes_club': 'Mountain Lakes Club',
+    'boonton_lanes':       'Boonton Lanes',
+}
+
+
 @records_bp.route('/records')
 def records():
     seasons, tournament_weeks = _get_season_data()
+    venue_filter = request.args.get('venue', 'all')
+
     if not seasons:
         return render_template('reports/records.html',
                                seasons=[],
+                               venue_filter=venue_filter,
+                               venue_labels=_VENUE_LABELS,
                                all_time_hg_s=[], all_time_hs_s=[],
                                all_time_hg_h=[], all_time_hs_h=[],
                                all_time_avg=[], top_season_avgs=[],
@@ -194,15 +204,27 @@ def records():
 
     summaries = _compute_bowler_season_summaries(seasons, tournament_weeks)
 
+    # Venue filter — applied before leaderboard computation so rankings are per-venue
+    if venue_filter in _VENUE_LABELS:
+        filtered = [s for s in summaries
+                    if (s['season'].venue or 'boonton_lanes') == venue_filter]
+        filtered_seasons = [s for s in seasons
+                            if (s.venue or 'boonton_lanes') == venue_filter]
+    else:
+        filtered = summaries
+        filtered_seasons = seasons
+
     all_time_hg_s, all_time_hs_s, all_time_hg_h, all_time_hs_h, all_time_avg = (
-        _all_time_records(summaries)
+        _all_time_records(filtered)
     )
-    most_improved = _most_improved(summaries)
-    season_comp   = _season_comparison(seasons, summaries)
-    top_season_avgs = sorted(summaries, key=lambda r: -r['avg'])[:25]
+    most_improved = _most_improved(filtered)
+    season_comp   = _season_comparison(filtered_seasons, filtered)
+    top_season_avgs = sorted(filtered, key=lambda r: -r['avg'])[:25]
 
     return render_template('reports/records.html',
                            seasons=seasons,
+                           venue_filter=venue_filter,
+                           venue_labels=_VENUE_LABELS,
                            all_time_hg_s=all_time_hg_s,
                            all_time_hs_s=all_time_hs_s,
                            all_time_hg_h=all_time_hg_h,
@@ -211,3 +233,23 @@ def records():
                            top_season_avgs=top_season_avgs,
                            most_improved=most_improved,
                            season_comparison=season_comp)
+
+
+@records_bp.route('/bowler_dir')
+def bowler_dir():
+    from calculations import get_career_stats
+    bowlers = Bowler.query.order_by(Bowler.last_name, Bowler.first_name).all()
+    dir_entries = []
+    for bowler in bowlers:
+        career = get_career_stats(bowler.id)
+        if not career:
+            continue
+        best_avg = max(r['avg'] for r in career)
+        best_hg  = max(r['high_game_scratch'] for r in career)
+        dir_entries.append({
+            'bowler':    bowler,
+            'career':    career,
+            'best_avg':  best_avg,
+            'best_hg':   best_hg,
+        })
+    return render_template('reports/bowler_dir.html', dir_entries=dir_entries)

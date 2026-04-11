@@ -474,11 +474,14 @@ def edit_weeks(season_id):
     ]
 
     if request.method == 'POST':
-        # Save tournament display names
+        # Save tournament display names and venue
         season.name_club_championship = request.form.get('name_club_championship', '').strip() or season.name_club_championship
         season.name_indiv_scratch     = request.form.get('name_indiv_scratch', '').strip()     or season.name_indiv_scratch
         season.name_indiv_hcp_1       = request.form.get('name_indiv_hcp_1', '').strip()       or season.name_indiv_hcp_1
         season.name_indiv_hcp_2       = request.form.get('name_indiv_hcp_2', '').strip()       or season.name_indiv_hcp_2
+        venue = request.form.get('venue', '').strip()
+        if venue in ('mountain_lakes_club', 'boonton_lanes'):
+            season.venue = venue
 
         for wk in weeks:
             date_str = request.form.get(f'date_{wk.week_num}')
@@ -1306,3 +1309,20 @@ def restore_backup(filename):
     except Exception as e:
         flash(f'Restore failed: {e}', 'danger')
     return redirect(url_for('admin.backup_restore'))
+
+
+# ---------------------------------------------------------------------------
+# All Bowlers (cross-season admin view)
+# ---------------------------------------------------------------------------
+
+@admin_bp.route('/bowlers')
+def all_bowlers():
+    bowlers = Bowler.query.order_by(Bowler.last_name, Bowler.first_name).all()
+    # Map bowler_id → list of roster entries, sorted newest season first
+    roster_map = {}
+    for r in (Roster.query
+              .join(Season)
+              .order_by(Season.name.desc())
+              .all()):
+        roster_map.setdefault(r.bowler_id, []).append(r)
+    return render_template('admin/all_bowlers.html', bowlers=bowlers, roster_map=roster_map)

@@ -608,6 +608,7 @@ def get_career_stats(bowler_id):
         results.append({
             'season':              r.season,
             'team':                r.team,
+            'venue':               r.season.venue or 'boonton_lanes',
             'avg':                 stats['running_avg'],
             'games':               stats['cumulative_games'],
             'high_game_scratch':   stats['ytd_high_game_scratch'],
