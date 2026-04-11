@@ -71,69 +71,74 @@ def home():
     my_team = roster.team if roster else None
 
     upcoming_week = None
-    my_matchup = None
-    opponent_team = None
+    all_matchups = []       # list of ScheduleEntry for upcoming week
+    my_matchup = None       # the user's own ScheduleEntry
+    games_played = 0        # user's regular-season games (for tournament eligibility)
     last_week = None
     last_week_pts = None
     last_week_opp_pts = None
 
     if season:
-        # Last entered regular week
+        # Last entered week (any type)
         last_week = (Week.query
                      .filter_by(season_id=season.id, is_entered=True)
-                     .filter(Week.week_num <= season.num_weeks)
                      .order_by(Week.week_num.desc())
                      .first())
 
-        # Next unentered, uncancelled regular week
+        # Next unentered, uncancelled week of ANY type
         upcoming_week = (Week.query
-                         .filter_by(season_id=season.id, is_entered=False,
-                                    is_cancelled=False, tournament_type=None)
-                         .filter(Week.week_num <= season.num_weeks)
+                         .filter_by(season_id=season.id, is_entered=False, is_cancelled=False)
                          .order_by(Week.week_num)
                          .first())
 
-        if my_team:
-            if upcoming_week:
-                my_matchup = (ScheduleEntry.query
-                              .filter_by(season_id=season.id,
-                                         week_num=upcoming_week.week_num)
-                              .filter(db.or_(ScheduleEntry.team1_id == my_team.id,
-                                             ScheduleEntry.team2_id == my_team.id))
-                              .first())
-                if my_matchup:
-                    opponent_team = (my_matchup.team2
-                                     if my_matchup.team1_id == my_team.id
-                                     else my_matchup.team1)
-
-            if last_week:
-                week_pts = (TeamPoints.query
-                            .filter_by(season_id=season.id,
-                                       week_num=last_week.week_num)
+        if upcoming_week:
+            # All lane assignments for the upcoming week (regular, position night, championship)
+            all_matchups = (ScheduleEntry.query
+                            .filter_by(season_id=season.id, week_num=upcoming_week.week_num)
+                            .order_by(ScheduleEntry.matchup_num)
                             .all())
-                totals = {}
-                for p in week_pts:
-                    totals[p.team_id] = totals.get(p.team_id, 0) + p.points_earned
-                last_week_pts = totals.get(my_team.id, 0)
+            if my_team:
+                my_matchup = next(
+                    (m for m in all_matchups
+                     if m.team1_id == my_team.id or m.team2_id == my_team.id),
+                    None
+                )
 
-                last_matchup = (ScheduleEntry.query
-                                .filter_by(season_id=season.id,
-                                           week_num=last_week.week_num)
-                                .filter(db.or_(ScheduleEntry.team1_id == my_team.id,
-                                               ScheduleEntry.team2_id == my_team.id))
-                                .first())
-                if last_matchup:
-                    last_opp = (last_matchup.team2
-                                if last_matchup.team1_id == my_team.id
-                                else last_matchup.team1)
-                    last_week_opp_pts = totals.get(last_opp.id, 0)
+        # Games played in regular season (for tournament eligibility display)
+        regular_entries = (MatchupEntry.query
+                           .filter_by(season_id=season.id, bowler_id=current_user.id, is_blind=False)
+                           .filter(MatchupEntry.week_num <= season.num_weeks)
+                           .all())
+        for e in regular_entries:
+            games_played += len(e.games_night1)
+
+        if my_team and last_week:
+            week_pts = (TeamPoints.query
+                        .filter_by(season_id=season.id, week_num=last_week.week_num)
+                        .all())
+            totals = {}
+            for p in week_pts:
+                totals[p.team_id] = totals.get(p.team_id, 0) + p.points_earned
+            last_week_pts = totals.get(my_team.id)
+
+            last_matchup = (ScheduleEntry.query
+                            .filter_by(season_id=season.id, week_num=last_week.week_num)
+                            .filter(db.or_(ScheduleEntry.team1_id == my_team.id,
+                                           ScheduleEntry.team2_id == my_team.id))
+                            .first())
+            if last_matchup:
+                last_opp = (last_matchup.team2
+                            if last_matchup.team1_id == my_team.id
+                            else last_matchup.team1)
+                last_week_opp_pts = totals.get(last_opp.id)
 
     return render_template('mobile/home.html',
                            season=season,
                            my_team=my_team,
                            upcoming_week=upcoming_week,
+                           all_matchups=all_matchups,
                            my_matchup=my_matchup,
-                           opponent_team=opponent_team,
+                           games_played=games_played,
                            last_week=last_week,
                            last_week_pts=last_week_pts,
                            last_week_opp_pts=last_week_opp_pts)
