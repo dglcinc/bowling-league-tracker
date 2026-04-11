@@ -3,7 +3,7 @@ Mobile PWA routes — /m/
 Serves a phone-optimised view of standings, scores, lane assignments, and bowler stats.
 Device detection lives in app.py (before_request). Preference toggle handled here.
 """
-from datetime import date
+from datetime import date, timedelta
 
 from flask import Blueprint, make_response, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -256,3 +256,49 @@ def me():
                            avg=avg,
                            hg_scratch=hg_scratch,
                            hs_scratch=hs_scratch)
+
+
+# ---------------------------------------------------------------------------
+# Schedule — full season calendar with break detection
+# ---------------------------------------------------------------------------
+
+@mobile_bp.route('/schedule')
+@login_required
+def schedule():
+    season = _active_season()
+    schedule_rows = []   # list of dicts: {date, week, is_break}
+
+    if season:
+        weeks = (Week.query
+                 .filter_by(season_id=season.id)
+                 .order_by(Week.week_num)
+                 .all())
+
+        dated_weeks = [w for w in weeks if w.date]
+
+        if dated_weeks:
+            date_to_week = {w.date: w for w in dated_weeks}
+            first_date = dated_weeks[0].date
+            last_date = dated_weeks[-1].date
+
+            current = first_date
+            while current <= last_date:
+                if current in date_to_week:
+                    schedule_rows.append({
+                        'date': current,
+                        'week': date_to_week[current],
+                        'is_break': False,
+                    })
+                else:
+                    schedule_rows.append({
+                        'date': current,
+                        'week': None,
+                        'is_break': True,
+                    })
+                current += timedelta(weeks=1)
+        else:
+            # No dates set yet — show weeks without dates
+            for w in weeks:
+                schedule_rows.append({'date': None, 'week': w, 'is_break': False})
+
+    return render_template('mobile/schedule.html', season=season, schedule_rows=schedule_rows)

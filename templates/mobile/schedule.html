@@ -1,0 +1,118 @@
+{% extends "mobile/base.html" %}
+{% block title %}Schedule — MLC Bowling{% endblock %}
+{% block header_title %}📅 Schedule{% endblock %}
+
+{% block content %}
+
+{% if not season %}
+<div class="m-card">
+  <div class="m-card-main text-muted">No active season.</div>
+</div>
+
+{% elif not schedule_rows %}
+<div class="m-card">
+  <div class="m-card-sub text-muted">No schedule available yet.</div>
+</div>
+
+{% else %}
+<div class="m-card" style="padding:0">
+  {% for row in schedule_rows %}
+
+  {% if row.is_break %}
+  {# ── Break week (gap in calendar) ── #}
+  <div style="display:flex;align-items:center;padding:10px 16px;
+              border-bottom:1px solid #f0f0f0;background:#f8f9fa">
+    <div style="width:72px;flex-shrink:0;font-size:.8rem;color:#adb5bd">
+      {{ row.date.strftime('%b %-d') }}
+    </div>
+    <div style="flex:1;font-size:.85rem;color:#adb5bd;font-style:italic">
+      No bowling — break
+    </div>
+  </div>
+
+  {% else %}
+  {% set w = row.week %}
+
+  {# Determine label #}
+  {% if w.tournament_type == 'club_championship' %}
+    {% set label = season.tournament_labels['club_championship'] %}
+    {% set badge = 'championship' %}
+  {% elif w.tournament_type == 'indiv_scratch' %}
+    {% set label = season.tournament_labels['indiv_scratch'] %}
+    {% set badge = 'tournament' %}
+  {% elif w.tournament_type == 'indiv_hcp_1' %}
+    {% set label = season.tournament_labels['indiv_hcp_1'] %}
+    {% set badge = 'tournament' %}
+  {% elif w.tournament_type == 'indiv_hcp_2' %}
+    {% set label = season.tournament_labels['indiv_hcp_2'] %}
+    {% set badge = 'tournament' %}
+  {% elif w.is_position_night %}
+    {% set label = 'Position Night' %}
+    {% set badge = 'position' %}
+  {% elif w.is_cancelled %}
+    {% set label = 'Cancelled' %}
+    {% set badge = 'cancelled' %}
+  {% else %}
+    {% set label = 'Week ' ~ w.week_num %}
+    {% set badge = 'regular' %}
+  {% endif %}
+
+  {# Row styling: upcoming = white highlighted, entered = muted, future = normal #}
+  {% set is_entered = w.is_entered %}
+  {% set is_upcoming = not w.is_entered and not w.is_cancelled %}
+
+  <div style="display:flex;align-items:center;padding:11px 16px;
+              border-bottom:1px solid #f0f0f0;
+              {% if loop.first and is_upcoming %}background:#f0f4ff;{% endif %}">
+
+    {# Date column #}
+    <div style="width:72px;flex-shrink:0">
+      {% if row.date %}
+      <div style="font-size:.85rem;font-weight:{% if is_upcoming %}700{% else %}400{% endif %};
+                  color:{% if is_entered %}#adb5bd{% elif is_upcoming %}#1b3a6b{% else %}#495057{% endif %}">
+        {{ row.date.strftime('%b %-d') }}
+      </div>
+      {% else %}
+      <div style="font-size:.8rem;color:#adb5bd">—</div>
+      {% endif %}
+    </div>
+
+    {# Event label #}
+    <div style="flex:1">
+      <div style="font-size:.95rem;
+                  font-weight:{% if badge != 'regular' or is_upcoming %}600{% else %}400{% endif %};
+                  color:{% if is_entered %}#adb5bd
+                        {% elif badge == 'championship' %}#8b0000
+                        {% elif badge == 'tournament' %}#5a1a8a
+                        {% elif badge == 'position' %}#1a5a3a
+                        {% elif badge == 'cancelled' %}#adb5bd
+                        {% elif is_upcoming %}#1b3a6b
+                        {% else %}#212529{% endif %}">
+        {{ label }}
+        {% if w.is_cancelled %}<span style="font-size:.75rem;color:#dc3545"> — cancelled</span>{% endif %}
+      </div>
+      {% if badge in ('championship', 'tournament', 'position') and not is_entered %}
+      <div style="font-size:.72rem;color:#6c757d;margin-top:1px">
+        {% if badge == 'championship' %}Club Championship
+        {% elif badge == 'tournament' %}Individual Tournament
+        {% elif badge == 'position' %}Position Night
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    {# Status indicator #}
+    <div style="font-size:.75rem;color:#adb5bd;margin-left:8px">
+      {% if w.is_entered %}✓
+      {% elif w.is_cancelled %}—
+      {% endif %}
+    </div>
+
+  </div>
+  {% endif %}
+
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}
