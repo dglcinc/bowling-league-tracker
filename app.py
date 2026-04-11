@@ -9,7 +9,7 @@ import time
 from dotenv import load_dotenv
 load_dotenv()  # loads .env from project root before Config reads os.environ
 
-from flask import Flask, redirect, url_for, abort, render_template
+from flask import Flask, redirect, request, url_for, abort, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config
 from models import db
