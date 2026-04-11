@@ -13,10 +13,10 @@
   <span class="text-muted small me-2">Venue:</span>
   <div class="btn-group btn-group-sm" role="group">
     <a href="{{ url_for('records.records', venue='all') }}"
-       class="btn btn-outline-secondary{% if venue_filter == 'all' %} active{% endif %}">All</a>
+       class="btn btn-outline-secondary venue-btn{% if venue_filter == 'all' %} active{% endif %}">All</a>
     {% for key, label in venue_labels.items() %}
     <a href="{{ url_for('records.records', venue=key) }}"
-       class="btn btn-outline-secondary{% if venue_filter == key %} active{% endif %}">{{ label }}</a>
+       class="btn btn-outline-secondary venue-btn{% if venue_filter == key %} active{% endif %}">{{ label }}</a>
     {% endfor %}
   </div>
   {% if venue_filter != 'all' %}
@@ -33,20 +33,41 @@
 </ul>
 {% block extra_js %}
 <script>
-// Restore the active tab from the URL hash (e.g. #tab-alltime)
 (function () {
+  // Keep venue filter buttons pointing at the current tab so switching venue
+  // stays on the same section.
+  function updateVenueHrefs(hash) {
+    document.querySelectorAll('.venue-btn').forEach(function (a) {
+      var base = a.getAttribute('data-base-href');
+      a.href = hash ? base + hash : base;
+    });
+  }
+
+  // Stash the base href (no hash) on each venue button once.
+  document.querySelectorAll('.venue-btn').forEach(function (a) {
+    a.setAttribute('data-base-href', a.href.split('#')[0]);
+  });
+
+  // Restore the active tab from the URL hash (e.g. #tab-alltime)
   var hash = window.location.hash;
   var target = hash ? document.querySelector('#recordsTabs a[href="' + hash + '"]') : null;
   if (target) {
     bootstrap.Tab.getOrCreateInstance(target).show();
   } else {
     var first = document.querySelector('#recordsTabs a[data-bs-toggle="tab"]');
-    if (first) bootstrap.Tab.getOrCreateInstance(first).show();
+    if (first) {
+      bootstrap.Tab.getOrCreateInstance(first).show();
+      hash = first.getAttribute('href');
+    }
   }
-  // Update hash when tabs change
+  updateVenueHrefs(hash);
+
+  // Update hash and venue hrefs when tabs change
   document.querySelectorAll('#recordsTabs a[data-bs-toggle="tab"]').forEach(function (el) {
     el.addEventListener('shown.bs.tab', function (e) {
-      history.replaceState(null, '', e.target.getAttribute('href'));
+      var newHash = e.target.getAttribute('href');
+      history.replaceState(null, '', newHash);
+      updateVenueHrefs(newHash);
     });
   });
 })();
