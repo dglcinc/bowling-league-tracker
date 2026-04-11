@@ -24,12 +24,7 @@
 </style>
 {% endblock %}
 
-{% set _tt_short = {
-  'club_championship': 'Club Champ.',
-  'harry_russell':     'Harry Russell',
-  'chad_harris':       'Chad Harris',
-  'shep_belyea':       'Shep Belyea',
-} %}
+{% set _tt_short = season.tournament_labels %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-2 no-print">
   <h2>Wkly Alpha — {{ season.name }}</h2>

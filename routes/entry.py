@@ -13,12 +13,6 @@ from config import Config
 
 entry_bp = Blueprint('entry', __name__)
 
-_TOURNAMENT_LABELS = {
-    'club_championship': 'Club Team Championship',
-    'harry_russell': 'Harry E. Russell Championship',
-    'chad_harris': 'Chad Harris Memorial Bowl',
-    'shep_belyea': 'Shep Belyea Open',
-}
 
 
 @entry_bp.route('/')
@@ -35,7 +29,7 @@ def week_list(season_id):
     season = Season.query.get_or_404(season_id)
     weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
     return render_template('entry/week_list.html', season=season, weeks=weeks,
-                           tournament_labels=_TOURNAMENT_LABELS)
+                           tournament_labels=season.tournament_labels)
 
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/cancel', methods=['POST'])
@@ -138,7 +132,7 @@ def week_entry(season_id, week_num):
 
     # Tournament score summary for individual post-season events
     tournament_entries = []
-    if week.tournament_type and week.tournament_type != 'club_championship':
+    if week.tournament_type and week.tournament_type != 'club_championship':  # noqa: individual types
         tournament_entries = (TournamentEntry.query
                               .filter_by(season_id=season_id, week_num=week_num)
                               .join(Bowler, TournamentEntry.bowler_id == Bowler.id, isouter=True)
@@ -156,7 +150,7 @@ def week_entry(season_id, week_num):
                            breakdown_by_pairing=breakdown_by_pairing,
                            prev_week_num=prev_week_num,
                            next_week_num=next_week_num,
-                           tournament_labels=_TOURNAMENT_LABELS,
+                           tournament_labels=season.tournament_labels,
                            tournament_entries=tournament_entries)
 
 
@@ -219,10 +213,10 @@ def generate_test_entries(season_id, week_num):
         flash(f'Generated test entries for {count} bowler slots.', 'success')
         return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
-    # Individual tournament (harry_russell, chad_harris, shep_belyea)
+    # Individual tournament (indiv_scratch, indiv_hcp_1, indiv_hcp_2)
     TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).delete()
 
-    is_harry = week.tournament_type == 'harry_russell'
+    is_harry = week.tournament_type == 'indiv_scratch'
     num_games = 5 if is_harry else 3
 
     roster = (Roster.query
@@ -616,7 +610,7 @@ def reconcile(season_id, week_num):
 
 
 # ---------------------------------------------------------------------------
-# Tournament entry (Harry Russell, Chad Harris, Shep Belyea, Club Championship)
+# Tournament entry (indiv_scratch, indiv_hcp_1, indiv_hcp_2, club_championship)
 # ---------------------------------------------------------------------------
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/tournament',
@@ -631,8 +625,8 @@ def tournament_entry(season_id, week_num):
     tt = week.tournament_type
     label = _TOURNAMENT_LABELS.get(tt, tt)
 
-    # Harry Russell: all bowlers ever (active + inactive); others: active only
-    if tt == 'harry_russell':
+    # indiv_scratch: all bowlers (active + inactive); handicap tournaments: active only
+    if tt == 'indiv_scratch':
         all_bowlers = (Bowler.query
                        .join(Roster, Roster.bowler_id == Bowler.id)
                        .filter(Roster.season_id == season_id)
@@ -645,8 +639,8 @@ def tournament_entry(season_id, week_num):
                        .order_by(Bowler.last_name)
                        .all())
 
-    num_games = 5 if tt == 'harry_russell' else 3
-    use_handicap = (tt != 'harry_russell')
+    num_games = 5 if tt == 'indiv_scratch' else 3
+    use_handicap = (tt != 'indiv_scratch')
 
     if request.method == 'POST':
         # Delete existing entries for this tournament week

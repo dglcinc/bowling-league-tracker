@@ -78,6 +78,15 @@ def _migrate_db(db):
         # Auth
         "ALTER TABLE bowlers ADD COLUMN is_editor BOOLEAN DEFAULT 0",
         "UPDATE bowlers SET is_editor = 1 WHERE id = 34",
+        # Rename tournament_type keys — personal names removed from DB
+        "UPDATE weeks SET tournament_type = 'indiv_scratch' WHERE tournament_type = 'harry_russell'",
+        "UPDATE weeks SET tournament_type = 'indiv_hcp_1'   WHERE tournament_type = 'chad_harris'",
+        "UPDATE weeks SET tournament_type = 'indiv_hcp_2'   WHERE tournament_type = 'shep_belyea'",
+        # Configurable tournament display names per season
+        "ALTER TABLE seasons ADD COLUMN name_club_championship VARCHAR(128) DEFAULT 'Club Championship'",
+        "ALTER TABLE seasons ADD COLUMN name_indiv_scratch VARCHAR(128) DEFAULT 'Harry E. Russell Championship'",
+        "ALTER TABLE seasons ADD COLUMN name_indiv_hcp_1 VARCHAR(128) DEFAULT 'Chad Harris Memorial Bowl'",
+        "ALTER TABLE seasons ADD COLUMN name_indiv_hcp_2 VARCHAR(128) DEFAULT 'Shep Belyea Open'",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:

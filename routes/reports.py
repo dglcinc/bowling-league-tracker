@@ -146,13 +146,13 @@ def week_prizes(season_id, week_num):
         tournament_results = sorted(team_data.values(), key=lambda x: -x['total_wood'])
         for i, r in enumerate(tournament_results):
             r['placement'] = i + 1
-    elif tt in ('harry_russell', 'chad_harris', 'shep_belyea'):
+    elif tt in ('indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'):
         t_entries = TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
         results = []
         for e in t_entries:
             games = [e.game1, e.game2, e.game3, e.game4, e.game5]
             scratch = sum(g for g in games if g is not None)
-            total_wood = scratch if tt == 'harry_russell' else e.total_with_hcp
+            total_wood = scratch if tt == 'indiv_scratch' else e.total_with_hcp
             results.append({
                 'name':      e.bowler.last_name if e.bowler else e.guest_name,
                 'nickname':  e.bowler.nickname  if e.bowler else '',
