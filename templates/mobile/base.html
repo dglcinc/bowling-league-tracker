@@ -134,7 +134,7 @@
       justify-content: center;
       text-decoration: none;
       color: #6c757d;
-      font-size: 0.65rem;
+      font-size: 0.6rem;
       gap: 2px;
       padding: 6px 0 4px;
     }
@@ -172,6 +172,10 @@
   <a href="{{ url_for('mobile.scores') }}"
      class="m-tab {% if request.endpoint in ('mobile.scores', 'mobile.week_scores') %}active{% endif %}">
     <span class="m-tab-icon">🎳</span><span>Scores</span>
+  </a>
+  <a href="{{ url_for('mobile.schedule') }}"
+     class="m-tab {% if request.endpoint == 'mobile.schedule' %}active{% endif %}">
+    <span class="m-tab-icon">📅</span><span>Schedule</span>
   </a>
   <a href="{{ url_for('mobile.me') }}"
      class="m-tab {% if request.endpoint == 'mobile.me' %}active{% endif %}">
