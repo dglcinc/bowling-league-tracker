@@ -153,7 +153,11 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 - Edit Bowler and Edit Roster are separate buttons on the roster list; edit_bowler no longer includes roster fields
 
 **`payout_bp`** (`/payout/season/<id>`)
-- YTD prize counts per bowler, weekly prize history, Iron Man candidates, Most Improved
+- `payout_overview` — YTD prize counts per bowler, weekly prize history, Most Improved
+- `payout_config` — Admin: configure PayoutConfig (total available, tournament/weekly/YTD rates, trophy cost, team pct splits)
+- `payout_summary` — Totals sheet: individual payouts, team payouts, currency breakdown (bill inventory)
+- `award_page` — Per-recipient printable award certificate (guilloche SVG border, Playfair Display/Lato fonts, navy/gold); one page per individual or team
+- `PayoutConfig` model: one row per season; waterfall: tournament prizes → weekly wins → YTD prizes → trophy deduction → team remainder by place %
 
 ### Print batch groups
 - **Group 1 (4 pages)**: 4 copies of Weekly Alpha — the physical hand-in score sheets
@@ -200,7 +204,6 @@ Production is live at **https://mlb.dglc.com** on a Mac Mini M4 (internal networ
 
 ### Still to build
 - Season rollover wizard
-- Prize money calculation (details TBD)
 
 ## Git Workflow
 
