@@ -194,6 +194,10 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 - TeamPoints for historical seasons come from the spreadsheet directly, not recomputed from scores
 - Viewer permissions stored in `viewer_permissions` table (endpoint → viewer_accessible bool); managed via Admin → Settings
 
+### Deployment
+
+Production is live at **https://mlb.dglc.com** on a Mac Mini M4 (internal network utility server). Full setup guide in `DEPLOYMENT.md` (gitignored). Routine deploys: `ssh macmini ~/bin/deploy-bowling.sh`.
+
 ### Still to build
 - Season rollover wizard
 - Prize money calculation (details TBD)
