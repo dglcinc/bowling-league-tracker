@@ -63,6 +63,7 @@ class Season(db.Model):
     blind_handicap = db.Column(db.Integer, default=60)
     is_active = db.Column(db.Boolean, default=True)
     bowling_format = db.Column(db.String(10), default='single')  # 'single' or 'double'
+    venue = db.Column(db.String(32), default='boonton_lanes')   # 'mountain_lakes_club' or 'boonton_lanes'
 
     # Configurable display names for the 4 post-season tournament weeks.
     # These are stored in the DB so personal names never appear in the repo.

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}All Bowlers — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4>All Bowlers</h4>
+  <a href="{{ url_for('admin.seasons') }}" class="btn btn-outline-secondary btn-sm">← Seasons</a>
+</div>
+<p class="text-muted small">Every bowler who has ever participated, across all seasons. Season badges link to that season's stats page.</p>
+
+<div class="table-scroll">
+<table class="table table-sm table-bordered table-striped">
+  <thead class="table-dark">
+    <tr>
+      <th>Bowler</th>
+      <th>Seasons</th>
+      <th>Editor</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for bowler in bowlers %}
+    <tr>
+      <td class="text-nowrap">{{ bowler.last_name }}{% if bowler.first_name %}, {{ bowler.first_name }}{% endif %}</td>
+      <td>
+        {% for r in roster_map.get(bowler.id, []) %}
+        <a href="{{ url_for('reports.bowler_detail', season_id=r.season_id, bowler_id=bowler.id) }}"
+           class="badge text-decoration-none me-1
+                  {% if r.season.venue == 'mountain_lakes_club' %}text-bg-secondary{% else %}text-bg-primary{% endif %}">
+          {{ r.season.name }}
+        </a>
+        {% else %}
+        <span class="text-muted small">—</span>
+        {% endfor %}
+      </td>
+      <td>{% if bowler.is_editor %}<span class="badge bg-warning text-dark">Editor</span>{% endif %}</td>
+      <td>
+        <a href="{{ url_for('admin.edit_bowler', bowler_id=bowler.id) }}"
+           class="btn btn-sm btn-outline-secondary">Edit</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="text-muted small mt-2">
+  Badge colors: <span class="badge text-bg-primary">Boonton Lanes</span>
+  <span class="badge text-bg-secondary">Mountain Lakes Club</span>
+</p>
+{% endblock %}

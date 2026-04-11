@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Bowler Directory{% endblock %}
+
+{% block content %}
+<h4 class="mb-3">Bowler Directory</h4>
+<p class="text-muted small">All bowlers who have participated in the league. Click a season badge to view that season's stats.</p>
+
+{% if not dir_entries %}
+<p class="text-muted">No bowler data available yet.</p>
+{% else %}
+<div class="table-scroll">
+<table class="table table-sm table-bordered table-striped">
+  <thead class="table-dark">
+    <tr>
+      <th>Bowler</th>
+      <th>Seasons</th>
+      <th>Best Avg</th>
+      <th>Best HG</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for entry in dir_entries %}
+    <tr>
+      <td class="text-nowrap">{{ entry.bowler.last_name }}{% if entry.bowler.first_name %}, {{ entry.bowler.first_name }}{% endif %}</td>
+      <td>
+        {% for row in entry.career %}
+        <a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=entry.bowler.id) }}"
+           class="badge text-decoration-none me-1
+                  {% if row.venue == 'mountain_lakes_club' %}text-bg-secondary{% else %}text-bg-primary{% endif %}">
+          {{ row.season.name }}
+        </a>
+        {% endfor %}
+      </td>
+      <td>{{ entry.best_avg }}</td>
+      <td>{{ entry.best_hg }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="text-muted small mt-2">
+  Badge colors: <span class="badge text-bg-primary">Boonton Lanes</span>
+  <span class="badge text-bg-secondary">Mountain Lakes Club</span>
+</p>
+{% endif %}
+{% endblock %}

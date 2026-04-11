@@ -31,6 +31,13 @@
         <input type="text" name="name_indiv_hcp_2" class="form-control form-control-sm"
                value="{{ season.name_indiv_hcp_2 }}">
       </div>
+      <div class="col-md-6 mt-2">
+        <label class="form-label small fw-semibold">Venue</label>
+        <select name="venue" class="form-select form-select-sm">
+          <option value="boonton_lanes" {{ 'selected' if season.venue == 'boonton_lanes' else '' }}>Boonton Lanes</option>
+          <option value="mountain_lakes_club" {{ 'selected' if season.venue == 'mountain_lakes_club' else '' }}>Mountain Lakes Club</option>
+        </select>
+      </div>
     </div>
   </div>
 </div>

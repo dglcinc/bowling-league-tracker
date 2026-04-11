@@ -37,7 +37,7 @@
 <table class="table table-sm table-bordered table-striped mb-3">
   <thead class="table-dark">
     <tr>
-      <th>Season</th><th>Team</th><th>Games</th><th>Avg</th>
+      <th>Season</th><th>Venue</th><th>Team</th><th>Games</th><th>Avg</th>
       <th>HG Scr</th><th>HS Scr</th><th>HG Hcp</th><th>HS Hcp</th>
     </tr>
   </thead>
@@ -45,6 +45,7 @@
     {% for row in career %}
     <tr {% if row.season.id == season.id %}class="table-primary fw-semibold"{% endif %}>
       <td><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=bowler.id) }}">{{ row.season.name }}</a></td>
+      <td class="text-nowrap"><small class="text-muted">{{ 'MLC' if row.venue == 'mountain_lakes_club' else 'BL' }}</small></td>
       <td>{{ row.team.name if row.team else '—' }}</td>
       <td>{{ row.games }}</td>
       <td>{{ row.avg }}</td>
