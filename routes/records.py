@@ -249,7 +249,7 @@ def records():
                                all_time_hg_h=[], all_time_hs_h=[],
                                all_time_avg=[], top_season_avgs=[],
                                most_improved=[], season_comparison=[],
-                               tournament_winners=[])
+                               tournament_winners=[], tournament_labels={})
 
     summaries = _compute_bowler_season_summaries(seasons, tournament_weeks)
 
@@ -272,6 +272,10 @@ def records():
     # Tournament winners table is always unfiltered (venue filter N/A to placements)
     tournament_winners = _tournament_winners_by_season(seasons)
 
+    # Tournament display names: use the active season's labels, fall back to most recent
+    active = Season.query.filter_by(is_active=True).first()
+    tournament_labels = (active or seasons[-1]).tournament_labels if seasons else {}
+
     return render_template('reports/records.html',
                            seasons=seasons,
                            venue_filter=venue_filter,
@@ -284,7 +288,8 @@ def records():
                            top_season_avgs=top_season_avgs,
                            most_improved=most_improved,
                            season_comparison=season_comp,
-                           tournament_winners=tournament_winners)
+                           tournament_winners=tournament_winners,
+                           tournament_labels=tournament_labels)
 
 
 @records_bp.route('/bowler_dir')
