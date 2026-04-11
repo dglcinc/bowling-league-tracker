@@ -15,6 +15,9 @@
     <a href="{{ url_for('admin.edit_weeks', season_id=season.id) }}" class="btn btn-outline-secondary btn-sm">Week Dates</a>
   </div>
   <div class="col-auto">
+    <a href="{{ url_for('admin.tournament_placement', season_id=season.id) }}" class="btn btn-outline-secondary btn-sm">Tournament Placements</a>
+  </div>
+  <div class="col-auto">
     <a href="{{ url_for('admin.assign_matchups_list', season_id=season.id) }}" class="btn btn-outline-warning btn-sm">Assign Matchups</a>
   </div>
   <div class="col-auto">

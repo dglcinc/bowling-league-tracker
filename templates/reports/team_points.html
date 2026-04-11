@@ -39,7 +39,7 @@
     </thead>
     <tbody>
       {% for i in range(overall | length) %}
-      <tr>
+      <tr{% if i == 0 %} style="background-color:#ffff99;-webkit-print-color-adjust:exact;print-color-adjust:exact"{% endif %}>
         <td>{{ i + 1 }}</td>
         <td>{{ first_half[i].team.name }}</td>
         <td class="text-end fw-bold">{{ first_half[i].points }}</td>

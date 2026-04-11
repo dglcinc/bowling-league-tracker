@@ -3,7 +3,7 @@ Admin routes: season setup, roster management, schedule entry, season rollover.
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission
+from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission, TournamentEntry
 from datetime import date, timedelta
 import io
 
@@ -1326,3 +1326,74 @@ def all_bowlers():
               .all()):
         roster_map.setdefault(r.bowler_id, []).append(r)
     return render_template('admin/all_bowlers.html', bowlers=bowlers, roster_map=roster_map)
+
+
+# ---------------------------------------------------------------------------
+# Tournament placement (historical results entry: 1st / 2nd / 3rd place)
+# ---------------------------------------------------------------------------
+
+@admin_bp.route('/seasons/<int:season_id>/tournament_placement', methods=['GET', 'POST'])
+def tournament_placement(season_id):
+    season = Season.query.get_or_404(season_id)
+
+    # The 3 individual tournament weeks (not club_championship)
+    indiv_weeks = (Week.query
+                   .filter(Week.season_id == season_id,
+                           Week.tournament_type.in_(['indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2']))
+                   .order_by(Week.week_num)
+                   .all())
+
+    # All roster bowlers for this season (active + inactive), for the dropdowns
+    roster_bowlers = (Bowler.query
+                      .join(Roster, Roster.bowler_id == Bowler.id)
+                      .filter(Roster.season_id == season_id)
+                      .order_by(Bowler.last_name, Bowler.first_name)
+                      .all())
+
+    if request.method == 'POST':
+        # Scores assigned per placement — large enough spread to always sort correctly
+        PLACE_SCORES = {1: 300, 2: 200, 3: 100}
+
+        for wk in indiv_weeks:
+            tt = wk.tournament_type
+            TournamentEntry.query.filter_by(season_id=season_id, week_num=wk.week_num).delete()
+
+            has_entry = False
+            for place, score in PLACE_SCORES.items():
+                bowler_val = request.form.get(f'{tt}_place{place}', '').strip()
+                if not bowler_val:
+                    continue
+                te = TournamentEntry(
+                    season_id=season_id,
+                    week_num=wk.week_num,
+                    bowler_id=int(bowler_val),
+                    handicap=0,          # no handicap for historical placement entry
+                    game1=score,
+                    game2=0,
+                    game3=0,
+                )
+                db.session.add(te)
+                has_entry = True
+
+            if has_entry and not wk.is_entered:
+                wk.is_entered = True
+
+        db.session.commit()
+        flash('Tournament placements saved.', 'success')
+        return redirect(url_for('admin.season_detail', season_id=season_id))
+
+    # GET — pre-populate from existing entries (sorted by game1 desc = placement order)
+    existing = {}
+    for wk in indiv_weeks:
+        entries = (TournamentEntry.query
+                   .filter_by(season_id=season_id, week_num=wk.week_num)
+                   .order_by(TournamentEntry.game1.desc())
+                   .all())
+        existing[wk.tournament_type] = entries
+
+    return render_template('admin/tournament_placement.html',
+                           season=season,
+                           indiv_weeks=indiv_weeks,
+                           roster_bowlers=roster_bowlers,
+                           existing=existing,
+                           tournament_labels=season.tournament_labels)

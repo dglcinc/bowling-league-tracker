@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Tournament Placements — {{ season.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.seasons') }}">Seasons</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.season_detail', season_id=season.id) }}">{{ season.name }}</a></li>
+    <li class="breadcrumb-item active">Tournament Placements</li>
+  </ol>
+</nav>
+
+<h4>Tournament Placements — {{ season.name }}</h4>
+<p class="text-muted small">
+  Record 1st, 2nd, and 3rd place for each individual tournament.
+  Dummy scores (300 / 200 / 100) are stored so results sort correctly on the prizes page.
+  These scores do not affect season averages or handicaps.
+</p>
+
+{% if not indiv_weeks %}
+<div class="alert alert-warning">No individual tournament weeks found for this season.</div>
+{% else %}
+<form method="post">
+  {% for wk in indiv_weeks %}
+  {% set tt = wk.tournament_type %}
+  {% set existing_entries = existing.get(tt, []) %}
+  <div class="card mb-4" style="max-width:500px">
+    <div class="card-header fw-semibold">
+      {{ tournament_labels.get(tt, tt) }}
+      <small class="text-muted ms-2">Week {{ wk.week_num }}</small>
+    </div>
+    <div class="card-body">
+      {% for place in [1, 2, 3] %}
+      {% set entry = existing_entries[place - 1] if existing_entries | length >= place else none %}
+      <div class="mb-2">
+        <label class="form-label small fw-semibold">
+          {% if place == 1 %}🥇 1st Place{% elif place == 2 %}🥈 2nd Place{% else %}🥉 3rd Place{% endif %}
+        </label>
+        <select name="{{ tt }}_place{{ place }}" class="form-select form-select-sm">
+          <option value="">— not recorded —</option>
+          {% for b in roster_bowlers %}
+          <option value="{{ b.id }}"
+            {% if entry and entry.bowler_id == b.id %}selected{% endif %}>
+            {{ b.last_name }}{% if b.first_name %}, {{ b.first_name }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Save Placements</button>
+    <a href="{{ url_for('admin.season_detail', season_id=season.id) }}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

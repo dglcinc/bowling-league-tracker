@@ -98,8 +98,8 @@
                          {% elif not view_season and active_season and s.id == active_season.id %}active{% endif %}"
                  href="#"
                  data-season-id="{{ s.id }}"
-                 data-latest-week="{{ wn }}"
-                 data-fallback="{{ url_for('reports.week_prizes', season_id=s.id, week_num=wn) }}">
+                 data-season-name="{{ s.name }}"
+                 data-latest-week="{{ wn }}">
                 {{ s.name }}{% if s.is_active %} &#9679;{% endif %}
               </a>
             </li>
@@ -268,30 +268,93 @@
 if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw.js'); }
 </script>
 <script>
-// Season selector — navigate to the same page type for the selected season
+// Season selector — swap season on season-scoped pages; update nav links in
+// place on non-season-scoped pages (Records, Admin, Bowlers) without navigating.
 (function () {
+  var STORAGE_KEY = 'bowling_nav_season';
+  var WEEK_ROUTES = /\/(alpha|ytd-alpha|print-batch)\/\d+$/;
+  // Season context as rendered by the server for this page
+  var serverSeasonId = '{{ nav_s.id if nav_s else "" }}';
+  var serverWeek     = '{{ nav_wk }}';
+
+  function storeSelection(id, wk, name) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({id: String(id), wk: String(wk), name: name})); } catch (e) {}
+  }
+  function getStored() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
+  }
+
+  // Rewrite all season-scoped nav links to use newId/newWk
+  function updateNavLinks(newId, newWk) {
+    var curId = serverSeasonId;
+    if (!curId) return;
+    document.querySelectorAll('#navMenu a[href]').forEach(function (a) {
+      var href = a.getAttribute('href');
+      if (!href || href === '#' || href.indexOf('/season/' + curId + '/') === -1) return;
+      var updated = href.replace('/season/' + curId + '/', '/season/' + newId + '/');
+      if (WEEK_ROUTES.test(updated)) {
+        updated = updated.replace(/\/\d+$/, '/' + newWk);
+      }
+      a.setAttribute('href', updated);
+    });
+    serverSeasonId = String(newId);
+    serverWeek     = String(newWk);
+  }
+
+  function updateDropdownUI(id, name) {
+    var toggle = document.querySelector('#navMenu .dropdown-toggle');
+    if (toggle && toggle.firstChild && toggle.firstChild.nodeType === 3) {
+      toggle.firstChild.textContent = name + ' ';
+    }
+    document.querySelectorAll('.season-selector-item').forEach(function (el) {
+      el.classList.toggle('active', el.dataset.seasonId === String(id));
+    });
+  }
+
+  var onSeasonScopedPage = /\/season\/\d+\//.test(window.location.pathname);
+
+  // On season-scoped pages: persist the current season to localStorage so
+  // non-season-scoped pages can pick up the user's last viewed season.
+  if (onSeasonScopedPage && serverSeasonId) {
+    var activeItem = document.querySelector('.season-selector-item.active');
+    var activeName = activeItem
+      ? (activeItem.dataset.seasonName || activeItem.textContent.trim().replace(/\s*[\u25CF\u25CF\u2022]\s*$/, ''))
+      : '';
+    if (activeName) storeSelection(serverSeasonId, serverWeek, activeName);
+  }
+
+  // On non-season-scoped pages: apply stored season preference to nav links
+  if (!onSeasonScopedPage && serverSeasonId) {
+    var stored = getStored();
+    if (stored && stored.id !== serverSeasonId) {
+      updateNavLinks(stored.id, stored.wk);
+      updateDropdownUI(stored.id, stored.name);
+    }
+  }
+
+  // Dropdown click handler
   document.querySelectorAll('.season-selector-item').forEach(function (el) {
     el.addEventListener('click', function (e) {
       e.preventDefault();
-      var newId  = el.dataset.seasonId;
-      var newWk  = el.dataset.latestWeek;
-      var fallback = el.dataset.fallback;
-      var path = window.location.pathname;
+      var newId   = el.dataset.seasonId;
+      var newWk   = el.dataset.latestWeek;
+      var newName = el.dataset.seasonName || el.textContent.trim().replace(/\s*[\u25CF\u2022]\s*$/, '');
+      var path    = window.location.pathname;
 
-      // Replace /season/NNN/ with /season/newId/
+      storeSelection(newId, newWk, newName);
+
       var updated = path.replace(/\/season\/\d+\//, '/season/' + newId + '/');
       if (updated === path) {
-        // Current page isn't a season-scoped URL (e.g. Records, Admin)
-        window.location.href = fallback;
+        // Non-season-scoped page: update links without navigating away
+        updateNavLinks(newId, newWk);
+        updateDropdownUI(newId, newName);
         return;
       }
 
-      // Replace trailing week number only for routes that end with a week number
-      // (alpha, ytd-alpha, print-batch). Do NOT replace for /bowler/<id> or similar.
-      if (/\/(alpha|ytd-alpha|print-batch)\/\d+$/.test(updated)) {
+      // Season-scoped page: navigate to same page with new season
+      if (WEEK_ROUTES.test(updated)) {
         updated = updated.replace(/\/\d+$/, '/' + newWk);
       }
-
       window.location.href = updated;
     });
   });
