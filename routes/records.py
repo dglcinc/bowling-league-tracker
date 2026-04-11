@@ -4,7 +4,7 @@ Records route: all-time leaderboards and season comparison table.
 
 from collections import defaultdict
 from flask import Blueprint, render_template, request
-from models import (db, Season, Week, Bowler, MatchupEntry)
+from models import (db, Season, Week, Bowler, MatchupEntry, TournamentEntry, TeamPoints)
 from calculations import get_bowler_stats, get_team_standings
 
 records_bp = Blueprint('records', __name__)
@@ -181,6 +181,54 @@ def _season_comparison(seasons, summaries):
     return rows
 
 
+def _tournament_winners_by_season(seasons):
+    """
+    For each season, return the top-3 placement for each individual tournament
+    (indiv_scratch, indiv_hcp_1, indiv_hcp_2) plus the club_championship team winner.
+    Returns list of dicts, one per season with data.
+    """
+    from calculations import get_team_standings
+
+    # Map tournament_type → week_num per season
+    rows = []
+    for season in seasons:
+        # Individual tournament top-3 (from TournamentEntry, sorted by total desc)
+        indiv = {}
+        for tt in ('indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'):
+            wk = Week.query.filter_by(season_id=season.id, tournament_type=tt).first()
+            if not wk:
+                indiv[tt] = []
+                continue
+            entries = (TournamentEntry.query
+                       .filter_by(season_id=season.id, week_num=wk.week_num)
+                       .all())
+            if not entries:
+                indiv[tt] = []
+                continue
+            # Sort by total_with_hcp desc for hcp events, scratch for indiv_scratch
+            if tt == 'indiv_scratch':
+                entries.sort(key=lambda e: -(e.total_scratch))
+            else:
+                entries.sort(key=lambda e: -(e.total_with_hcp))
+            indiv[tt] = entries[:3]
+
+        # Club championship: highest-points team in the club_champ week (team standings)
+        champion_team = None
+        standings = get_team_standings(season.id)
+        if standings:
+            champion_team = standings[0]['team']
+
+        if any(indiv[tt] for tt in indiv) or champion_team:
+            rows.append({
+                'season':         season,
+                'indiv_scratch':  indiv['indiv_scratch'],
+                'indiv_hcp_1':    indiv['indiv_hcp_1'],
+                'indiv_hcp_2':    indiv['indiv_hcp_2'],
+                'champion_team':  champion_team,
+            })
+    return rows
+
+
 _VENUE_LABELS = {
     'mountain_lakes_club': 'Mountain Lakes Club',
     'boonton_lanes':       'Boonton Lanes',
@@ -200,7 +248,8 @@ def records():
                                all_time_hg_s=[], all_time_hs_s=[],
                                all_time_hg_h=[], all_time_hs_h=[],
                                all_time_avg=[], top_season_avgs=[],
-                               most_improved=[], season_comparison=[])
+                               most_improved=[], season_comparison=[],
+                               tournament_winners=[], tournament_labels={})
 
     summaries = _compute_bowler_season_summaries(seasons, tournament_weeks)
 
@@ -220,6 +269,11 @@ def records():
     most_improved = _most_improved(filtered)
     season_comp   = _season_comparison(filtered_seasons, filtered)
     top_season_avgs = sorted(filtered, key=lambda r: -r['avg'])[:25]
+    tournament_winners = _tournament_winners_by_season(filtered_seasons)
+
+    # Tournament display names: use the active season's labels, fall back to most recent
+    active = Season.query.filter_by(is_active=True).first()
+    tournament_labels = (active or seasons[-1]).tournament_labels if seasons else {}
 
     return render_template('reports/records.html',
                            seasons=seasons,
@@ -232,7 +286,9 @@ def records():
                            all_time_avg=all_time_avg,
                            top_season_avgs=top_season_avgs,
                            most_improved=most_improved,
-                           season_comparison=season_comp)
+                           season_comparison=season_comp,
+                           tournament_winners=tournament_winners,
+                           tournament_labels=tournament_labels)
 
 
 @records_bp.route('/bowler_dir')
