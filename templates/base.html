@@ -286,8 +286,11 @@ if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw
         return;
       }
 
-      // Replace trailing week number segment, if present
-      updated = updated.replace(/\/\d+$/, '/' + newWk);
+      // Replace trailing week number only for routes that end with a week number
+      // (alpha, ytd-alpha, print-batch). Do NOT replace for /bowler/<id> or similar.
+      if (/\/(alpha|ytd-alpha|print-batch)\/\d+$/.test(updated)) {
+        updated = updated.replace(/\/\d+$/, '/' + newWk);
+      }
 
       window.location.href = updated;
     });
