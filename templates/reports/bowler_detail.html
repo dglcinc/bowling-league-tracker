@@ -18,7 +18,35 @@
   <div class="col-auto"><strong>HS Hcp:</strong> {{ stats.ytd_high_series_hcp }}</div>
 </div>
 
-<h6>Week-by-Week</h6>
+{% if career | length > 1 %}
+<h6 class="mt-3">Career History</h6>
+<div class="table-scroll">
+<table class="table table-sm table-bordered table-striped mb-3">
+  <thead class="table-dark">
+    <tr>
+      <th>Season</th><th>Team</th><th>Games</th><th>Avg</th>
+      <th>HG Scr</th><th>HS Scr</th><th>HG Hcp</th><th>HS Hcp</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in career %}
+    <tr {% if row.season.id == season.id %}class="table-primary fw-semibold"{% endif %}>
+      <td>{{ row.season.name }}</td>
+      <td>{{ row.team.name if row.team else '—' }}</td>
+      <td>{{ row.games }}</td>
+      <td>{{ row.avg }}</td>
+      <td>{{ row.high_game_scratch }}</td>
+      <td>{{ row.high_series_scratch }}</td>
+      <td>{{ row.high_game_hcp }}</td>
+      <td>{{ row.high_series_hcp }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+<h6>Week-by-Week — {{ season.name }}</h6>
 <table class="table table-sm table-bordered table-striped">
   <thead>
     <tr>

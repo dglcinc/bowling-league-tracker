@@ -68,6 +68,9 @@
           <a class="nav-link" href="{{ url_for('payout.payout_overview', season_id=active_season.id) }}">Payouts</a>
         </li>
         {% endif %}
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('records.records') }}">Records</a>
+        </li>
         {% if current_user.is_editor %}
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('admin.seasons') }}">Admin</a>

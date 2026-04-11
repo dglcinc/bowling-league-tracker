@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Records{% endblock %}
+
+{% block content %}
+<h4 class="mb-3">League Records</h4>
+
+{% if not seasons %}
+<p class="text-muted">No historical data available yet.</p>
+{% else %}
+
+{# ── Nav tabs ──────────────────────────────────────────────────────────────── #}
+<ul class="nav nav-tabs mb-3 no-print" id="recordsTabs">
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-alltime">All-Time</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-seasons">By Season</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-ironman">Iron Man</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-improved">Most Improved</a></li>
+</ul>
+
+<div class="tab-content">
+
+{# ════════════════════════════════════════════════════════════════════════════ #}
+{# ALL-TIME tab                                                                #}
+{# ════════════════════════════════════════════════════════════════════════════ #}
+<div class="tab-pane fade show active" id="tab-alltime">
+
+  <div class="row g-4">
+
+    {# High Game #}
+    <div class="col-md-6">
+      <h6>All-Time High Game (Scratch)</h6>
+      <div class="table-scroll">
+      <table class="table table-sm table-bordered table-striped mb-0">
+        <thead class="table-dark">
+          <tr><th>#</th><th>Bowler</th><th>Score</th><th>Season</th></tr>
+        </thead>
+        <tbody>
+          {% for row in all_time_hg %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</td>
+            <td><strong>{{ row.score }}</strong></td>
+            <td>{{ row.season.name }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-muted text-center">No data</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+    {# High Series #}
+    <div class="col-md-6">
+      <h6>All-Time High Series (Scratch)</h6>
+      <div class="table-scroll">
+      <table class="table table-sm table-bordered table-striped mb-0">
+        <thead class="table-dark">
+          <tr><th>#</th><th>Bowler</th><th>Score</th><th>Season</th></tr>
+        </thead>
+        <tbody>
+          {% for row in all_time_hs %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</td>
+            <td><strong>{{ row.score }}</strong></td>
+            <td>{{ row.season.name }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-muted text-center">No data</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+    {# Best Season Averages #}
+    <div class="col-12">
+      <h6>Best Single-Season Averages (min 6 games)</h6>
+      <div class="table-scroll">
+      <table class="table table-sm table-bordered table-striped mb-0">
+        <thead class="table-dark">
+          <tr><th>#</th><th>Bowler</th><th>Avg</th><th>Games</th><th>Season</th></tr>
+        </thead>
+        <tbody>
+          {% for row in top_season_avgs %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</td>
+            <td><strong>{{ row.avg }}</strong></td>
+            <td>{{ row.games }}</td>
+            <td>{{ row.season.name }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-muted text-center">No data</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+  </div>{# /row #}
+</div>{# /tab-alltime #}
+
+
+{# ════════════════════════════════════════════════════════════════════════════ #}
+{# BY SEASON tab                                                               #}
+{# ════════════════════════════════════════════════════════════════════════════ #}
+<div class="tab-pane fade" id="tab-seasons">
+
+  <h6>Season-by-Season Summary</h6>
+  <div class="table-scroll">
+  <table class="table table-sm table-bordered table-striped">
+    <thead class="table-dark">
+      <tr>
+        <th>Season</th>
+        <th>Bowlers</th>
+        <th>League Avg</th>
+        <th>High Game</th>
+        <th>High Game Bowler</th>
+        <th>High Series</th>
+        <th>High Series Bowler</th>
+        <th>Team Champion</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in season_comparison %}
+      <tr>
+        <td>{{ row.season.name }}</td>
+        <td>{{ row.bowler_count }}</td>
+        <td>{{ row.league_avg }}</td>
+        <td><strong>{{ row.high_game }}</strong></td>
+        <td>{{ row.high_game_bowler.last_name if row.high_game_bowler else '—' }}</td>
+        <td><strong>{{ row.high_series }}</strong></td>
+        <td>{{ row.high_series_bowler.last_name if row.high_series_bowler else '—' }}</td>
+        <td>{{ row.champion_team.name if row.champion_team else '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="text-muted text-center">No data</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+</div>{# /tab-seasons #}
+
+
+{# ════════════════════════════════════════════════════════════════════════════ #}
+{# IRON MAN tab                                                                #}
+{# ════════════════════════════════════════════════════════════════════════════ #}
+<div class="tab-pane fade" id="tab-ironman">
+
+  <h6>Iron Man — Most Seasons Bowled</h6>
+  <p class="text-muted small">Counts seasons in which the bowler completed at least 6 regular-week games.</p>
+  <div class="table-scroll">
+  <table class="table table-sm table-bordered table-striped">
+    <thead class="table-dark">
+      <tr><th>#</th><th>Bowler</th><th>Seasons</th></tr>
+    </thead>
+    <tbody>
+      {% for row in iron_man %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</td>
+        <td>{{ row.seasons }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="text-muted text-center">No data</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+</div>{# /tab-ironman #}
+
+
+{# ════════════════════════════════════════════════════════════════════════════ #}
+{# MOST IMPROVED tab                                                           #}
+{# ════════════════════════════════════════════════════════════════════════════ #}
+<div class="tab-pane fade" id="tab-improved">
+
+  <h6>Most Improved — Single-Season Average Gain</h6>
+  <p class="text-muted small">Largest average increase from one season to the immediately following season.</p>
+  <div class="table-scroll">
+  <table class="table table-sm table-bordered table-striped">
+    <thead class="table-dark">
+      <tr><th>#</th><th>Bowler</th><th>From</th><th>Avg</th><th>To</th><th>Avg</th><th>Gain</th></tr>
+    </thead>
+    <tbody>
+      {% for row in most_improved %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</td>
+        <td>{{ row.from_season.name }}</td>
+        <td>{{ row.from_avg }}</td>
+        <td>{{ row.to_season.name }}</td>
+        <td>{{ row.to_avg }}</td>
+        <td><strong>{{ '+' if row.gain > 0 }}{{ row.gain }}</strong></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-muted text-center">No data</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+</div>{# /tab-improved #}
+
+</div>{# /tab-content #}
+{% endif %}
+{% endblock %}

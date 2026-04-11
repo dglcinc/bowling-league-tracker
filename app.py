@@ -167,12 +167,14 @@ def create_app():
     from routes.entry import entry_bp
     from routes.reports import reports_bp
     from routes.payout import payout_bp
+    from routes.records import records_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(entry_bp, url_prefix='/entry')
     app.register_blueprint(reports_bp, url_prefix='/reports')
     app.register_blueprint(payout_bp, url_prefix='/payout')
+    app.register_blueprint(records_bp, url_prefix='/reports')
 
     # Global auth enforcement — runs before every request
     @app.before_request
