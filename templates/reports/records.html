@@ -274,7 +274,7 @@
           {% endif %}
         </td>
         {% endif %}
-        <td class="text-muted small">{{ tournament_labels.get(tt, tt) }}</td>
+        <td class="text-muted small">{{ row.season.tournament_labels.get(tt, tt) }}</td>
         {% for place in range(3) %}
         {% if entries | length > place %}
         {% set e = entries[place] %}
