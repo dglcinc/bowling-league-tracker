@@ -440,7 +440,7 @@ def matchup_entry(season_id, week_num, matchup_num):
                            season=season, week=week, sched=sched,
                            teams=teams, team_entries=team_entries,
                            roster_data=roster_data, breakdown=breakdown,
-                           tournament_labels=_TOURNAMENT_LABELS)
+                           tournament_labels=season.tournament_labels)
 
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/position/<int:pairing_num>',
@@ -623,7 +623,7 @@ def tournament_entry(season_id, week_num):
         return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
     tt = week.tournament_type
-    label = _TOURNAMENT_LABELS.get(tt, tt)
+    label = season.tournament_labels.get(tt, tt)
 
     # indiv_scratch: all bowlers (active + inactive); handicap tournaments: active only
     if tt == 'indiv_scratch':
