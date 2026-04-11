@@ -67,14 +67,6 @@
 </div>
 {% endif %}
 
-{# Full stats link #}
-{% if season %}
-<div class="text-center mt-2">
-  <a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=current_user.id) }}"
-     style="color:#1b3a6b;font-size:.85rem">Full season detail →</a>
-</div>
-{% endif %}
-
 {# Account actions #}
 <div class="m-card mt-3" style="text-align:center">
   <a href="{{ url_for('mobile.prefer_desktop', next=url_for('index')) }}"
