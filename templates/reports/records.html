@@ -276,8 +276,9 @@
         <td class="text-nowrap">
           {% set e = entries[place] %}
           {% if e.bowler %}
+          {% set display %}{% if e.bowler.first_name %}{{ e.bowler.first_name[0] }}. {% endif %}{{ e.bowler.last_name }}{% if e.bowler.nickname %} ({{ e.bowler.nickname }}){% endif %}{% endset %}
           <a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=e.bowler.id) }}"
-             class="text-decoration-none text-body">{{ e.bowler.nickname or (e.bowler.last_name + (', ' + e.bowler.first_name if e.bowler.first_name else '')) }}</a>
+             class="text-decoration-none text-body">{{ display }}</a>
           {% elif e.guest_name %}{{ e.guest_name }}{% else %}—{% endif %}
         </td>
         {% else %}

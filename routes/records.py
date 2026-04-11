@@ -269,8 +269,7 @@ def records():
     most_improved = _most_improved(filtered)
     season_comp   = _season_comparison(filtered_seasons, filtered)
     top_season_avgs = sorted(filtered, key=lambda r: -r['avg'])[:25]
-    # Tournament winners table is always unfiltered (venue filter N/A to placements)
-    tournament_winners = _tournament_winners_by_season(seasons)
+    tournament_winners = _tournament_winners_by_season(filtered_seasons)
 
     # Tournament display names: use the active season's labels, fall back to most recent
     active = Season.query.filter_by(is_active=True).first()
