@@ -248,49 +248,52 @@
   <h6>Tournament Winners by Season</h6>
   <p class="text-muted small">1st, 2nd, and 3rd place finishers for each post-season event. Enter placements via Admin → Season → Tournament Placements.</p>
   {% if tournament_winners %}
-  <div class="table-scroll">
-  <table class="table table-sm table-bordered table-striped">
+  <style>
+    #winners-table tbody + tbody > tr:first-child td { border-top: 2px solid #6c757d; }
+  </style>
+  <table id="winners-table" class="table table-sm table-bordered">
     <thead class="table-dark">
       <tr>
-        <th rowspan="2" class="align-middle">Season</th>
-        <th rowspan="2" class="align-middle">Champion Team</th>
-        <th colspan="3" class="text-center">{{ tournament_labels.get('indiv_scratch', 'Indiv Scratch') }}</th>
-        <th colspan="3" class="text-center">{{ tournament_labels.get('indiv_hcp_1', 'Hcp Tournament 1') }}</th>
-        <th colspan="3" class="text-center">{{ tournament_labels.get('indiv_hcp_2', 'Hcp Tournament 2') }}</th>
-      </tr>
-      <tr>
-        <th class="text-center">🥇</th><th class="text-center">🥈</th><th class="text-center">🥉</th>
-        <th class="text-center">🥇</th><th class="text-center">🥈</th><th class="text-center">🥉</th>
-        <th class="text-center">🥇</th><th class="text-center">🥈</th><th class="text-center">🥉</th>
+        <th style="width:9em">Season</th>
+        <th>Tournament</th>
+        <th>🥇</th>
+        <th>🥈</th>
+        <th>🥉</th>
       </tr>
     </thead>
+    {% for row in tournament_winners %}
     <tbody>
-      {% for row in tournament_winners %}
+      {% for tt in ['indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'] %}
+      {% set entries = row[tt] %}
       <tr>
-        <td class="text-nowrap">{{ row.season.name }}</td>
-        <td>{{ row.champion_team.name if row.champion_team else '—' }}</td>
-        {% for tt in ['indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'] %}
-        {% set entries = row[tt] %}
+        {% if loop.first %}
+        <td rowspan="3" class="align-top text-nowrap fw-semibold">
+          {{ row.season.name }}
+          {% if row.champion_team %}
+          <br><small class="text-muted fw-normal">{{ row.champion_team.name }}</small>
+          {% endif %}
+        </td>
+        {% endif %}
+        <td class="text-muted small">{{ tournament_labels.get(tt, tt) }}</td>
         {% for place in range(3) %}
         {% if entries | length > place %}
+        {% set e = entries[place] %}
         <td class="text-nowrap">
-          {% set e = entries[place] %}
           {% if e.bowler %}
           {% set display %}{% if e.bowler.first_name %}{{ e.bowler.first_name[0] }}. {% endif %}{{ e.bowler.last_name }}{% if e.bowler.nickname %} ({{ e.bowler.nickname }}){% endif %}{% endset %}
           <a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=e.bowler.id) }}"
              class="text-decoration-none text-body">{{ display }}</a>
-          {% elif e.guest_name %}{{ e.guest_name }}{% else %}—{% endif %}
+          {% elif e.guest_name %}{{ e.guest_name }}{% else %}<span class="text-muted">—</span>{% endif %}
         </td>
         {% else %}
         <td class="text-muted">—</td>
         {% endif %}
         {% endfor %}
-        {% endfor %}
       </tr>
       {% endfor %}
     </tbody>
+    {% endfor %}
   </table>
-  </div>
   {% else %}
   <p class="text-muted">No tournament placements recorded yet.</p>
   {% endif %}
