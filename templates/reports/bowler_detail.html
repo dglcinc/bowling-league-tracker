@@ -7,6 +7,19 @@
   <a href="{{ url_for('admin.edit_bowler', bowler_id=bowler.id, season_id=season.id) }}" class="btn btn-sm btn-outline-secondary no-print">Edit Bowler</a>
 </div>
 <p>{{ roster.team.name }} &nbsp;|&nbsp; Prior Hcp: {{ roster.prior_handicap or 0 }}</p>
+{% if career | length > 1 %}
+<div class="mb-3 no-print">
+  {% for row in career %}
+  {% if row.season.id == season.id %}
+  <a class="badge text-bg-primary text-decoration-none me-1"
+     href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=bowler.id) }}">{{ row.season.name }}</a>
+  {% else %}
+  <a class="badge text-bg-light border text-dark text-decoration-none me-1"
+     href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=bowler.id) }}">{{ row.season.name }}</a>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
 
 <div class="row mb-3">
   <div class="col-auto"><strong>Games:</strong> {{ stats.cumulative_games }}</div>
@@ -31,7 +44,7 @@
   <tbody>
     {% for row in career %}
     <tr {% if row.season.id == season.id %}class="table-primary fw-semibold"{% endif %}>
-      <td>{{ row.season.name }}</td>
+      <td><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=bowler.id) }}">{{ row.season.name }}</a></td>
       <td>{{ row.team.name if row.team else '—' }}</td>
       <td>{{ row.games }}</td>
       <td>{{ row.avg }}</td>
