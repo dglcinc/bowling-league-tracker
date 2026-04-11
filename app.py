@@ -55,6 +55,8 @@ _VIEWER_DEFAULTS = [
     ('reports.week_prizes',   'Prizes & Standings',  True),
     ('payout.payout_overview','Payout',              True),
     ('reports.print_batch',   'Print Batch',         False),
+    ('records.records',       'Records',             True),
+    ('records.bowler_dir',    'Bowler Directory',    True),
 ]
 
 
@@ -167,12 +169,14 @@ def create_app():
     from routes.entry import entry_bp
     from routes.reports import reports_bp
     from routes.payout import payout_bp
+    from routes.records import records_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(entry_bp, url_prefix='/entry')
     app.register_blueprint(reports_bp, url_prefix='/reports')
     app.register_blueprint(payout_bp, url_prefix='/payout')
+    app.register_blueprint(records_bp, url_prefix='/reports')
 
     # Global auth enforcement — runs before every request
     @app.before_request
@@ -241,8 +245,16 @@ def create_app():
                   .first())
             latest_entered[s.id] = lw.week_num if lw else 0
         seasons_with_data = [s for s in all_seasons if latest_entered.get(s.id, 0) > 0]
+
+        # Determine which season the current page is about (for navbar dropdown label)
+        from flask import request as _req
+        view_args = _req.view_args or {}
+        sid = view_args.get('season_id')
+        view_season = db.session.get(Season, sid) if sid else active
+
         return {
             'active_season': active,
+            'view_season': view_season,
             'current_week': current_week,
             'league_settings': settings,
             'has_passkey': has_passkey,

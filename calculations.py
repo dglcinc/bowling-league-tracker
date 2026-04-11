@@ -582,6 +582,44 @@ def get_iron_man_status(season_id, through_week):
 
 
 # ---------------------------------------------------------------------------
+# Career stats (cross-season)
+# ---------------------------------------------------------------------------
+
+def get_career_stats(bowler_id):
+    """
+    Returns list of per-season stat dicts for all seasons where the bowler
+    has at least one regular-week entry, sorted oldest-to-newest.
+    Each dict: {season, team, avg, games, high_game_scratch, high_series_scratch,
+                high_game_hcp, high_series_hcp, prior_hcp}
+    """
+    from models import Season, Roster, Week, Bowler
+
+    rosters = (Roster.query
+               .filter_by(bowler_id=bowler_id)
+               .join(Season)
+               .order_by(Season.name)
+               .all())
+
+    results = []
+    for r in rosters:
+        stats = get_bowler_stats(bowler_id, r.season_id)
+        if stats['cumulative_games'] == 0:
+            continue
+        results.append({
+            'season':              r.season,
+            'team':                r.team,
+            'avg':                 stats['running_avg'],
+            'games':               stats['cumulative_games'],
+            'high_game_scratch':   stats['ytd_high_game_scratch'],
+            'high_series_scratch': stats['ytd_high_series_scratch'],
+            'high_game_hcp':       stats['ytd_high_game_hcp'],
+            'high_series_hcp':     stats['ytd_high_series_hcp'],
+            'prior_hcp':           r.prior_handicap,
+        })
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Most Improved calculation
 # ---------------------------------------------------------------------------
 

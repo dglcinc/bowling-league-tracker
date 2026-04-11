@@ -6,7 +6,8 @@ from flask import Blueprint, render_template, request, redirect, url_for
 from models import Season, Week, Roster, Bowler, Team, MatchupEntry, TeamPoints, TournamentEntry, PayoutConfig
 from calculations import (get_wkly_alpha, get_team_standings, get_bowler_stats,
                            get_iron_man_status, get_most_improved, get_weekly_prizes,
-                           calculate_handicap, get_weekly_team_points, get_matchup_breakdown)
+                           calculate_handicap, get_weekly_team_points, get_matchup_breakdown,
+                           get_career_stats)
 
 reports_bp = Blueprint('reports', __name__)
 
@@ -34,9 +35,11 @@ def bowler_detail(season_id, bowler_id):
     bowler = Bowler.query.get_or_404(bowler_id)
     stats = get_bowler_stats(bowler_id, season_id)
     roster = Roster.query.filter_by(bowler_id=bowler_id, season_id=season_id).first()
+    career = get_career_stats(bowler_id)
     return render_template('reports/bowler_detail.html',
                            season=season, bowler=bowler,
-                           stats=stats, roster=roster)
+                           stats=stats, roster=roster,
+                           career=career)
 
 
 def _build_high_games_leaders(season_id, through_week, min_games=0):
