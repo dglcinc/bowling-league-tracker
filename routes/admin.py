@@ -412,14 +412,19 @@ def schedule(season_id):
                            weeks=weeks, sched_map=sched_map)
 
 
+_INDIV_TOURNAMENT_TYPES = {'indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'}
+
+
 @admin_bp.route('/seasons/<int:season_id>/schedule/save', methods=['POST'])
 def save_schedule(season_id):
     """Save schedule entries from form. Expects fields like week_1_matchup_1_t1, etc."""
     season = Season.query.get_or_404(season_id)
 
+    # Build week-type lookup so we can handle solo (individual tournament) weeks
+    week_map = {w.week_num: w for w in Week.query.filter_by(season_id=season_id).all()}
+
     # Collect all fields per matchup first so we never add a partial entry to the
-    # session — an in-session entry with team2_id=None would violate NOT NULL on the
-    # next query's autoflush before we get a chance to set team2_id.
+    # session before all fields are set.
     updates = {}
     for key, val in request.form.items():
         # Expected key format: week_{wn}_matchup_{mn}_{field}
@@ -437,24 +442,36 @@ def save_schedule(season_id):
     for (wn, mn), fields in updates.items():
         t1 = int(fields['t1']) if fields.get('t1') else None
         t2 = int(fields['t2']) if fields.get('t2') else None
+        lane = fields.get('lane', '').strip()
+
+        week = week_map.get(wn)
+        is_solo = week and week.tournament_type in _INDIV_TOURNAMENT_TYPES
 
         entry = ScheduleEntry.query.filter_by(
             season_id=season_id, week_num=wn, matchup_num=mn
         ).first()
+
         if not entry:
-            # Don't create a new entry without both team IDs — tournament weeks
-            # may submit a lane pair with no team dropdowns filled.
-            if not (t1 and t2):
+            if is_solo and lane:
+                # Individual tournament: create lane-only entry (no teams)
+                entry = ScheduleEntry(season_id=season_id, week_num=wn, matchup_num=mn)
+                db.session.add(entry)
+            elif t1 and t2:
+                entry = ScheduleEntry(season_id=season_id, week_num=wn, matchup_num=mn)
+                db.session.add(entry)
+            else:
                 continue
-            entry = ScheduleEntry(season_id=season_id, week_num=wn, matchup_num=mn)
-            db.session.add(entry)
 
         if t1:
             entry.team1_id = t1
         if t2:
             entry.team2_id = t2
-        if fields.get('lane'):
-            entry.lane_pair = fields['lane'].strip()
+        if lane:
+            entry.lane_pair = lane
+        elif is_solo and not lane and entry.id:
+            # Lane cleared on a solo entry — delete it
+            db.session.delete(entry)
+            continue
 
     db.session.commit()
     flash('Schedule saved.', 'success')
