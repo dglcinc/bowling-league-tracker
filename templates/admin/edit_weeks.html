@@ -4,7 +4,36 @@
 {% block content %}
 <h4>Week Dates — {{ season.name }}</h4>
 <p class="text-muted small">Enter the first date; subsequent dates auto-fill every 7 days. Entering any date re-cascades from that point forward.</p>
+
 <form method="post">
+<div class="card mb-3">
+  <div class="card-header">Tournament Display Names</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">These names appear in reports, headers, and prize pages. Changes apply to this season only.</p>
+    <div class="row g-2">
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Club Championship (team event)</label>
+        <input type="text" name="name_club_championship" class="form-control form-control-sm"
+               value="{{ season.name_club_championship }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Individual Scratch Championship (5 games)</label>
+        <input type="text" name="name_indiv_scratch" class="form-control form-control-sm"
+               value="{{ season.name_indiv_scratch }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Individual Handicap Tournament 1 (3 games)</label>
+        <input type="text" name="name_indiv_hcp_1" class="form-control form-control-sm"
+               value="{{ season.name_indiv_hcp_1 }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Individual Handicap Tournament 2 (3 games)</label>
+        <input type="text" name="name_indiv_hcp_2" class="form-control form-control-sm"
+               value="{{ season.name_indiv_hcp_2 }}">
+      </div>
+    </div>
+  </div>
+</div>
   <table class="table table-sm" id="weeks-table">
     <thead>
       <tr><th>Week</th><th>Date</th><th>Position Night</th><th>Tournament Type</th></tr>

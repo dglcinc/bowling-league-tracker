@@ -64,6 +64,23 @@ class Season(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     bowling_format = db.Column(db.String(10), default='single')  # 'single' or 'double'
 
+    # Configurable display names for the 4 post-season tournament weeks.
+    # These are stored in the DB so personal names never appear in the repo.
+    name_club_championship = db.Column(db.String(128), default='Club Championship')
+    name_indiv_scratch     = db.Column(db.String(128), default='Harry E. Russell Championship')
+    name_indiv_hcp_1       = db.Column(db.String(128), default='Chad Harris Memorial Bowl')
+    name_indiv_hcp_2       = db.Column(db.String(128), default='Shep Belyea Open')
+
+    @property
+    def tournament_labels(self):
+        """Map tournament_type key → display name for this season."""
+        return {
+            'club_championship': self.name_club_championship or 'Club Championship',
+            'indiv_scratch':     self.name_indiv_scratch     or 'Individual Scratch Championship',
+            'indiv_hcp_1':       self.name_indiv_hcp_1       or 'Individual Handicap Tournament 1',
+            'indiv_hcp_2':       self.name_indiv_hcp_2       or 'Individual Handicap Tournament 2',
+        }
+
     teams = db.relationship('Team', back_populates='season', lazy='dynamic')
     roster = db.relationship('Roster', back_populates='season', lazy='dynamic')
     weeks = db.relationship('Week', back_populates='season', lazy='dynamic', order_by='Week.week_num')
@@ -236,8 +253,8 @@ class TeamPoints(db.Model):
 class TournamentEntry(db.Model):
     """
     One bowler's (or write-in's) scores for a tournament week.
-    Used for Harry Russell (5 games scratch), Chad Harris, Shep Belyea (3 games hcp).
-    write-in participants have bowler_id=None and guest_name set.
+    Used for indiv_scratch (5 games) and indiv_hcp_1/indiv_hcp_2 (3 games hcp).
+    Write-in participants have bowler_id=None and guest_name set.
     """
     __tablename__ = 'tournament_entries'
 

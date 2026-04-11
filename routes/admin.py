@@ -9,12 +9,13 @@ import io
 
 admin_bp = Blueprint('admin', __name__)
 
-# Post-season tournament weeks added after every regular season
+# Post-season tournament weeks added after every regular season.
+# Keys are generic — display names are configured per season in the seasons table.
 _POSTSEASON_WEEKS = [
-    ('club_championship', True),   # Club Team Championship — scored as position night
-    ('harry_russell',     False),  # Harry E. Russell Championship
-    ('chad_harris',       False),  # Chad Harris Memorial Bowl
-    ('shep_belyea',       False),  # Shep Belyea Open
+    ('club_championship', True),   # Club team championship — scored as position night
+    ('indiv_scratch',     False),  # Individual scratch championship
+    ('indiv_hcp_1',       False),  # Individual handicap tournament 1
+    ('indiv_hcp_2',       False),  # Individual handicap tournament 2
 ]
 
 
@@ -60,12 +61,18 @@ def new_season():
 
         bowling_format = request.form.get('bowling_format', 'single')
 
+        # Default tournament display names from the most recent existing season
+        prev = Season.query.order_by(Season.id.desc()).first()
         season = Season(
             name=name,
             num_weeks=num_weeks,
             half_boundary_week=half_boundary,
             is_active=True,
             bowling_format=bowling_format,
+            name_club_championship=request.form.get('name_club_championship', '').strip() or (prev.name_club_championship if prev else 'Club Championship'),
+            name_indiv_scratch=request.form.get('name_indiv_scratch', '').strip() or (prev.name_indiv_scratch if prev else 'Individual Scratch Championship'),
+            name_indiv_hcp_1=request.form.get('name_indiv_hcp_1', '').strip() or (prev.name_indiv_hcp_1 if prev else 'Individual Handicap Tournament 1'),
+            name_indiv_hcp_2=request.form.get('name_indiv_hcp_2', '').strip() or (prev.name_indiv_hcp_2 if prev else 'Individual Handicap Tournament 2'),
         )
         if start_date_str:
             season.start_date = date.fromisoformat(start_date_str)
@@ -457,15 +464,22 @@ def edit_weeks(season_id):
     season = Season.query.get_or_404(season_id)
     weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
 
+    labels = season.tournament_labels
     TOURNAMENT_TYPES = [
         ('', '— Regular week —'),
-        ('club_championship', 'Club Team Championship'),
-        ('harry_russell', 'Harry E. Russell Championship'),
-        ('chad_harris', 'Chad Harris Memorial Bowl'),
-        ('shep_belyea', 'Shep Belyea Open'),
+        ('club_championship', labels['club_championship']),
+        ('indiv_scratch',     labels['indiv_scratch']),
+        ('indiv_hcp_1',       labels['indiv_hcp_1']),
+        ('indiv_hcp_2',       labels['indiv_hcp_2']),
     ]
 
     if request.method == 'POST':
+        # Save tournament display names
+        season.name_club_championship = request.form.get('name_club_championship', '').strip() or season.name_club_championship
+        season.name_indiv_scratch     = request.form.get('name_indiv_scratch', '').strip()     or season.name_indiv_scratch
+        season.name_indiv_hcp_1       = request.form.get('name_indiv_hcp_1', '').strip()       or season.name_indiv_hcp_1
+        season.name_indiv_hcp_2       = request.form.get('name_indiv_hcp_2', '').strip()       or season.name_indiv_hcp_2
+
         for wk in weeks:
             date_str = request.form.get(f'date_{wk.week_num}')
             pos_night = request.form.get(f'pos_{wk.week_num}') == 'on'
