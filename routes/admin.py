@@ -279,6 +279,12 @@ def league_settings():
                 active_season.blind_handicap = int(request.form.get('blind_handicap', active_season.blind_handicap))
             except (ValueError, TypeError):
                 pass
+            arrival = request.form.get('arrival_time', '').strip()
+            start = request.form.get('start_time', '').strip()
+            if arrival:
+                active_season.arrival_time = arrival
+            if start:
+                active_season.start_time = start
         db.session.commit()
         flash('League settings saved.', 'success')
         return redirect(url_for('admin.league_settings'))

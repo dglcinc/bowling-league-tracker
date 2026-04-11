@@ -43,7 +43,22 @@
 
   {% if active_season %}
   <hr>
-  <h6 class="mb-3">Handicap &amp; Blind Settings — {{ active_season.name }}</h6>
+  <h6 class="mb-3">Active Season Settings — {{ active_season.name }}</h6>
+  <div class="row g-3 mb-3">
+    <div class="col-auto">
+      <label class="form-label fw-bold">Arrival Time</label>
+      <input type="text" class="form-control" name="arrival_time"
+             value="{{ active_season.arrival_time or '7:45 PM' }}" style="max-width:120px">
+      <div class="form-text">Shown on mobile home screen.</div>
+    </div>
+    <div class="col-auto">
+      <label class="form-label fw-bold">Start Time</label>
+      <input type="text" class="form-control" name="start_time"
+             value="{{ active_season.start_time or '8:00 PM' }}" style="max-width:120px">
+      <div class="form-text">Shown on mobile home screen.</div>
+    </div>
+  </div>
+  <h6 class="mb-3">Handicap &amp; Blind Settings</h6>
   <div class="mb-3">
     <label class="form-label fw-bold">Handicap Base</label>
     <input type="number" class="form-control" name="handicap_base" min="0" max="300"

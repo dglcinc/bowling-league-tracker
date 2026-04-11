@@ -92,6 +92,9 @@ def _migrate_db(db):
         # Venue distinction: which bowling alley was used for each season
         "ALTER TABLE seasons ADD COLUMN venue VARCHAR(32) DEFAULT 'boonton_lanes'",
         "UPDATE seasons SET venue = 'mountain_lakes_club' WHERE name < '2024-2025'",
+        # Bowling night times (configurable per season, shown on mobile home screen)
+        "ALTER TABLE seasons ADD COLUMN arrival_time VARCHAR(16) DEFAULT '7:45 PM'",
+        "ALTER TABLE seasons ADD COLUMN start_time VARCHAR(16) DEFAULT '8:00 PM'",
         # OTP login — replaces magic links for day-to-day sign-in
         """CREATE TABLE IF NOT EXISTS login_otps (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -4,44 +4,147 @@
 
 {% block content %}
 
-{# ── Upcoming week ── #}
+{# ── Upcoming event ── #}
 {% if upcoming_week %}
+
+{# Determine event label and type #}
+{% if upcoming_week.tournament_type == 'club_championship' %}
+  {% set event_label = season.tournament_labels['club_championship'] %}
+  {% set event_type = 'championship' %}
+{% elif upcoming_week.tournament_type == 'indiv_scratch' %}
+  {% set event_label = season.tournament_labels['indiv_scratch'] %}
+  {% set event_type = 'indiv_scratch' %}
+{% elif upcoming_week.tournament_type == 'indiv_hcp_1' %}
+  {% set event_label = season.tournament_labels['indiv_hcp_1'] %}
+  {% set event_type = 'indiv_hcp_1' %}
+{% elif upcoming_week.tournament_type == 'indiv_hcp_2' %}
+  {% set event_label = season.tournament_labels['indiv_hcp_2'] %}
+  {% set event_type = 'indiv_hcp_2' %}
+{% elif upcoming_week.is_position_night %}
+  {% set event_label = 'Position Night' %}
+  {% set event_type = 'lanes' %}
+{% else %}
+  {% set event_label = 'Week ' ~ upcoming_week.week_num %}
+  {% set event_type = 'lanes' %}
+{% endif %}
+
 <div class="m-card">
   <div class="m-card-title">Up Next</div>
-  <div class="m-card-main">
-    Week {{ upcoming_week.week_num }}
-    {% if upcoming_week.is_position_night %}<span class="badge bg-warning text-dark ms-1" style="font-size:.7rem">Position Night</span>{% endif %}
-  </div>
+  <div class="m-card-main">{{ event_label }}</div>
+  {% if not upcoming_week.tournament_type %}
+  <div style="font-size:.8rem;color:#6c757d">Week {{ upcoming_week.week_num }}</div>
+  {% endif %}
   {% if upcoming_week.date %}
   <div class="m-card-sub">{{ upcoming_week.date.strftime('%A, %B %-d') }}</div>
   {% endif %}
 
-  {% if my_matchup %}
-  <div class="mt-3 d-flex align-items-center gap-3">
-    <div>
-      <div style="font-size:.75rem;color:#6c757d;font-weight:600;text-transform:uppercase">Lanes</div>
-      <span class="lane-badge">{{ my_matchup.lane_pair or '—' }}</span>
-    </div>
-    {% if opponent_team %}
-    <div>
-      <div style="font-size:.75rem;color:#6c757d;font-weight:600;text-transform:uppercase">Opponent</div>
-      <div style="font-weight:600">{{ opponent_team.name }}</div>
-    </div>
+  {# Times — Russell has a special 7pm start #}
+  <div class="mt-2" style="font-size:.85rem;color:#495057">
+    {% if event_type == 'indiv_scratch' %}
+      <strong>Arrive:</strong> 6:45 PM &nbsp;·&nbsp; <strong>Start:</strong> 7:00 PM
+    {% else %}
+      <strong>Arrive:</strong> {{ season.arrival_time or '7:45 PM' }}
+      &nbsp;·&nbsp;
+      <strong>Start:</strong> {{ season.start_time or '8:00 PM' }}
     {% endif %}
   </div>
-  {% elif my_team %}
-  <div class="m-card-sub mt-2 text-muted" style="font-size:.85rem">Lane assignments not yet set for this week.</div>
-  {% else %}
-  <div class="m-card-sub mt-2 text-muted" style="font-size:.85rem">You're not on the roster for this season.</div>
+</div>
+
+{# ── Lane assignments (regular week, position night, club championship) ── #}
+{% if event_type in ('lanes', 'championship') %}
+
+{% if all_matchups %}
+<div class="m-card">
+  <div class="m-card-title">
+    {% if event_type == 'championship' %}Team Matchups{% else %}Lane Assignments{% endif %}
+  </div>
+  {% for m in all_matchups %}
+  {% set is_mine = my_team and (m.team1_id == my_team.id or m.team2_id == my_team.id) %}
+  <div style="display:flex;align-items:center;padding:9px 0;
+              border-bottom:1px solid #f0f0f0;
+              {% if is_mine %}background:#f0f4ff;margin:0 -16px;padding:9px 16px;{% endif %}">
+    <div style="width:64px;flex-shrink:0">
+      {% if m.lane_pair %}
+      <span class="lane-badge">{{ m.lane_pair }}</span>
+      {% else %}
+      <span style="color:#adb5bd;font-size:.8rem">TBD</span>
+      {% endif %}
+    </div>
+    <div style="flex:1;font-size:.95rem;{% if is_mine %}font-weight:700;color:#1b3a6b{% endif %}">
+      {{ m.team1.name }} <span style="color:#6c757d;font-weight:400">vs</span> {{ m.team2.name }}
+    </div>
+    {% if is_mine %}
+    <div style="font-size:.7rem;color:#1b3a6b;font-weight:600">YOU</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% elif my_team %}
+<div class="m-card">
+  <div class="m-card-sub text-muted" style="font-size:.85rem">Lane assignments not yet posted for this week.</div>
+</div>
+{% endif %}
+
+{% if event_type == 'championship' %}
+<div class="m-card" style="font-size:.85rem;color:#495057">
+  Top two teams from regular season standings. Handicaps count. Three games.
+  Top two teams on lanes 13–16; bottom two on lanes 17–20.
+</div>
+{% endif %}
+
+{# ── Individual tournament eligibility ── #}
+{% elif event_type == 'indiv_scratch' %}
+<div class="m-card">
+  <div class="m-card-title">Who's Eligible</div>
+  <div style="font-size:.9rem;line-height:1.5;color:#495057">
+    Top 10 scratch bowlers with <strong>30+ games</strong> this season.
+    Previous champions exempt from the game minimum ("Green Jacket Exemption").
+    5 games, scratch scoring (no handicap).
+  </div>
+  {% if games_played %}
+  <div class="mt-2" style="font-size:.85rem;color:#1b3a6b;font-weight:600">
+    You have {{ games_played }} game{{ 's' if games_played != 1 else '' }} this season.
+  </div>
   {% endif %}
 </div>
 
-{% elif season %}
-{# No upcoming regular week — check if we're in post-season or done #}
+{% elif event_type == 'indiv_hcp_1' %}
 <div class="m-card">
-  <div class="m-card-title">Season</div>
-  <div class="m-card-main">Regular season complete</div>
-  <div class="m-card-sub">Post-season tournaments in progress.</div>
+  <div class="m-card-title">Who's Eligible</div>
+  <div style="font-size:.9rem;line-height:1.5;color:#495057">
+    All league bowlers with <strong>30+ games</strong> this season.
+    3 games with handicap. If more than 24 bowlers attend, the event may extend to a second night.
+  </div>
+  {% if games_played %}
+  <div class="mt-2" style="font-size:.85rem;
+    {% if games_played >= 30 %}color:#198754{% else %}color:#dc3545{% endif %};font-weight:600">
+    You have {{ games_played }} game{{ 's' if games_played != 1 else '' }} this season
+    {% if games_played >= 30 %} — you're eligible ✓{% else %} — need {{ 30 - games_played }} more{% endif %}.
+  </div>
+  {% endif %}
+</div>
+
+{% elif event_type == 'indiv_hcp_2' %}
+<div class="m-card">
+  <div class="m-card-title">Who's Eligible</div>
+  <div style="font-size:.9rem;line-height:1.5;color:#495057">
+    Bowlers <strong>50 years or older</strong> with <strong>30+ games</strong> this season.
+    3 games with handicap.
+  </div>
+  {% if games_played %}
+  <div class="mt-2" style="font-size:.85rem;
+    {% if games_played >= 30 %}color:#198754{% else %}color:#dc3545{% endif %};font-weight:600">
+    You have {{ games_played }} game{{ 's' if games_played != 1 else '' }} this season
+    {% if games_played >= 30 %} — games requirement met ✓{% else %} — need {{ 30 - games_played }} more{% endif %}.
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{# No upcoming week #}
+{% elif season %}
+<div class="m-card">
+  <div class="m-card-main text-muted">Season complete.</div>
 </div>
 {% else %}
 <div class="m-card">
@@ -50,9 +153,18 @@
 {% endif %}
 
 {# ── Last week result ── #}
-{% if last_week %}
+{% if last_week and my_team %}
 <div class="m-card">
-  <div class="m-card-title">Last Week (Week {{ last_week.week_num }})</div>
+  <div class="m-card-title">
+    Last Week
+    {% if last_week.tournament_type %}
+      — {{ season.tournament_labels.get(last_week.tournament_type, 'Tournament') }}
+    {% elif last_week.is_position_night %}
+      — Position Night
+    {% else %}
+      (Week {{ last_week.week_num }})
+    {% endif %}
+  </div>
   {% if last_week_pts is not none and last_week_opp_pts is not none %}
     {% if last_week_pts > last_week_opp_pts %}
       <div class="m-card-main result-win">Won {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
@@ -61,14 +173,12 @@
     {% else %}
       <div class="m-card-main result-tie">Tied {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
     {% endif %}
-  {% elif last_week_pts is not none %}
-    <div class="m-card-main">{{ last_week_pts | int }} pts</div>
   {% else %}
     <div class="m-card-sub text-muted">Result not available.</div>
   {% endif %}
   <div class="m-card-sub mt-1">
     <a href="{{ url_for('mobile.week_scores', week_num=last_week.week_num) }}"
-       style="color:#1b3a6b;font-size:.85rem">View full scores →</a>
+       style="color:#1b3a6b;font-size:.85rem">View scores →</a>
   </div>
 </div>
 {% endif %}
