@@ -124,6 +124,31 @@ def _migrate_db(db):
             ))
     db.session.commit()
 
+    # Make schedule.team1_id / team2_id nullable (SQLite requires table recreation)
+    try:
+        with db.engine.connect() as conn:
+            result = conn.execute(text("PRAGMA table_info(schedule)"))
+            notnull = {row[1]: row[3] for row in result.fetchall()}
+            if notnull.get('team1_id', 1) != 0:  # 0 = nullable, 1 = NOT NULL
+                conn.execute(text("ALTER TABLE schedule RENAME TO _schedule_old"))
+                conn.execute(text("""
+                    CREATE TABLE schedule (
+                        id INTEGER PRIMARY KEY,
+                        season_id INTEGER NOT NULL REFERENCES seasons(id),
+                        week_num INTEGER NOT NULL,
+                        matchup_num INTEGER NOT NULL,
+                        team1_id INTEGER REFERENCES teams(id),
+                        team2_id INTEGER REFERENCES teams(id),
+                        lane_pair VARCHAR(8),
+                        UNIQUE(season_id, week_num, matchup_num)
+                    )
+                """))
+                conn.execute(text("INSERT INTO schedule SELECT * FROM _schedule_old"))
+                conn.execute(text("DROP TABLE _schedule_old"))
+                conn.commit()
+    except Exception:
+        pass
+
     # Backfill post-season tournament weeks for seasons that only have regular weeks
     from models import Season, Week
     from datetime import timedelta

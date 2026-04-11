@@ -167,8 +167,8 @@ class ScheduleEntry(db.Model):
     season_id = db.Column(db.Integer, db.ForeignKey('seasons.id'), nullable=False)
     week_num = db.Column(db.Integer, nullable=False)
     matchup_num = db.Column(db.Integer, nullable=False)  # 1–4
-    team1_id = db.Column(db.Integer, db.ForeignKey('teams.id'), nullable=False)
-    team2_id = db.Column(db.Integer, db.ForeignKey('teams.id'), nullable=False)
+    team1_id = db.Column(db.Integer, db.ForeignKey('teams.id'), nullable=True)
+    team2_id = db.Column(db.Integer, db.ForeignKey('teams.id'), nullable=True)
     lane_pair = db.Column(db.String(8))  # e.g. "1-2"
 
     season = db.relationship('Season', back_populates='schedule')

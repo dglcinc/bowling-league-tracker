@@ -3,7 +3,11 @@
 
 {% block content %}
 <h4>Schedule — {{ season.name }}</h4>
-<p class="text-muted">Set which teams play each other in each matchup each week. 4 matchups per week, each on one lane pair.</p>
+<p class="text-muted mb-1">
+  Set lane assignments for each week.
+  For regular/championship weeks you can use 1–4 matchups — unused ones are skipped.
+  Individual tournament weeks use a <strong>Solo</strong> layout: enter lane pairs only, no team assignment.
+</p>
 
 <div class="mb-3 p-2 border rounded bg-light">
   <div class="fw-semibold small mb-2">Global Lane Pairs — fill all weeks at once</div>
@@ -20,31 +24,50 @@
   </div>
 </div>
 
+<style>
+  .matchup-disabled { opacity: 0.25; pointer-events: none; }
+</style>
+
 <script>
 function fillAllLanes() {
-  {% for m in range(1, 5) %}
-  var val{{ m }} = document.getElementById('global_lane_{{ m }}').value;
-  if (val{{ m }}) {
-    document.querySelectorAll('input[name$="_matchup_{{ m }}_lane"]').forEach(function(el) {
-      el.value = val{{ m }};
+  for (let m = 1; m <= 4; m++) {
+    const val = document.getElementById('global_lane_' + m).value;
+    if (!val) continue;
+    document.querySelectorAll('input[name$="_matchup_' + m + '_lane"]:not(:disabled)').forEach(el => {
+      el.value = val;
     });
   }
-  {% endfor %}
+}
+
+function setMatchupCount(weekNum, count) {
+  for (let m = 1; m <= 4; m++) {
+    document.querySelectorAll('[data-week="' + weekNum + '"][data-matchup="' + m + '"]').forEach(cell => {
+      if (m <= count) {
+        cell.classList.remove('matchup-disabled');
+        cell.querySelectorAll('select, input').forEach(el => el.disabled = false);
+      } else {
+        cell.classList.add('matchup-disabled');
+        cell.querySelectorAll('select, input').forEach(el => {
+          el.disabled = true;
+          el.value = '';
+        });
+      }
+    });
+  }
 }
 </script>
 
 <form method="post" action="{{ url_for('admin.save_schedule', season_id=season.id) }}">
   <div class="table-responsive">
-    <table class="table table-sm table-bordered">
+    <table class="table table-sm table-bordered align-middle">
       <thead>
         <tr>
-          <th>Week</th>
+          <th rowspan="2" style="vertical-align:middle">Week</th>
           {% for m in range(1, 5) %}
           <th colspan="3" class="text-center">Matchup {{ m }}</th>
           {% endfor %}
         </tr>
         <tr>
-          <th></th>
           {% for m in range(1, 5) %}
           <th>Team 1</th><th>Team 2</th><th>Lanes</th>
           {% endfor %}
@@ -52,36 +75,104 @@ function fillAllLanes() {
       </thead>
       <tbody>
         {% for wk in weeks %}
+        {% set is_indiv = wk.tournament_type in ('indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2') %}
+
+        {# Determine label for tournament/special weeks #}
+        {% if wk.tournament_type == 'club_championship' %}
+          {% set wk_label = season.tournament_labels['club_championship'] %}
+        {% elif wk.tournament_type == 'indiv_scratch' %}
+          {% set wk_label = season.tournament_labels['indiv_scratch'] %}
+        {% elif wk.tournament_type == 'indiv_hcp_1' %}
+          {% set wk_label = season.tournament_labels['indiv_hcp_1'] %}
+        {% elif wk.tournament_type == 'indiv_hcp_2' %}
+          {% set wk_label = season.tournament_labels['indiv_hcp_2'] %}
+        {% elif wk.is_position_night %}
+          {% set wk_label = 'Position Night' %}
+        {% else %}
+          {% set wk_label = '' %}
+        {% endif %}
+
         <tr>
-          <td>{{ wk.week_num }}{% if wk.is_position_night %} ⭐{% endif %}</td>
+          <td style="min-width:110px">
+            <div class="fw-semibold">Wk {{ wk.week_num }}{% if wk.is_position_night %} ⭐{% endif %}</div>
+            {% if wk_label %}<div class="text-muted" style="font-size:.75rem">{{ wk_label }}</div>{% endif %}
+            {% if not is_indiv %}
+            <select class="form-select form-select-sm mt-1" style="font-size:.75rem"
+                    title="Number of active matchups this week"
+                    onchange="setMatchupCount({{ wk.week_num }}, parseInt(this.value))">
+              {% for n in [1,2,3,4] %}
+              <option value="{{ n }}"
+                {% if wk.tournament_type == 'club_championship' and n == 2 %}selected
+                {% elif not wk.tournament_type and n == 4 %}selected
+                {% elif wk.is_position_night and n == 4 %}selected
+                {% endif %}>{{ n }} matchup{{ 's' if n != 1 }}</option>
+              {% endfor %}
+            </select>
+            {% else %}
+            <span class="badge bg-secondary" style="font-size:.7rem">Solo</span>
+            {% endif %}
+          </td>
+
           {% for m in range(1, 5) %}
           {% set entry = sched_map.get((wk.week_num, m)) %}
-          <td>
-            <select name="week_{{ wk.week_num }}_matchup_{{ m }}_t1" class="form-select form-select-sm">
-              <option value="">—</option>
-              {% for t in teams %}
-              <option value="{{ t.id }}" {% if entry and entry.team1_id == t.id %}selected{% endif %}>
-                {{ t.name }}
-              </option>
-              {% endfor %}
-            </select>
-          </td>
-          <td>
-            <select name="week_{{ wk.week_num }}_matchup_{{ m }}_t2" class="form-select form-select-sm">
-              <option value="">—</option>
-              {% for t in teams %}
-              <option value="{{ t.id }}" {% if entry and entry.team2_id == t.id %}selected{% endif %}>
-                {{ t.number }}
-              </option>
-              {% endfor %}
-            </select>
-          </td>
-          <td>
+
+          {% if is_indiv %}
+          {# Individual tournament: Solo label + lane pair input only #}
+          <td data-week="{{ wk.week_num }}" data-matchup="{{ m }}"
+              class="text-center text-muted" style="font-size:.8rem;background:#f8f9fa">Solo</td>
+          <td data-week="{{ wk.week_num }}" data-matchup="{{ m }}"
+              class="text-center text-muted" style="font-size:.8rem;background:#f8f9fa">—</td>
+          <td data-week="{{ wk.week_num }}" data-matchup="{{ m }}">
             <input type="text" name="week_{{ wk.week_num }}_matchup_{{ m }}_lane"
                    class="form-control form-control-sm" style="width:60px"
                    placeholder="1-2"
                    value="{{ entry.lane_pair if entry and entry.lane_pair else '' }}">
           </td>
+
+          {% else %}
+          {# Regular / championship week: team selects #}
+          {# Determine initial disabled state based on matchup count default #}
+          {% set default_count = 2 if wk.tournament_type == 'club_championship' else 4 %}
+          {% set is_disabled = m > default_count %}
+
+          <td data-week="{{ wk.week_num }}" data-matchup="{{ m }}"
+              {% if is_disabled %}class="matchup-disabled"{% endif %}>
+            <select name="week_{{ wk.week_num }}_matchup_{{ m }}_t1"
+                    class="form-select form-select-sm"
+                    {% if is_disabled %}disabled{% endif %}>
+              <option value="">—</option>
+              {% for t in teams %}
+              <option value="{{ t.id }}"
+                {% if entry and entry.team1_id == t.id %}selected{% endif %}>
+                {{ t.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </td>
+          <td data-week="{{ wk.week_num }}" data-matchup="{{ m }}"
+              {% if is_disabled %}class="matchup-disabled"{% endif %}>
+            <select name="week_{{ wk.week_num }}_matchup_{{ m }}_t2"
+                    class="form-select form-select-sm"
+                    {% if is_disabled %}disabled{% endif %}>
+              <option value="">—</option>
+              {% for t in teams %}
+              <option value="{{ t.id }}"
+                {% if entry and entry.team2_id == t.id %}selected{% endif %}>
+                {{ t.number }}
+              </option>
+              {% endfor %}
+            </select>
+          </td>
+          <td data-week="{{ wk.week_num }}" data-matchup="{{ m }}"
+              {% if is_disabled %}class="matchup-disabled"{% endif %}>
+            <input type="text" name="week_{{ wk.week_num }}_matchup_{{ m }}_lane"
+                   class="form-control form-control-sm" style="width:60px"
+                   placeholder="1-2"
+                   {% if is_disabled %}disabled{% endif %}
+                   value="{{ entry.lane_pair if entry and entry.lane_pair else '' }}">
+          </td>
+          {% endif %}
+
           {% endfor %}
         </tr>
         {% endfor %}
