@@ -553,15 +553,36 @@ def import_season(cfg, app):
                 if not scores:
                     active = False
 
-                # Find or create bowler
+                # Find or create bowler.
+                # Spreadsheets use LastnameInitial (e.g. LewisD) to disambiguate same-surname
+                # bowlers.  Try the exact name first, then strip the trailing initial and
+                # match on base last_name + first_name initial.
+                import re as _re
                 bowler = (Bowler.query
                           .filter_by(last_name=last, first_name=first)
                           .first())
                 if not bowler:
                     bowler = Bowler.query.filter_by(last_name=last).first()
                     if bowler and bowler.first_name and first and bowler.first_name != first:
-                        # Different first name — create new
                         bowler = None
+
+                # Handle LastnameInitial disambiguation (e.g. 'LewisD', first='David')
+                if not bowler and _re.match(r'^[A-Za-z]+[A-Z]$', last):
+                    base_last = last[:-1]
+                    initial   = last[-1]
+                    candidates = Bowler.query.filter_by(last_name=base_last).all()
+                    for c in candidates:
+                        if c.first_name and c.first_name.startswith(initial):
+                            bowler = c
+                            break
+                    if not bowler and first and first[0].upper() == initial:
+                        # No base-last match yet; look for any bowler with this first initial
+                        candidates2 = (Bowler.query
+                                       .filter(Bowler.last_name == base_last)
+                                       .filter(Bowler.first_name.ilike(f'{initial}%'))
+                                       .all())
+                        if len(candidates2) == 1:
+                            bowler = candidates2[0]
 
                 if bowler:
                     bowlers_matched += 1

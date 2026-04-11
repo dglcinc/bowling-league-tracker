@@ -81,7 +81,7 @@
         {% if seasons_with_data | length > 1 %}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-            {{ active_season.name if active_season else 'Season' }}
+            {{ view_season.name if view_season else (active_season.name if active_season else 'Season') }}
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
             {% for s in seasons_with_data %}

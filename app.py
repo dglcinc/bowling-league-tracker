@@ -243,8 +243,16 @@ def create_app():
                   .first())
             latest_entered[s.id] = lw.week_num if lw else 0
         seasons_with_data = [s for s in all_seasons if latest_entered.get(s.id, 0) > 0]
+
+        # Determine which season the current page is about (for navbar dropdown label)
+        from flask import request as _req
+        view_args = _req.view_args or {}
+        sid = view_args.get('season_id')
+        view_season = db.session.get(Season, sid) if sid else active
+
         return {
             'active_season': active,
+            'view_season': view_season,
             'current_week': current_week,
             'league_settings': settings,
             'has_passkey': has_passkey,

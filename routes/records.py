@@ -2,10 +2,9 @@
 Records route: all-time leaderboards and season comparison table.
 """
 
+from collections import defaultdict
 from flask import Blueprint, render_template
-from sqlalchemy import func
-from models import (db, Season, Week, Roster, Bowler, Team,
-                    MatchupEntry, TeamPoints, TournamentEntry)
+from models import (db, Season, Week, Bowler, MatchupEntry)
 from calculations import get_bowler_stats, get_team_standings
 
 records_bp = Blueprint('records', __name__)
@@ -27,7 +26,6 @@ def _get_season_data():
                .order_by(Season.name)
                .all())
 
-    # tournament week nums per season_id
     tournament_weeks = {}
     for s in seasons:
         tournament_weeks[s.id] = {
@@ -40,14 +38,13 @@ def _get_season_data():
 
 def _compute_bowler_season_summaries(seasons, tournament_weeks):
     """
-    For each (bowler, season) that has regular-week entries, compute
-    {avg, games, high_game_scratch, high_series_scratch}.
-    Returns list of dicts, each with bowler, season, and stats.
+    For each (bowler, season) that has regular-week entries (min 6 games),
+    compute scratch and handicap stats.
+    Returns list of dicts with bowler, season, avg, games, high game/series S+H.
     """
     summaries = []
     for season in seasons:
         twks = tournament_weeks[season.id]
-        # Distinct bowlers with entries this season
         bowler_ids = (
             db.session.query(MatchupEntry.bowler_id)
             .filter_by(season_id=season.id, is_blind=False)
@@ -67,82 +64,58 @@ def _compute_bowler_season_summaries(seasons, tournament_weeks):
                 'games':               stats['cumulative_games'],
                 'high_game_scratch':   stats['ytd_high_game_scratch'],
                 'high_series_scratch': stats['ytd_high_series_scratch'],
+                'high_game_hcp':       stats['ytd_high_game_hcp'],
+                'high_series_hcp':     stats['ytd_high_series_hcp'],
             })
     return summaries
 
 
 def _all_time_records(summaries):
-    """Compute all-time leaderboards from bowler-season summaries."""
-    # Per-bowler bests across all seasons
-    bowler_best_game   = {}  # bowler_id -> {'bowler', 'score', 'season'}
-    bowler_best_series = {}
-    bowler_best_avg    = {}
+    """Compute per-bowler all-time bests (scratch and handicap) from summaries."""
+    bowler_best = {}   # bowler_id -> best scores across all seasons
 
     for row in summaries:
         bid = row['bowler'].id
-
-        if row['high_game_scratch'] > bowler_best_game.get(bid, {}).get('score', 0):
-            bowler_best_game[bid] = {
+        if bid not in bowler_best:
+            bowler_best[bid] = {
                 'bowler': row['bowler'],
-                'score':  row['high_game_scratch'],
-                'season': row['season'],
+                'hg_scratch': 0, 'hg_scratch_season': None,
+                'hs_scratch': 0, 'hs_scratch_season': None,
+                'hg_hcp':     0, 'hg_hcp_season':     None,
+                'hs_hcp':     0, 'hs_hcp_season':     None,
+                'best_avg':   0, 'best_avg_season':   None,
+                'best_avg_games': 0,
             }
-        if row['high_series_scratch'] > bowler_best_series.get(bid, {}).get('score', 0):
-            bowler_best_series[bid] = {
-                'bowler': row['bowler'],
-                'score':  row['high_series_scratch'],
-                'season': row['season'],
-            }
-        if row['avg'] > bowler_best_avg.get(bid, {}).get('avg', 0):
-            bowler_best_avg[bid] = {
-                'bowler': row['bowler'],
-                'avg':    row['avg'],
-                'games':  row['games'],
-                'season': row['season'],
-            }
+        b = bowler_best[bid]
+        if row['high_game_scratch'] > b['hg_scratch']:
+            b['hg_scratch'] = row['high_game_scratch']
+            b['hg_scratch_season'] = row['season']
+        if row['high_series_scratch'] > b['hs_scratch']:
+            b['hs_scratch'] = row['high_series_scratch']
+            b['hs_scratch_season'] = row['season']
+        if row['high_game_hcp'] > b['hg_hcp']:
+            b['hg_hcp'] = row['high_game_hcp']
+            b['hg_hcp_season'] = row['season']
+        if row['high_series_hcp'] > b['hs_hcp']:
+            b['hs_hcp'] = row['high_series_hcp']
+            b['hs_hcp_season'] = row['season']
+        if row['avg'] > b['best_avg']:
+            b['best_avg'] = row['avg']
+            b['best_avg_season'] = row['season']
+            b['best_avg_games'] = row['games']
 
-    all_time_hg  = sorted(bowler_best_game.values(),   key=lambda x: -x['score'])[:20]
-    all_time_hs  = sorted(bowler_best_series.values(),  key=lambda x: -x['score'])[:20]
-    all_time_avg = sorted(bowler_best_avg.values(),     key=lambda x: -x['avg'])[:20]
-    return all_time_hg, all_time_hs, all_time_avg
+    bests = list(bowler_best.values())
 
-
-def _iron_man(seasons):
-    """Count distinct seasons each bowler has bowled in (≥ 6 regular-week games)."""
-    # Use summaries computed above — but we need min_games check already done there
-    # So just count how many times each bowler appears across all seasons
-    # We'll re-derive from Roster joined with entry existence
-    counts = {}  # bowler_id -> {seasons_count, bowler}
-    for season in seasons:
-        twks = {
-            w.week_num for w in
-            Week.query.filter_by(season_id=season.id)
-            .filter(Week.tournament_type.isnot(None)).all()
-        }
-        bowler_ids = (
-            db.session.query(MatchupEntry.bowler_id,
-                             func.count(MatchupEntry.id).label('cnt'))
-            .filter_by(season_id=season.id, is_blind=False)
-            .filter(MatchupEntry.week_num.notin_(twks) if twks else True)
-            .group_by(MatchupEntry.bowler_id)
-            .having(func.count(MatchupEntry.id) >= 6)
-            .all()
-        )
-        for (bid, _) in bowler_ids:
-            if bid not in counts:
-                counts[bid] = {'bowler': db.session.get(Bowler, bid), 'seasons': 0}
-            counts[bid]['seasons'] += 1
-
-    return sorted(counts.values(), key=lambda x: (-x['seasons'], x['bowler'].last_name))
+    all_time_hg_s  = sorted(bests, key=lambda x: -x['hg_scratch'])[:20]
+    all_time_hs_s  = sorted(bests, key=lambda x: -x['hs_scratch'])[:20]
+    all_time_hg_h  = sorted(bests, key=lambda x: -x['hg_hcp'])[:20]
+    all_time_hs_h  = sorted(bests, key=lambda x: -x['hs_hcp'])[:20]
+    all_time_avg   = sorted(bests, key=lambda x: -x['best_avg'])[:20]
+    return all_time_hg_s, all_time_hs_s, all_time_hg_h, all_time_hs_h, all_time_avg
 
 
 def _most_improved(summaries):
-    """
-    Biggest single-season average improvement vs prior season.
-    Only bowlers who have entries in 2+ seasons.
-    """
-    # Group by bowler, sort by season name (chronological since names are YYYY-YYYY)
-    from collections import defaultdict
+    """Largest single-season average improvement between consecutive bowled seasons."""
     by_bowler = defaultdict(list)
     for row in summaries:
         by_bowler[row['bowler'].id].append(row)
@@ -155,12 +128,12 @@ def _most_improved(summaries):
             curr = rows_sorted[i]
             gain = curr['avg'] - prev['avg']
             improvements.append({
-                'bowler':       curr['bowler'],
-                'from_season':  prev['season'],
-                'to_season':    curr['season'],
-                'from_avg':     prev['avg'],
-                'to_avg':       curr['avg'],
-                'gain':         gain,
+                'bowler':      curr['bowler'],
+                'from_season': prev['season'],
+                'to_season':   curr['season'],
+                'from_avg':    prev['avg'],
+                'to_avg':      curr['avg'],
+                'gain':        gain,
             })
 
     improvements.sort(key=lambda x: -x['gain'])
@@ -168,12 +141,7 @@ def _most_improved(summaries):
 
 
 def _season_comparison(seasons, summaries):
-    """
-    One row per season: league avg, best game, best series, team champion.
-    """
-    from collections import defaultdict
-
-    # Index summaries by season
+    """One row per season: league avg, high game/series S+H, team champion."""
     by_season = defaultdict(list)
     for row in summaries:
         by_season[row['season'].id].append(row)
@@ -188,21 +156,26 @@ def _season_comparison(seasons, summaries):
         total_games = sum(r['games'] for r in season_rows)
         league_avg  = round(total_pins / total_games) if total_games else 0
 
-        best_game_row   = max(season_rows, key=lambda r: r['high_game_scratch'])
-        best_series_row = max(season_rows, key=lambda r: r['high_series_scratch'])
+        best_hg_s = max(season_rows, key=lambda r: r['high_game_scratch'])
+        best_hs_s = max(season_rows, key=lambda r: r['high_series_scratch'])
+        best_hg_h = max(season_rows, key=lambda r: r['high_game_hcp'])
+        best_hs_h = max(season_rows, key=lambda r: r['high_series_hcp'])
 
-        # Team champion: 1st place in full-season standings
         standings = get_team_standings(season.id)
         champion_team = standings[0]['team'] if standings else None
 
         rows.append({
             'season':            season,
             'league_avg':        league_avg,
-            'high_game':         best_game_row['high_game_scratch'],
-            'high_game_bowler':  best_game_row['bowler'],
-            'high_series':       best_series_row['high_series_scratch'],
-            'high_series_bowler': best_series_row['bowler'],
             'bowler_count':      len(season_rows),
+            'hg_scratch':        best_hg_s['high_game_scratch'],
+            'hg_scratch_bowler': best_hg_s['bowler'],
+            'hs_scratch':        best_hs_s['high_series_scratch'],
+            'hs_scratch_bowler': best_hs_s['bowler'],
+            'hg_hcp':            best_hg_h['high_game_hcp'],
+            'hg_hcp_bowler':     best_hg_h['bowler'],
+            'hs_hcp':            best_hs_h['high_series_hcp'],
+            'hs_hcp_bowler':     best_hs_h['bowler'],
             'champion_team':     champion_team,
         })
     return rows
@@ -213,26 +186,28 @@ def records():
     seasons, tournament_weeks = _get_season_data()
     if not seasons:
         return render_template('reports/records.html',
-                               seasons=[], all_time_hg=[], all_time_hs=[],
-                               all_time_avg=[], iron_man=[], most_improved=[],
-                               season_comparison=[])
+                               seasons=[],
+                               all_time_hg_s=[], all_time_hs_s=[],
+                               all_time_hg_h=[], all_time_hs_h=[],
+                               all_time_avg=[], top_season_avgs=[],
+                               most_improved=[], season_comparison=[])
 
     summaries = _compute_bowler_season_summaries(seasons, tournament_weeks)
 
-    all_time_hg, all_time_hs, all_time_avg = _all_time_records(summaries)
-    iron_man_list    = _iron_man(seasons)
-    most_improved    = _most_improved(summaries)
-    season_comp      = _season_comparison(seasons, summaries)
-
-    # Top season averages (all bowler-season combos, not just best per bowler)
-    top_season_avgs  = sorted(summaries, key=lambda r: -r['avg'])[:25]
+    all_time_hg_s, all_time_hs_s, all_time_hg_h, all_time_hs_h, all_time_avg = (
+        _all_time_records(summaries)
+    )
+    most_improved = _most_improved(summaries)
+    season_comp   = _season_comparison(seasons, summaries)
+    top_season_avgs = sorted(summaries, key=lambda r: -r['avg'])[:25]
 
     return render_template('reports/records.html',
                            seasons=seasons,
-                           all_time_hg=all_time_hg,
-                           all_time_hs=all_time_hs,
+                           all_time_hg_s=all_time_hg_s,
+                           all_time_hs_s=all_time_hs_s,
+                           all_time_hg_h=all_time_hg_h,
+                           all_time_hs_h=all_time_hs_h,
                            all_time_avg=all_time_avg,
                            top_season_avgs=top_season_avgs,
-                           iron_man=iron_man_list,
                            most_improved=most_improved,
                            season_comparison=season_comp)
