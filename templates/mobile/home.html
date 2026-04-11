@@ -1,0 +1,82 @@
+{% extends "mobile/base.html" %}
+{% block title %}Home — MLC Bowling{% endblock %}
+{% block header_title %}🏠 Home{% endblock %}
+
+{% block content %}
+
+{# ── Upcoming week ── #}
+{% if upcoming_week %}
+<div class="m-card">
+  <div class="m-card-title">Up Next</div>
+  <div class="m-card-main">
+    Week {{ upcoming_week.week_num }}
+    {% if upcoming_week.is_position_night %}<span class="badge bg-warning text-dark ms-1" style="font-size:.7rem">Position Night</span>{% endif %}
+  </div>
+  {% if upcoming_week.date %}
+  <div class="m-card-sub">{{ upcoming_week.date.strftime('%A, %B %-d') }}</div>
+  {% endif %}
+
+  {% if my_matchup %}
+  <div class="mt-3 d-flex align-items-center gap-3">
+    <div>
+      <div style="font-size:.75rem;color:#6c757d;font-weight:600;text-transform:uppercase">Lanes</div>
+      <span class="lane-badge">{{ my_matchup.lane_pair or '—' }}</span>
+    </div>
+    {% if opponent_team %}
+    <div>
+      <div style="font-size:.75rem;color:#6c757d;font-weight:600;text-transform:uppercase">Opponent</div>
+      <div style="font-weight:600">{{ opponent_team.name }}</div>
+    </div>
+    {% endif %}
+  </div>
+  {% elif my_team %}
+  <div class="m-card-sub mt-2 text-muted" style="font-size:.85rem">Lane assignments not yet set for this week.</div>
+  {% else %}
+  <div class="m-card-sub mt-2 text-muted" style="font-size:.85rem">You're not on the roster for this season.</div>
+  {% endif %}
+</div>
+
+{% elif season %}
+{# No upcoming regular week — check if we're in post-season or done #}
+<div class="m-card">
+  <div class="m-card-title">Season</div>
+  <div class="m-card-main">Regular season complete</div>
+  <div class="m-card-sub">Post-season tournaments in progress.</div>
+</div>
+{% else %}
+<div class="m-card">
+  <div class="m-card-main text-muted">No active season.</div>
+</div>
+{% endif %}
+
+{# ── Last week result ── #}
+{% if last_week %}
+<div class="m-card">
+  <div class="m-card-title">Last Week (Week {{ last_week.week_num }})</div>
+  {% if last_week_pts is not none and last_week_opp_pts is not none %}
+    {% if last_week_pts > last_week_opp_pts %}
+      <div class="m-card-main result-win">Won {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
+    {% elif last_week_pts < last_week_opp_pts %}
+      <div class="m-card-main result-loss">Lost {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
+    {% else %}
+      <div class="m-card-main result-tie">Tied {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
+    {% endif %}
+  {% elif last_week_pts is not none %}
+    <div class="m-card-main">{{ last_week_pts | int }} pts</div>
+  {% else %}
+    <div class="m-card-sub text-muted">Result not available.</div>
+  {% endif %}
+  <div class="m-card-sub mt-1">
+    <a href="{{ url_for('mobile.week_scores', week_num=last_week.week_num) }}"
+       style="color:#1b3a6b;font-size:.85rem">View full scores →</a>
+  </div>
+</div>
+{% endif %}
+
+{# ── Full site link ── #}
+<div class="text-center mt-3" style="padding-bottom:4px">
+  <a href="{{ url_for('mobile.prefer_desktop', next=url_for('index')) }}"
+     style="color:#6c757d;font-size:.8rem">Switch to full site</a>
+</div>
+
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "mobile/base.html" %}
+{% block title %}Week {{ week.week_num }} Scores — MLC Bowling{% endblock %}
+{% block header_title %}
+  <a href="{{ url_for('mobile.scores') }}" style="color:#fff;text-decoration:none;font-size:.9rem;opacity:.8">‹ Scores</a>
+  <div>Week {{ week.week_num }}{% if week.date %} &mdash; {{ week.date.strftime('%b %-d') }}{% endif %}</div>
+{% endblock %}
+{% block header_sub %}{% endblock %}
+
+{% block content %}
+
+{% for group in team_groups %}
+<div class="m-card" style="margin-bottom:10px">
+  <div class="m-card-title" style="margin-bottom:8px">{{ group.team.name }}</div>
+  <table class="m-score-table">
+    <thead>
+      <tr>
+        <th class="name-col">Bowler</th>
+        <th style="text-align:right">G1</th>
+        <th style="text-align:right">G2</th>
+        <th style="text-align:right">G3</th>
+        <th style="text-align:right" class="total-col">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in group.entries %}
+      <tr>
+        <td class="name-col">{{ e.bowler.last_name if e.bowler else '—' }}</td>
+        <td style="text-align:right">{{ e.game1 or '—' }}</td>
+        <td style="text-align:right">{{ e.game2 or '—' }}</td>
+        <td style="text-align:right">{{ e.game3 or '—' }}</td>
+        <td style="text-align:right" class="total-col">
+          {% set games = e.games_night1 %}
+          {% if games %}{{ games | sum }}{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="m-card">
+  <div class="m-card-sub text-muted">No scores recorded for this week.</div>
+</div>
+{% endfor %}
+
+<div class="text-center mt-2">
+  <a href="{{ url_for('reports.week_prizes', season_id=season.id, week_num=week.week_num) }}"
+     style="color:#1b3a6b;font-size:.85rem">Prizes &amp; standings →</a>
+</div>
+
+<div class="text-center mt-3">
+  <a href="{{ url_for('mobile.prefer_desktop', next=url_for('index')) }}"
+     style="color:#6c757d;font-size:.8rem">Switch to full site</a>
+</div>
+
+{% endblock %}

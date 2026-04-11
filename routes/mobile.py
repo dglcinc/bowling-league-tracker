@@ -1,0 +1,253 @@
+"""
+Mobile PWA routes — /m/
+Serves a phone-optimised view of standings, scores, lane assignments, and bowler stats.
+Device detection lives in app.py (before_request). Preference toggle handled here.
+"""
+from datetime import date
+
+from flask import Blueprint, make_response, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
+from sqlalchemy import func
+
+from models import MatchupEntry, Roster, ScheduleEntry, Season, Team, TeamPoints, Week, db
+
+mobile_bp = Blueprint('mobile', __name__)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _active_season():
+    return Season.query.filter_by(is_active=True).first()
+
+
+def _my_roster(season):
+    if not season or not current_user.is_authenticated:
+        return None
+    return Roster.query.filter_by(
+        bowler_id=current_user.id,
+        season_id=season.id,
+    ).first()
+
+
+def _team_totals(season_id):
+    """Return {team_id: total_points} for the given season."""
+    rows = (db.session.query(TeamPoints.team_id, func.sum(TeamPoints.points_earned))
+            .filter_by(season_id=season_id)
+            .group_by(TeamPoints.team_id)
+            .all())
+    return {tid: float(pts) for tid, pts in rows}
+
+
+# ---------------------------------------------------------------------------
+# Preference toggles
+# ---------------------------------------------------------------------------
+
+@mobile_bp.route('/prefer-desktop')
+def prefer_desktop():
+    dest = request.args.get('next') or '/'
+    resp = make_response(redirect(dest))
+    resp.set_cookie('prefer_desktop', '1', max_age=60 * 60 * 24 * 365, samesite='Lax')
+    return resp
+
+
+@mobile_bp.route('/prefer-mobile')
+def prefer_mobile():
+    resp = make_response(redirect(url_for('mobile.home')))
+    resp.delete_cookie('prefer_desktop')
+    return resp
+
+
+# ---------------------------------------------------------------------------
+# Home
+# ---------------------------------------------------------------------------
+
+@mobile_bp.route('/')
+@login_required
+def home():
+    season = _active_season()
+    roster = _my_roster(season)
+    my_team = roster.team if roster else None
+
+    upcoming_week = None
+    my_matchup = None
+    opponent_team = None
+    last_week = None
+    last_week_pts = None
+    last_week_opp_pts = None
+
+    if season:
+        # Last entered regular week
+        last_week = (Week.query
+                     .filter_by(season_id=season.id, is_entered=True)
+                     .filter(Week.week_num <= season.num_weeks)
+                     .order_by(Week.week_num.desc())
+                     .first())
+
+        # Next unentered, uncancelled regular week
+        upcoming_week = (Week.query
+                         .filter_by(season_id=season.id, is_entered=False,
+                                    is_cancelled=False, tournament_type=None)
+                         .filter(Week.week_num <= season.num_weeks)
+                         .order_by(Week.week_num)
+                         .first())
+
+        if my_team:
+            if upcoming_week:
+                my_matchup = (ScheduleEntry.query
+                              .filter_by(season_id=season.id,
+                                         week_num=upcoming_week.week_num)
+                              .filter(db.or_(ScheduleEntry.team1_id == my_team.id,
+                                             ScheduleEntry.team2_id == my_team.id))
+                              .first())
+                if my_matchup:
+                    opponent_team = (my_matchup.team2
+                                     if my_matchup.team1_id == my_team.id
+                                     else my_matchup.team1)
+
+            if last_week:
+                week_pts = (TeamPoints.query
+                            .filter_by(season_id=season.id,
+                                       week_num=last_week.week_num)
+                            .all())
+                totals = {}
+                for p in week_pts:
+                    totals[p.team_id] = totals.get(p.team_id, 0) + p.points_earned
+                last_week_pts = totals.get(my_team.id, 0)
+
+                last_matchup = (ScheduleEntry.query
+                                .filter_by(season_id=season.id,
+                                           week_num=last_week.week_num)
+                                .filter(db.or_(ScheduleEntry.team1_id == my_team.id,
+                                               ScheduleEntry.team2_id == my_team.id))
+                                .first())
+                if last_matchup:
+                    last_opp = (last_matchup.team2
+                                if last_matchup.team1_id == my_team.id
+                                else last_matchup.team1)
+                    last_week_opp_pts = totals.get(last_opp.id, 0)
+
+    return render_template('mobile/home.html',
+                           season=season,
+                           my_team=my_team,
+                           upcoming_week=upcoming_week,
+                           my_matchup=my_matchup,
+                           opponent_team=opponent_team,
+                           last_week=last_week,
+                           last_week_pts=last_week_pts,
+                           last_week_opp_pts=last_week_opp_pts)
+
+
+# ---------------------------------------------------------------------------
+# Standings
+# ---------------------------------------------------------------------------
+
+@mobile_bp.route('/standings')
+@login_required
+def standings():
+    season = _active_season()
+    teams = []
+    if season:
+        totals = _team_totals(season.id)
+        all_teams = Team.query.filter_by(season_id=season.id).order_by(Team.number).all()
+        teams = sorted(
+            [{'team': t, 'points': totals.get(t.id, 0)} for t in all_teams],
+            key=lambda x: x['points'],
+            reverse=True,
+        )
+    return render_template('mobile/standings.html', season=season, teams=teams)
+
+
+# ---------------------------------------------------------------------------
+# Scores — week list then week detail
+# ---------------------------------------------------------------------------
+
+@mobile_bp.route('/scores')
+@login_required
+def scores():
+    season = _active_season()
+    entered_weeks = []
+    if season:
+        entered_weeks = (Week.query
+                         .filter_by(season_id=season.id, is_entered=True)
+                         .filter(Week.week_num <= season.num_weeks + 4)
+                         .order_by(Week.week_num.desc())
+                         .all())
+    return render_template('mobile/scores.html', season=season, weeks=entered_weeks)
+
+
+@mobile_bp.route('/scores/week/<int:week_num>')
+@login_required
+def week_scores(week_num):
+    season = _active_season()
+    if not season:
+        return redirect(url_for('mobile.scores'))
+
+    week = Week.query.filter_by(season_id=season.id, week_num=week_num).first_or_404()
+    entries = (MatchupEntry.query
+               .filter_by(season_id=season.id, week_num=week_num)
+               .filter(MatchupEntry.is_blind == False)
+               .filter(MatchupEntry.bowler_id != None)
+               .order_by(MatchupEntry.team_id, MatchupEntry.matchup_num)
+               .all())
+
+    # Group by team
+    teams_dict = {}
+    for e in entries:
+        if e.team_id not in teams_dict:
+            teams_dict[e.team_id] = {'team': e.team, 'entries': []}
+        teams_dict[e.team_id]['entries'].append(e)
+    team_groups = sorted(teams_dict.values(), key=lambda x: x['team'].number)
+
+    return render_template('mobile/week_scores.html',
+                           season=season, week=week, team_groups=team_groups)
+
+
+# ---------------------------------------------------------------------------
+# Me — personal stats
+# ---------------------------------------------------------------------------
+
+@mobile_bp.route('/me')
+@login_required
+def me():
+    season = _active_season()
+    roster = _my_roster(season)
+
+    entries = []
+    avg = None
+    hg_scratch = None
+    hs_scratch = None
+
+    if season:
+        entries = (MatchupEntry.query
+                   .filter_by(season_id=season.id, bowler_id=current_user.id)
+                   .order_by(MatchupEntry.week_num)
+                   .all())
+
+        all_games = []
+        for e in entries:
+            all_games.extend(e.games_night1)
+
+        if all_games:
+            avg = round(sum(all_games) / len(all_games), 1)
+            hg_scratch = max(all_games)
+
+        # High series: best 3-game total per week
+        week_series = {}
+        for e in entries:
+            g = e.games_night1
+            if len(g) == 3:
+                week_series[e.week_num] = max(
+                    week_series.get(e.week_num, 0), sum(g)
+                )
+        if week_series:
+            hs_scratch = max(week_series.values())
+
+    return render_template('mobile/me.html',
+                           season=season,
+                           roster=roster,
+                           entries=entries,
+                           avg=avg,
+                           hg_scratch=hg_scratch,
+                           hs_scratch=hs_scratch)

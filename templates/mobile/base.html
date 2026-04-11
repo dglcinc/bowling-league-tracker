@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}MLC Bowling{% endblock %}</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#1b3a6b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MLC Bowling">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root { --tab-height: 60px; --safe-bottom: env(safe-area-inset-bottom, 0px); }
+    body {
+      font-size: 1rem;
+      background: #f8f9fa;
+      padding-bottom: calc(var(--tab-height) + var(--safe-bottom));
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Top header */
+    .m-header {
+      background: #1b3a6b;
+      color: #fff;
+      padding: 14px 16px 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .m-header h1 { font-size: 1.1rem; margin: 0; font-weight: 600; }
+    .m-header .m-subtitle { font-size: 0.8rem; opacity: 0.75; }
+
+    /* Content area */
+    .m-content { padding: 16px; }
+
+    /* Cards */
+    .m-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .m-card-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #6c757d;
+      margin-bottom: 6px;
+    }
+    .m-card-main { font-size: 1.15rem; font-weight: 600; color: #1b3a6b; }
+    .m-card-sub { font-size: 0.85rem; color: #495057; margin-top: 2px; }
+
+    /* Lane badge */
+    .lane-badge {
+      display: inline-block;
+      background: #1b3a6b;
+      color: #fff;
+      border-radius: 8px;
+      padding: 2px 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    /* Result pill */
+    .result-win  { color: #198754; font-weight: 700; }
+    .result-loss { color: #dc3545; font-weight: 700; }
+    .result-tie  { color: #6c757d; font-weight: 700; }
+
+    /* Standings table */
+    .m-standings-row {
+      display: flex;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .m-standings-row:last-child { border-bottom: none; }
+    .m-rank { width: 28px; font-weight: 700; color: #6c757d; font-size: 0.9rem; }
+    .m-team-name { flex: 1; font-weight: 600; }
+    .m-pts { font-size: 1.1rem; font-weight: 700; color: #1b3a6b; }
+
+    /* Week list */
+    .m-week-row {
+      display: flex;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+      text-decoration: none;
+      color: inherit;
+    }
+    .m-week-row:last-child { border-bottom: none; }
+    .m-week-row:active { background: #f8f9fa; margin: 0 -16px; padding: 12px 16px; }
+    .m-week-num { width: 60px; font-weight: 700; font-size: 0.95rem; color: #1b3a6b; }
+    .m-week-date { flex: 1; color: #495057; font-size: 0.9rem; }
+    .m-week-chevron { color: #adb5bd; font-size: 1.1rem; }
+
+    /* Score table in week detail */
+    .m-score-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .m-score-table th { color: #6c757d; font-weight: 600; font-size: 0.75rem;
+                        text-transform: uppercase; padding: 4px 6px; border-bottom: 1px solid #dee2e6; }
+    .m-score-table td { padding: 6px 6px; border-bottom: 1px solid #f5f5f5; }
+    .m-score-table tr:last-child td { border-bottom: none; }
+    .m-score-table .name-col { font-weight: 500; }
+    .m-score-table .total-col { font-weight: 700; color: #1b3a6b; }
+
+    /* Me stats grid */
+    .m-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .m-stat-box { background: #fff; border-radius: 10px; padding: 12px;
+                  box-shadow: 0 1px 3px rgba(0,0,0,.07); text-align: center; }
+    .m-stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em;
+                    color: #6c757d; margin-bottom: 4px; }
+    .m-stat-value { font-size: 1.6rem; font-weight: 700; color: #1b3a6b; }
+
+    /* Bottom tab bar */
+    .m-tabbar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: calc(var(--tab-height) + var(--safe-bottom));
+      background: #fff;
+      border-top: 1px solid #dee2e6;
+      display: flex;
+      padding-bottom: var(--safe-bottom);
+      z-index: 200;
+    }
+    .m-tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      color: #6c757d;
+      font-size: 0.65rem;
+      gap: 2px;
+      padding: 6px 0 4px;
+    }
+    .m-tab.active { color: #1b3a6b; }
+    .m-tab-icon { font-size: 1.4rem; line-height: 1; }
+    .m-tab span { font-weight: 500; }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<div class="m-header">
+  <h1>{% block header_title %}🎳 MLC Bowling{% endblock %}</h1>
+  {% block header_sub %}<div class="m-subtitle">{{ season.name if season else '' }}</div>{% endblock %}
+</div>
+
+<div class="m-content">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} py-2 mb-2" style="font-size:.9rem">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+
+<nav class="m-tabbar">
+  <a href="{{ url_for('mobile.home') }}"
+     class="m-tab {% if request.endpoint == 'mobile.home' %}active{% endif %}">
+    <span class="m-tab-icon">🏠</span><span>Home</span>
+  </a>
+  <a href="{{ url_for('mobile.standings') }}"
+     class="m-tab {% if request.endpoint == 'mobile.standings' %}active{% endif %}">
+    <span class="m-tab-icon">🏆</span><span>Standings</span>
+  </a>
+  <a href="{{ url_for('mobile.scores') }}"
+     class="m-tab {% if request.endpoint in ('mobile.scores', 'mobile.week_scores') %}active{% endif %}">
+    <span class="m-tab-icon">🎳</span><span>Scores</span>
+  </a>
+  <a href="{{ url_for('mobile.me') }}"
+     class="m-tab {% if request.endpoint == 'mobile.me' %}active{% endif %}">
+    <span class="m-tab-icon">👤</span><span>Me</span>
+  </a>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block extra_js %}{% endblock %}
+<script>
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw.js'); }
+</script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+{% extends "mobile/base.html" %}
+{% block title %}Me — MLC Bowling{% endblock %}
+{% block header_title %}👤 Me{% endblock %}
+{% block header_sub %}
+  <div class="m-subtitle">{{ current_user.display_name }}</div>
+{% endblock %}
+
+{% block content %}
+
+{# Stats grid #}
+<div class="m-stats-grid mb-3">
+  <div class="m-stat-box">
+    <div class="m-stat-label">Average</div>
+    <div class="m-stat-value">{{ avg or '—' }}</div>
+  </div>
+  <div class="m-stat-box">
+    <div class="m-stat-label">High Game</div>
+    <div class="m-stat-value">{{ hg_scratch or '—' }}</div>
+  </div>
+  <div class="m-stat-box">
+    <div class="m-stat-label">High Series</div>
+    <div class="m-stat-value">{{ hs_scratch or '—' }}</div>
+  </div>
+  <div class="m-stat-box">
+    <div class="m-stat-label">Games</div>
+    <div class="m-stat-value">
+      {% set total_games = namespace(n=0) %}
+      {% for e in entries %}{% set total_games.n = total_games.n + e.games_night1 | length %}{% endfor %}
+      {{ total_games.n }}
+    </div>
+  </div>
+</div>
+
+{# Week-by-week #}
+{% if entries %}
+<div class="m-card">
+  <div class="m-card-title" style="margin-bottom:8px">This Season</div>
+  <table class="m-score-table">
+    <thead>
+      <tr>
+        <th>Wk</th>
+        <th style="text-align:right">G1</th>
+        <th style="text-align:right">G2</th>
+        <th style="text-align:right">G3</th>
+        <th style="text-align:right" class="total-col">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in entries | sort(attribute='week_num') %}
+      {% set games = e.games_night1 %}
+      {% if games %}
+      <tr>
+        <td>{{ e.week_num }}</td>
+        <td style="text-align:right">{{ e.game1 or '—' }}</td>
+        <td style="text-align:right">{{ e.game2 or '—' }}</td>
+        <td style="text-align:right">{{ e.game3 or '—' }}</td>
+        <td style="text-align:right" class="total-col">{{ games | sum }}</td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="m-card">
+  <div class="m-card-sub text-muted">No scores entered yet this season.</div>
+</div>
+{% endif %}
+
+{# Full stats link #}
+{% if season %}
+<div class="text-center mt-2">
+  <a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=current_user.id) }}"
+     style="color:#1b3a6b;font-size:.85rem">Full season detail →</a>
+</div>
+{% endif %}
+
+{# Account actions #}
+<div class="m-card mt-3" style="text-align:center">
+  <a href="{{ url_for('mobile.prefer_desktop', next=url_for('index')) }}"
+     style="color:#1b3a6b;font-size:.9rem;display:block;padding:4px 0">Switch to full site</a>
+  <div style="border-top:1px solid #f0f0f0;margin:8px 0"></div>
+  <a href="{{ url_for('auth.logout') }}"
+     style="color:#dc3545;font-size:.9rem;display:block;padding:4px 0">Sign out</a>
+</div>
+
+{% endblock %}
