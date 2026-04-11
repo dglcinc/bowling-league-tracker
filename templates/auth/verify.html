@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enter Code — League Tracker</title>
+  <meta name="theme-color" content="#1b3a6b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="MLC Bowling">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f0f4f8; }
+    .login-card { max-width: 420px; margin: 60px auto 0; }
+    .brand-header {
+      background: #1b3a6b; color: #fff;
+      padding: 1.25rem 1.5rem;
+      border-radius: 0.5rem 0.5rem 0 0;
+      text-align: center;
+    }
+    .brand-header h1 { font-size: 1.4rem; margin: 0; }
+    .brand-header p  { margin: 0.25rem 0 0; opacity: 0.8; font-size: 0.9rem; }
+    .code-input {
+      font-size: 2rem;
+      letter-spacing: .35rem;
+      text-align: center;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+<div class="login-card">
+  <div class="brand-header">
+    <h1>🎳 League Tracker</h1>
+    <p>{{ league_settings.league_name if league_settings else 'Bowling League' }}</p>
+  </div>
+  <div class="card border-top-0 rounded-top-0">
+    <div class="card-body p-4">
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} py-2">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <p class="text-muted mb-1" style="font-size:0.9rem">
+        Enter the 6-digit code we sent to:
+      </p>
+      <p class="fw-bold mb-3">{{ email }}</p>
+      <p class="text-muted mb-3" style="font-size:0.85rem">
+        The code expires in 10 minutes. Check your spam folder if you don't see it.
+      </p>
+
+      <form method="post">
+        <input type="hidden" name="email" value="{{ email }}">
+        <div class="mb-3">
+          <input type="text" name="code" class="form-control code-input"
+                 inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+                 placeholder="000000" autocomplete="one-time-code"
+                 autofocus required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 mb-3">Sign in</button>
+      </form>
+
+      <div class="text-center">
+        <a href="{{ url_for('auth.login') }}" class="text-muted" style="font-size:0.85rem">
+          Use a different email or resend code
+        </a>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 {
   "name": "MLC Pirate Bowling League",
-  "short_name": "Bowl Tracker",
+  "short_name": "MLC Bowling",
   "description": "Mountain Lakes Men's Bowling League score tracker and standings",
   "start_url": "/",
   "display": "standalone",

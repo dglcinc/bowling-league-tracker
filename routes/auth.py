@@ -5,6 +5,7 @@ All routes here are public (exempt from the before_request auth check in app.py)
 
 import uuid
 import json
+import random
 import urllib.request
 import urllib.parse
 from datetime import datetime, timedelta
@@ -14,7 +15,7 @@ from flask import (Blueprint, render_template, request, redirect,
 from flask_login import login_user, logout_user, current_user, login_required
 
 from extensions import limiter
-from models import db, Bowler, MagicLinkToken, LinkedAccount, WebAuthnCredential
+from models import db, Bowler, LoginOtp, MagicLinkToken, LinkedAccount, WebAuthnCredential
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -42,6 +43,52 @@ def _verify_turnstile(cf_token):
             return result.get('success', False)
     except Exception:
         return False
+
+
+def send_otp(bowler):
+    """Generate a 6-digit OTP, email it, and return (True, None) or (False, error_str)."""
+    from routes.admin import _send_via_graph
+
+    now = datetime.utcnow()
+
+    # Invalidate any unused OTPs for this bowler
+    LoginOtp.query.filter_by(bowler_id=bowler.id, used_at=None).update({'used_at': now})
+
+    code = f"{random.randint(0, 999999):06d}"
+    otp = LoginOtp(
+        bowler_id=bowler.id,
+        code=code,
+        expires_at=now + timedelta(minutes=10),
+        created_at=now,
+    )
+    db.session.add(otp)
+    db.session.commit()
+
+    name = bowler.first_name or bowler.last_name
+    from models import LeagueSettings
+    settings = db.session.get(LeagueSettings, 1)
+    league_name = settings.league_name if settings else 'League Tracker'
+
+    html_body = f"""
+<p>Hello {name},</p>
+<p>Your sign-in code for {league_name} is:</p>
+<p style="font-size:2.5rem;font-weight:bold;letter-spacing:.25rem;margin:24px 0;color:#1b3a6b">{code}</p>
+<p>Enter this code on the sign-in screen. It expires in 10 minutes.</p>
+<p style="color:#888;font-size:0.85em">
+  If you didn't request this code, you can safely ignore this email.
+</p>
+"""
+    try:
+        _send_via_graph(
+            current_app.config,
+            f'{league_name}: Your sign-in code',
+            html_body,
+            to_list=[bowler.email],
+            bcc_list=[],
+        )
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
 
 
 def send_magic_link(bowler, subject=None):
@@ -128,15 +175,69 @@ def login():
         ).first()
 
         if bowler:
-            send_magic_link(bowler)
+            send_otp(bowler)
+
+        # Store email in session so the verify page knows who to check
+        session['otp_email'] = email
 
         # Generic response — never confirm whether the email is registered
-        flash("If your email is registered, you'll receive a sign-in link shortly. "
-              "Check your inbox (and spam folder). Links expire after 24 hours.", 'info')
-        return redirect(url_for('auth.login'))
+        flash("If your email is registered, you'll receive a 6-digit code shortly. "
+              "Check your inbox (and spam folder).", 'info')
+        return redirect(url_for('auth.verify_otp'))
 
     site_key = current_app.config.get('TURNSTILE_SITE_KEY', '')
     return render_template('auth/login.html', turnstile_site_key=site_key)
+
+
+@auth_bp.route('/login/verify', methods=['GET', 'POST'])
+@limiter.limit('10 per 15 minutes', methods=['POST'])
+def verify_otp():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        email = (request.form.get('email') or session.get('otp_email', '')).strip().lower()
+        code = request.form.get('code', '').strip()
+        now = datetime.utcnow()
+
+        bowler = Bowler.query.filter(db.func.lower(Bowler.email) == email).first()
+        otp = None
+        if bowler:
+            otp = LoginOtp.query.filter_by(
+                bowler_id=bowler.id, used_at=None
+            ).filter(LoginOtp.expires_at > now).order_by(LoginOtp.created_at.desc()).first()
+
+        if not bowler or not otp or otp.code != code:
+            flash('Invalid or expired code. Please try again or request a new one.', 'danger')
+            return render_template('auth/verify.html',
+                                   email=session.get('otp_email', ''))
+
+        # Consume the OTP
+        otp.used_at = now
+        acct = LinkedAccount.query.filter_by(
+            bowler_id=bowler.id, auth_method='otp'
+        ).first()
+        if acct:
+            acct.last_login = now
+        else:
+            db.session.add(LinkedAccount(
+                bowler_id=bowler.id,
+                auth_method='otp',
+                auth_identifier=bowler.email,
+                last_login=now,
+            ))
+        db.session.commit()
+        session.pop('otp_email', None)
+
+        login_user(bowler, remember=True)
+        flash(f'Welcome, {bowler.first_name or bowler.last_name}!', 'success')
+
+        next_url = request.args.get('next', '')
+        if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+            return redirect(next_url)
+        return redirect(url_for('index'))
+
+    return render_template('auth/verify.html', email=session.get('otp_email', ''))
 
 
 @auth_bp.route('/magic/<token>')

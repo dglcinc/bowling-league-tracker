@@ -55,7 +55,7 @@ class Config:
     GRAPH_SENDER_EMAIL   = os.environ.get("GRAPH_SENDER_EMAIL", "")
 
     # Auth / session
-    REMEMBER_COOKIE_DURATION = timedelta(days=30)
+    REMEMBER_COOKIE_DURATION = timedelta(days=90)
     REMEMBER_COOKIE_SECURE = os.environ.get("REMEMBER_COOKIE_SECURE", "false").lower() == "true"
     REMEMBER_COOKIE_HTTPONLY = True
 

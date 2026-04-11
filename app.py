@@ -92,6 +92,15 @@ def _migrate_db(db):
         # Venue distinction: which bowling alley was used for each season
         "ALTER TABLE seasons ADD COLUMN venue VARCHAR(32) DEFAULT 'boonton_lanes'",
         "UPDATE seasons SET venue = 'mountain_lakes_club' WHERE name < '2024-2025'",
+        # OTP login — replaces magic links for day-to-day sign-in
+        """CREATE TABLE IF NOT EXISTS login_otps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bowler_id INTEGER NOT NULL REFERENCES bowlers(id),
+            code VARCHAR(6) NOT NULL,
+            expires_at DATETIME NOT NULL,
+            used_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:
