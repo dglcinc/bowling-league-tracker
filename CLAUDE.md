@@ -200,7 +200,7 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 
 ### Deployment
 
-Production is live at **https://mlb.dglc.com** on a Mac Mini M4 (internal network utility server). Full setup guide in `DEPLOYMENT.md` (gitignored). Routine deploys: `ssh macmini ~/bin/deploy-bowling.sh`.
+Production is live at **https://mlb.dglc.com** on Mac Mini M4 (`utilityserver@10.0.0.84`). nginx + TLS handled by Pi (`pi@10.0.0.82`). App: gunicorn via launchd (`com.dglc.bowling-app`), binds `0.0.0.0:5001`. DB stays on OneDrive (`~/OneDrive - DGLC/Claude/bowling-league-tracker/league.db`), auto-detected by `config.py`. Restart: `pkill -f "gunicorn.*wsgi"` (launchd auto-restarts). Logs: `/tmp/bowling-app.log`. Full setup guide in `DEPLOYMENT.md` (gitignored).
 
 ### Still to build
 - Season rollover wizard
