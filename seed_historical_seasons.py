@@ -308,7 +308,8 @@ def read_bowler_sheet_scores(ws, num_weeks):
     # Row 2 (index 1): last_name at col 5, first at col 6, team at col 7, active at col 8
     info_row = rows[1]
     last  = str(info_row[5]).strip() if info_row[5] else ''
-    first = str(info_row[6]).strip() if len(info_row) > 6 and info_row[6] else ''
+    first_raw = str(info_row[6]).strip() if len(info_row) > 6 and info_row[6] else ''
+    first = '' if first_raw == 'First' else first_raw  # 'First' is a placeholder in template sheets
     team_val = info_row[7] if len(info_row) > 7 else None
     team = int(team_val) if isinstance(team_val, (int, float)) else None
     active_val = info_row[8] if len(info_row) > 8 else None
