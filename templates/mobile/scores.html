@@ -1,0 +1,34 @@
+{% extends "mobile/base.html" %}
+{% block title %}Scores — MLC Bowling{% endblock %}
+{% block header_title %}🎳 Scores{% endblock %}
+
+{% block content %}
+
+{% if weeks %}
+<div class="m-card">
+  {% for week in weeks %}
+  <a href="{{ url_for('mobile.week_scores', week_num=week.week_num) }}" class="m-week-row">
+    <div class="m-week-num">
+      Week {{ week.week_num }}
+      {% if week.tournament_type %}<div style="font-size:.65rem;font-weight:400;color:#6c757d">{{ season.tournament_labels.get(week.tournament_type, 'Tournament') }}</div>{% endif %}
+    </div>
+    <div class="m-week-date">
+      {{ week.date.strftime('%b %-d') if week.date else '—' }}
+      {% if week.is_position_night %}<span class="badge bg-warning text-dark ms-1" style="font-size:.65rem">Pos. Night</span>{% endif %}
+    </div>
+    <div class="m-week-chevron">›</div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="m-card">
+  <div class="m-card-sub text-muted">No scores entered yet.</div>
+</div>
+{% endif %}
+
+<div class="text-center mt-3">
+  <a href="{{ url_for('mobile.prefer_desktop', next=url_for('index')) }}"
+     style="color:#6c757d;font-size:.8rem">Switch to full site</a>
+</div>
+
+{% endblock %}

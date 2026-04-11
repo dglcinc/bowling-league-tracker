@@ -1,0 +1,33 @@
+{% extends "mobile/base.html" %}
+{% block title %}Standings — MLC Bowling{% endblock %}
+{% block header_title %}🏆 Standings{% endblock %}
+
+{% block content %}
+
+{% if teams %}
+<div class="m-card">
+  {% for row in teams %}
+  <div class="m-standings-row">
+    <div class="m-rank">{{ loop.index }}</div>
+    <div class="m-team-name">{{ row.team.name }}</div>
+    <div class="m-pts">{{ row.points | int }}<span style="font-size:.7rem;font-weight:400;color:#6c757d"> pts</span></div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="text-center mt-2">
+  <a href="{{ url_for('reports.team_points', season_id=season.id) }}"
+     style="color:#1b3a6b;font-size:.85rem">Full points breakdown →</a>
+</div>
+{% else %}
+<div class="m-card">
+  <div class="m-card-sub text-muted">No standings data yet.</div>
+</div>
+{% endif %}
+
+<div class="text-center mt-3">
+  <a href="{{ url_for('mobile.prefer_desktop', next=url_for('index')) }}"
+     style="color:#6c757d;font-size:.8rem">Switch to full site</a>
+</div>
+
+{% endblock %}

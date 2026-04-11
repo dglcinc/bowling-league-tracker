@@ -182,6 +182,7 @@ def create_app():
     from routes.reports import reports_bp
     from routes.payout import payout_bp
     from routes.records import records_bp
+    from routes.mobile import mobile_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(admin_bp, url_prefix='/admin')
@@ -189,6 +190,25 @@ def create_app():
     app.register_blueprint(reports_bp, url_prefix='/reports')
     app.register_blueprint(payout_bp, url_prefix='/payout')
     app.register_blueprint(records_bp, url_prefix='/reports')
+    app.register_blueprint(mobile_bp, url_prefix='/m')
+
+    # Mobile redirect — runs before auth check so mobile users land on /m/ by default.
+    # Skipped for: static files, auth routes, mobile routes themselves, prefer_desktop cookie.
+    def _is_mobile_ua():
+        ua = request.user_agent.string.lower()
+        return 'iphone' in ua or ('android' in ua and 'mobile' in ua)
+
+    @app.before_request
+    def mobile_redirect():
+        ep = request.endpoint
+        if ep is None or ep == 'static':
+            return
+        if ep.startswith('auth.') or ep.startswith('mobile.'):
+            return
+        if request.cookies.get('prefer_desktop'):
+            return
+        if _is_mobile_ua():
+            return redirect(url_for('mobile.home'))
 
     # Global auth enforcement — runs before every request
     @app.before_request
