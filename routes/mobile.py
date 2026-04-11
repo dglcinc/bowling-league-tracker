@@ -10,6 +10,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from models import MatchupEntry, Roster, ScheduleEntry, Season, Team, TeamPoints, Week, db
+from calculations import get_team_standings
 
 mobile_bp = Blueprint('mobile', __name__)
 
@@ -153,14 +154,23 @@ def home():
 def standings():
     season = _active_season()
     teams = []
+    fh_map = {}
+    sh_map = {}
     if season:
-        totals = _team_totals(season.id)
-        all_teams = Team.query.filter_by(season_id=season.id).order_by(Team.number).all()
-        teams = sorted(
-            [{'team': t, 'points': totals.get(t.id, 0)} for t in all_teams],
-            key=lambda x: x['points'],
-            reverse=True,
-        )
+        overall = get_team_standings(season.id)
+        fh_list = get_team_standings(season.id, half=1)
+        sh_list = get_team_standings(season.id, half=2)
+        fh_map = {r['team'].id: r['points'] for r in fh_list}
+        sh_map = {r['team'].id: r['points'] for r in sh_list}
+        teams = [
+            {
+                'team': r['team'],
+                'points': r['points'],
+                'fh': fh_map.get(r['team'].id, 0),
+                'sh': sh_map.get(r['team'].id, 0),
+            }
+            for r in overall
+        ]
     return render_template('mobile/standings.html', season=season, teams=teams)
 
 

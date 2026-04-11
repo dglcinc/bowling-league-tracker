@@ -5,19 +5,37 @@
 {% block content %}
 
 {% if teams %}
-<div class="m-card">
+<div class="m-card" style="padding:0 16px">
+
+  {# Header row #}
+  <div style="display:flex;align-items:center;padding:8px 0;border-bottom:2px solid #dee2e6">
+    <div style="width:28px"></div>
+    <div style="flex:1;font-size:.7rem;font-weight:700;text-transform:uppercase;
+                letter-spacing:.04em;color:#6c757d">Team</div>
+    <div style="width:52px;text-align:right;font-size:.7rem;font-weight:700;
+                text-transform:uppercase;letter-spacing:.04em;color:#6c757d">1st½</div>
+    <div style="width:52px;text-align:right;font-size:.7rem;font-weight:700;
+                text-transform:uppercase;letter-spacing:.04em;color:#6c757d">2nd½</div>
+    <div style="width:52px;text-align:right;font-size:.7rem;font-weight:700;
+                text-transform:uppercase;letter-spacing:.04em;color:#1b3a6b">Total</div>
+  </div>
+
   {% for row in teams %}
-  <div class="m-standings-row">
+  <div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0">
     <div class="m-rank">{{ loop.index }}</div>
-    <div class="m-team-name">{{ row.team.name }}</div>
-    <div class="m-pts">{{ row.points | int }}<span style="font-size:.7rem;font-weight:400;color:#6c757d"> pts</span></div>
+    <div style="flex:1;font-weight:600;font-size:.95rem">{{ row.team.name }}</div>
+    <div style="width:52px;text-align:right;font-size:.9rem;color:#6c757d">
+      {% if row.fh %}{{ row.fh | int }}{% else %}—{% endif %}
+    </div>
+    <div style="width:52px;text-align:right;font-size:.9rem;color:#6c757d">
+      {% if row.sh %}{{ row.sh | int }}{% else %}—{% endif %}
+    </div>
+    <div style="width:52px;text-align:right;font-size:1.05rem;font-weight:700;color:#1b3a6b">
+      {{ row.points | int }}
+    </div>
   </div>
   {% endfor %}
-</div>
 
-<div class="text-center mt-2">
-  <a href="{{ url_for('reports.team_points', season_id=season.id) }}"
-     style="color:#1b3a6b;font-size:.85rem">Full points breakdown →</a>
 </div>
 {% else %}
 <div class="m-card">
