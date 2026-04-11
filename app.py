@@ -55,6 +55,8 @@ _VIEWER_DEFAULTS = [
     ('reports.week_prizes',   'Prizes & Standings',  True),
     ('payout.payout_overview','Payout',              True),
     ('reports.print_batch',   'Print Batch',         False),
+    ('records.records',       'Records',             True),
+    ('records.bowler_dir',    'Bowler Directory',    True),
 ]
 
 

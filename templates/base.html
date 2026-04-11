@@ -41,31 +41,34 @@
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navMenu">
+      {# nav_s: the season whose data the current page is showing (view_season if set, else active) #}
+      {% set nav_s = view_season if view_season else active_season %}
+      {% set nav_wk = latest_entered.get(nav_s.id, current_week or 0) if nav_s else 0 %}
       <ul class="navbar-nav me-auto">
         {% if current_user.is_editor %}
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('entry.index') }}">Scores</a>
         </li>
         {% endif %}
-        {% if active_season %}
+        {% if nav_s %}
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports.team_points', season_id=active_season.id) }}">Points</a>
+          <a class="nav-link" href="{{ url_for('reports.team_points', season_id=nav_s.id) }}">Points</a>
         </li>
-        {% if current_week %}
+        {% if nav_wk %}
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports.ytd_alpha', season_id=active_season.id, week_num=current_week) }}">YTD Alpha</a>
+          <a class="nav-link" href="{{ url_for('reports.ytd_alpha', season_id=nav_s.id, week_num=nav_wk) }}">YTD Alpha</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports.week_prizes', season_id=active_season.id, week_num=current_week) }}">Prizes &amp; Standings</a>
+          <a class="nav-link" href="{{ url_for('reports.week_prizes', season_id=nav_s.id, week_num=nav_wk) }}">Prizes &amp; Standings</a>
         </li>
         {% if current_user.is_editor %}
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports.print_batch', season_id=active_season.id, week_num=current_week) }}">Print Batch</a>
+          <a class="nav-link" href="{{ url_for('reports.print_batch', season_id=nav_s.id, week_num=nav_wk) }}">Print Batch</a>
         </li>
         {% endif %}
         {% endif %}
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('payout.payout_overview', season_id=active_season.id) }}">Payouts</a>
+          <a class="nav-link" href="{{ url_for('payout.payout_overview', season_id=nav_s.id) }}">Payouts</a>
         </li>
         {% endif %}
         <li class="nav-item">
@@ -87,8 +90,13 @@
             {% for s in seasons_with_data %}
             {% set wn = latest_entered.get(s.id, 0) %}
             <li>
-              <a class="dropdown-item {% if active_season and s.id == active_season.id %}active{% endif %}"
-                 href="{{ url_for('reports.week_prizes', season_id=s.id, week_num=wn) }}">
+              <a class="dropdown-item season-selector-item
+                         {% if view_season and s.id == view_season.id %}active
+                         {% elif not view_season and active_season and s.id == active_season.id %}active{% endif %}"
+                 href="#"
+                 data-season-id="{{ s.id }}"
+                 data-latest-week="{{ wn }}"
+                 data-fallback="{{ url_for('reports.week_prizes', season_id=s.id, week_num=wn) }}">
                 {{ s.name }}{% if s.is_active %} &#9679;{% endif %}
               </a>
             </li>
@@ -255,6 +263,33 @@
   }
 })();
 if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw.js'); }
+</script>
+<script>
+// Season selector — navigate to the same page type for the selected season
+(function () {
+  document.querySelectorAll('.season-selector-item').forEach(function (el) {
+    el.addEventListener('click', function (e) {
+      e.preventDefault();
+      var newId  = el.dataset.seasonId;
+      var newWk  = el.dataset.latestWeek;
+      var fallback = el.dataset.fallback;
+      var path = window.location.pathname;
+
+      // Replace /season/NNN/ with /season/newId/
+      var updated = path.replace(/\/season\/\d+\//, '/season/' + newId + '/');
+      if (updated === path) {
+        // Current page isn't a season-scoped URL (e.g. Records, Admin)
+        window.location.href = fallback;
+        return;
+      }
+
+      // Replace trailing week number segment, if present
+      updated = updated.replace(/\/\d+$/, '/' + newWk);
+
+      window.location.href = updated;
+    });
+  });
+})();
 </script>
 </body>
 </html>
