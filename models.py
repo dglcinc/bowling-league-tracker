@@ -340,6 +340,23 @@ class LinkedAccount(db.Model):
         return f'<LinkedAccount bowler={self.bowler_id} method={self.auth_method}>'
 
 
+class LoginOtp(db.Model):
+    """Short-lived 6-digit code sent by email — replaces magic links for day-to-day login."""
+    __tablename__ = 'login_otps'
+
+    id = db.Column(db.Integer, primary_key=True)
+    bowler_id = db.Column(db.Integer, db.ForeignKey('bowlers.id'), nullable=False)
+    code = db.Column(db.String(6), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    bowler = db.relationship('Bowler')
+
+    def __repr__(self):
+        return f'<LoginOtp bowler={self.bowler_id} used={self.used_at is not None}>'
+
+
 class MagicLinkToken(db.Model):
     """Single-use sign-in tokens sent via email."""
     __tablename__ = 'magic_link_tokens'
