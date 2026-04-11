@@ -46,11 +46,11 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 Four tournament weeks are appended after every regular season. The order is the default; can be reordered via Admin → Week Dates without structural changes.
 
 - **Club Championship** (`tournament_type='club_championship'`, `is_position_night=True`): team competition scored as a position night; uses normal matchup entry; auto-assigns lane assignments from standings
-- **Harry E. Russell Championship** (`harry_russell`): individual scratch, 5 games; shows all bowlers (active + inactive) + write-in option for non-league participants
-- **Chad Harris Memorial Bowl** (`chad_harris`): individual handicap, 3 games; active bowlers + write-in
-- **Shep Belyea Open** (`shep_belyea`): individual handicap, 3 games; active bowlers + write-in
+- **Harry E. Russell Championship** (`indiv_scratch`): individual scratch, 5 games; shows all bowlers (active + inactive) + write-in option for non-league participants
+- **Hcp Tournament 1** (`indiv_hcp_1`): individual handicap, 3 games; active bowlers + write-in (named "Buz Bedford Championship" pre-2023, "Shep Belyea Open" 2023+)
+- **Hcp Tournament 2** (`indiv_hcp_2`): individual handicap, 3 games; active bowlers + write-in (named "Rose Bowl" pre-2023, "Chad Harris Memorial Bowl" 2023+)
 
-Tournament scores stored in `tournament_entries` table. All tournament weeks excluded from `get_bowler_entries` so they never affect season averages/handicaps. Tournament entry form shows live JS rankings.
+Tournament display names are configurable per season via Admin → Week Dates and stored as JSON in `Season.tournament_labels`. Tournament scores stored in `tournament_entries` table (game1=300/200/100 for placement ordering on the prizes page). All tournament weeks excluded from `get_bowler_entries` so they never affect season averages/handicaps. Tournament entry form shows live JS rankings. Top-3 placement can also be set via Admin → Tournament Placements (uses dummy scores 300/200/100).
 
 ## Key Formulas
 
@@ -93,7 +93,7 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 ### Tables
 
 - **bowlers**: id, last_name, first_name, nickname, email. Never deleted.
-- **seasons**: id, name, start_date, num_weeks, half_boundary_week (default 11), handicap_base (200), handicap_factor (0.9), blind_scratch (125), blind_handicap (60), is_active, bowling_format ('single'/'double')
+- **seasons**: id, name, start_date, num_weeks, half_boundary_week (default 11), handicap_base (200), handicap_factor (0.9), blind_scratch (125), blind_handicap (60), is_active, bowling_format ('single'/'double'), venue ('mountain_lakes_club' pre-2024-2025, 'boonton_lanes' 2024-2025+), tournament_labels (JSON dict mapping internal key → display name)
 - **teams**: id, season_id, number (1–4), name
 - **roster**: bowler_id, season_id, team_id, active, prior_handicap, joined_week
 - **schedule**: season_id, week_num, matchup_num (1–4), team1_id, team2_id, lane_pair
@@ -133,13 +133,20 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 - `wkly_high_avg` — same columns as wkly_alpha, sorted by average with rank
 - `standings` — summary tables + week-by-week scoring grid (A/B pts per team, cumulative)
 - `high_games` — average leaders + top-10 HG/HS scratch & hcp; `?min_games=N` filter
-- `bowler_detail` — full season week-by-week for one bowler
-- `week_prizes` — per-week prize winners (4 categories with ties), team standings, YTD leaders
+- `bowler_detail` — full season week-by-week for one bowler; includes venue badge per season
+- `week_prizes` — per-week prize winners (4 categories with ties), team standings, YTD leaders; first-half/second-half/season points winners highlighted yellow
 - `print_batch` — combined print page: Group 1 = 4× wkly alpha; Group 2 = alpha + YTD + high avg + high games
+- `team_points` — season points totals table
+
+**`records_bp`** (`/records`, `/bowler_dir`)
+- `records` — all-time leaderboards, season comparison, tournament winners by year, most improved; venue filter (`?venue=all/mountain_lakes_club/boonton_lanes`); tab state persisted via URL hash
+- `bowler_dir` — alphabetical list of all bowlers with career highlights and season badges
 
 **`admin_bp`** (`/admin/...`)
 - Season, team, roster, week, and schedule management
-- `edit_weeks` — set dates (with JS cascade +7 days), position night flags, tournament types
+- `edit_weeks` — set dates (with JS cascade +7 days), position night flags, tournament types, venue, tournament display names
+- `tournament_placement` — set 1st/2nd/3rd place finishers per individual tournament; stores dummy scores 300/200/100 in tournament_entries
+- `all_bowlers` — lists every bowler across all seasons with season badges and edit links
 - `import_season` — web UI to upload XLS and seed a full historical season
 - `assign_matchups_list` / `assign_matchups` — per-week tool to assign bowlers to lane pair A or B
 - `edit_team` — edit team name and captain name (`Team.captain_name` column); team badges on season_detail are clickable links to this page
@@ -156,16 +163,18 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 ### Snapshots
 Written automatically after each week is fully entered. Stored as JSON at OneDrive path next to the DB.
 
-## Current State (as of 2026-04-02)
+## Current State (as of 2026-04-11)
 
 ### Seasons in DB
-- **2025-2026** (active): all 22 regular weeks entered; 4 post-season tournament weeks (23–26) added; TeamPoints from spreadsheet
-- **2026-2027** (inactive): roster seeded from `seed_from_xls.py`; schedule seeded from `seed_schedule.py`; 4 post-season tournament weeks (23–26) added
+- **2017-2018 through 2023-2024** (historical, venue=mountain_lakes_club): imported via `seed_historical_seasons.py`; regular scores + tournament 1st/2nd/3rd place entries
+- **2024-2025** (historical, venue=boonton_lanes): imported via `seed_historical_seasons.py`
+- **2025-2026** (active, venue=boonton_lanes): all 22 regular weeks entered; 4 post-season tournament weeks (23–26) added; TeamPoints from spreadsheet
+- **2026-2027** (inactive, venue=boonton_lanes): roster seeded from `seed_from_xls.py`; schedule seeded from `seed_schedule.py`; 4 post-season tournament weeks (23–26) added
 
-Both seasons have 26 weeks: 22 regular + Club Championship (23), Harry Russell (24), Chad Harris (25), Shep Belyea (26).
+All seasons have 26 weeks: 22 regular + Club Championship (23), Harry Russell/indiv_scratch (24), indiv_hcp_1 (25), indiv_hcp_2 (26). 2019-2020 is a COVID season with no tournament weeks.
 
 ### Seed scripts (run on Mac, Flask app stopped)
-XLS path: `/users/david/OneDrive - DGLC/Claude/scoring 2025-2026 - Week 22.xlsx`
+XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 
 | Script | Purpose |
 |--------|---------|
@@ -174,12 +183,16 @@ XLS path: `/users/david/OneDrive - DGLC/Claude/scoring 2025-2026 - Week 22.xlsx`
 | `seed_historical.py <xlsx>` | Seeds 2025-2026 structure: season, teams, bowlers, roster, weeks, schedule |
 | `seed_week.py <week_num> <xlsx>` | Imports one week's scores + verifies lane assignment; saves JSON snapshot |
 | `seed_all_weeks.py` | Runs `seed_historical.py` then `seed_week.py` for weeks 1–21 in sequence |
+| `seed_historical_seasons.py` | Imports all 6 historical seasons (2017-2018 through 2024-2025) from XLS; idempotent (skips existing seasons) |
+| `backfill_tournament_winners.py` | Re-reads XLS Payout Formula sheets to backfill 2nd/3rd place tournament entries; safe to re-run |
+| `crawl_routes.py` | BFS route tester: crawls all GET routes as editor (all 200) and viewer (checks ALLOW/DENY); run after significant changes |
 
 ### Known technical notes
 - SQLite writes must run natively on Mac (not from VM) — VirtioFS file locking doesn't support SQLite
 - `TeamPoints.points_earned` is Float to support 0.5-pt ties from tied games
 - Historical data uses `matchup_num = team_number` as a simplification; corrected per-week via Assign Matchups admin tool
 - TeamPoints for historical seasons come from the spreadsheet directly, not recomputed from scores
+- Viewer permissions stored in `viewer_permissions` table (endpoint → viewer_accessible bool); managed via Admin → Settings
 
 ### Still to build
 - Season rollover wizard
