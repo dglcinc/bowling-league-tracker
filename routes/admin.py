@@ -480,6 +480,22 @@ def save_schedule(season_id):
             db.session.delete(entry)
             continue
 
+    # Delete entries beyond the selected matchup count for non-individual weeks
+    for key, val in request.form.items():
+        parts = key.split('_')
+        # key format: week_{wn}_matchup_count
+        if len(parts) == 4 and parts[0] == 'week' and parts[2] == 'matchup' and parts[3] == 'count':
+            try:
+                wn, count = int(parts[1]), int(val)
+            except ValueError:
+                continue
+            week = week_map.get(wn)
+            if week and week.tournament_type not in _INDIV_TOURNAMENT_TYPES:
+                (ScheduleEntry.query
+                 .filter_by(season_id=season_id, week_num=wn)
+                 .filter(ScheduleEntry.matchup_num > count)
+                 .delete())
+
     db.session.commit()
     flash('Schedule saved.', 'success')
     return redirect(url_for('admin.schedule', season_id=season_id))
