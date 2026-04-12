@@ -1380,23 +1380,6 @@ def restore_backup(filename):
 
 
 # ---------------------------------------------------------------------------
-# All Bowlers (cross-season admin view)
-# ---------------------------------------------------------------------------
-
-@admin_bp.route('/bowlers')
-def all_bowlers():
-    bowlers = Bowler.query.order_by(Bowler.last_name, Bowler.first_name).all()
-    # Map bowler_id → list of roster entries, sorted newest season first
-    roster_map = {}
-    for r in (Roster.query
-              .join(Season)
-              .order_by(Season.name.desc())
-              .all()):
-        roster_map.setdefault(r.bowler_id, []).append(r)
-    return render_template('admin/all_bowlers.html', bowlers=bowlers, roster_map=roster_map)
-
-
-# ---------------------------------------------------------------------------
 # Tournament placement (historical results entry: 1st / 2nd / 3rd place)
 # ---------------------------------------------------------------------------
 
