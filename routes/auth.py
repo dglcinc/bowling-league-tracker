@@ -403,25 +403,20 @@ def webauthn_authenticate_begin():
     data = request.get_json(force=True) or {}
     email = (data.get('email') or '').strip().lower()
 
-    if not email:
-        return jsonify({'error': 'Enter your email address first, then click the passkey button.'}), 400
-
-    bowler = Bowler.query.filter(db.func.lower(Bowler.email) == email).first()
-    if not bowler:
-        # Don't reveal whether email is registered — same generic flow
-        return jsonify({'error': 'No passkey found for this email. '
-                        'Sign in with an email link first, then set up a passkey from the banner that appears.'}), 400
-
-    creds = WebAuthnCredential.query.filter_by(bowler_id=bowler.id).all()
-    if not creds:
-        return jsonify({'error': 'No passkey registered yet for this account. '
-                        'Sign in with an email link first, then set up a passkey from the banner that appears.'}), 400
-
-    allow_credentials = [
-        PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
-        for c in creds
-    ]
-    bowler_id = bowler.id
+    # Try to narrow to the specific bowler's credentials for a smoother prompt.
+    # If the email is missing/unrecognised/has no credentials, fall back to
+    # discoverable-credential mode (empty allowCredentials): the browser shows
+    # all passkeys stored for this site and the user picks with Touch ID.
+    # authenticate/complete identifies the user by credential_id regardless.
+    allow_credentials = []
+    if email:
+        bowler = Bowler.query.filter(db.func.lower(Bowler.email) == email).first()
+        if bowler:
+            creds = WebAuthnCredential.query.filter_by(bowler_id=bowler.id).all()
+            allow_credentials = [
+                PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
+                for c in creds
+            ]
 
     options = generate_authentication_options(
         rp_id=current_app.config['WEBAUTHN_RP_ID'],
@@ -430,7 +425,6 @@ def webauthn_authenticate_begin():
     )
 
     session['webauthn_auth_challenge'] = bytes_to_base64url(options.challenge)
-    session['webauthn_auth_bowler_id'] = bowler_id  # unused in complete() but kept for future use
     return current_app.response_class(
         response=options_to_json(options), mimetype='application/json'
     )
