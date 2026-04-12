@@ -4,7 +4,7 @@ Records route: all-time leaderboards and season comparison table.
 
 from collections import defaultdict
 from flask import Blueprint, render_template, request
-from models import (db, Season, Week, Bowler, MatchupEntry, TournamentEntry, TeamPoints)
+from models import (db, Season, Week, Bowler, MatchupEntry, TournamentEntry, TeamPoints, Roster)
 from calculations import get_bowler_stats, get_team_standings
 
 records_bp = Blueprint('records', __name__)
@@ -296,10 +296,16 @@ def bowler_dir():
     from calculations import get_career_stats
     bowlers = Bowler.query.order_by(Bowler.last_name, Bowler.first_name).all()
     dir_entries = []
+    # Pre-build a set of bowler IDs that have at least one roster entry so we
+    # can include bowlers whose career stats are all inactive/empty (e.g. legacy
+    # members who were listed but never scored) while still excluding pure
+    # system/admin accounts that were never in any season.
+    rostered_ids = {r.bowler_id for r in Roster.query.with_entities(Roster.bowler_id).all()}
+
     for bowler in bowlers:
-        career = get_career_stats(bowler.id)
-        if not career:
+        if bowler.id not in rostered_ids:
             continue
+        career = get_career_stats(bowler.id)
         scored = [r for r in career if r['has_data']]
         best_avg = max(r['avg'] for r in scored) if scored else None
         best_hg  = max(r['high_game_scratch'] for r in scored) if scored else None
