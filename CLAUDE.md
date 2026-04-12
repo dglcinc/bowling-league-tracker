@@ -167,7 +167,7 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 ### Snapshots
 Written automatically after each week is fully entered. Stored as JSON at OneDrive path next to the DB.
 
-## Current State (as of 2026-04-11)
+## Current State (as of 2026-04-12)
 
 ### Seasons in DB
 - **2017-2018 through 2023-2024** (historical, venue=mountain_lakes_club): imported via `seed_historical_seasons.py`; regular scores + tournament 1st/2nd/3rd place entries
@@ -201,6 +201,14 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 ### Deployment
 
 Production is live at **https://mlb.dglc.com** on Mac Mini M4 (`utilityserver@10.0.0.84`). nginx + TLS on Pi (`pi@10.0.0.82`; config: `/etc/nginx/sites-available/mlb.dglc.com`). App: gunicorn via launchd (`com.dglc.bowling-app`), binds `0.0.0.0:5001`. DB: `~/bowling-data/league.db` (local — NOT OneDrive; SQLite + cloud sync = corruption risk). Restart: `pkill -f "gunicorn.*wsgi"` (launchd auto-restarts). Logs: `/tmp/bowling-app.log`. Full setup guide in `DEPLOYMENT.md` (gitignored).
+
+### Push notifications
+- `PushSubscription` model + `push_subscriptions` table (endpoint, subscription JSON, platform, 3 preference booleans)
+- `/m/push/subscribe`, `/m/push/unsubscribe`, `/m/push/preferences`, `/m/push/vapid-public-key` routes
+- `send_notifications.py` — standalone sender, three triggers: bowling_tomorrow (6 PM prior evening), bowling_tonight (9 AM bowl day), scores_posted (after `week.is_entered`). Per-week `notif_*_sent` flags prevent duplicates.
+- `com.dglc.bowling-notify` launchd timer on utilityserver, 10-min interval
+- VAPID keys in `.env` (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_PEM`, `VAPID_CLAIMS_EMAIL`) — never change after first subscriber
+- Me tab: iOS install prompt → permission button → preference toggles (bowling tomorrow / tonight / scores)
 
 ### Still to build
 - Season rollover wizard
