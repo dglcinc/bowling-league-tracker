@@ -59,6 +59,7 @@
     {% if event_type == 'championship' %}Team Matchups{% else %}Lane Assignments{% endif %}
   </div>
   {% for m in all_matchups %}
+  {% if m.team1 and m.team2 %}
   {% set is_mine = my_team and (m.team1_id == my_team.id or m.team2_id == my_team.id) %}
   <div style="display:flex;align-items:center;padding:9px 0;
               border-bottom:1px solid #f0f0f0;
@@ -77,6 +78,7 @@
     <div style="font-size:.7rem;color:#1b3a6b;font-weight:600">YOU</div>
     {% endif %}
   </div>
+  {% endif %}
   {% endfor %}
 </div>
 {% elif my_team %}

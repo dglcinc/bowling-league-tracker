@@ -39,6 +39,17 @@ function fillAllLanes() {
   }
 }
 
+function toggleSoloLane(select, weekNum, matchupNum) {
+  var isSolo = select.value === 'solo';
+  var laneInput = document.querySelector(
+    'input[name="week_' + weekNum + '_matchup_' + matchupNum + '_lane"]'
+  );
+  if (laneInput) {
+    laneInput.disabled = !isSolo;
+    if (!isSolo) laneInput.value = '';
+  }
+}
+
 function setMatchupCount(weekNum, count) {
   for (let m = 1; m <= 4; m++) {
     document.querySelectorAll('[data-week="' + weekNum + '"][data-matchup="' + m + '"]').forEach(cell => {
@@ -97,15 +108,16 @@ function setMatchupCount(weekNum, count) {
             <div class="fw-semibold">Wk {{ wk.week_num }}{% if wk.is_position_night %} ⭐{% endif %}</div>
             {% if wk_label %}<div class="text-muted" style="font-size:.75rem">{{ wk_label }}</div>{% endif %}
             {% if not is_indiv %}
+            {# Default count: actual data in db, else 4 (or 2 for championship if no data yet) #}
+            {% set default_count = week_matchup_counts.get(wk.week_num,
+                 2 if wk.tournament_type == 'club_championship' else 4) %}
             <select class="form-select form-select-sm mt-1" style="font-size:.75rem"
                     title="Number of active matchups this week"
                     onchange="setMatchupCount({{ wk.week_num }}, parseInt(this.value))">
               {% for n in [1,2,3,4] %}
-              <option value="{{ n }}"
-                {% if wk.tournament_type == 'club_championship' and n == 2 %}selected
-                {% elif not wk.tournament_type and n == 4 %}selected
-                {% elif wk.is_position_night and n == 4 %}selected
-                {% endif %}>{{ n }} matchup{{ 's' if n != 1 }}</option>
+              <option value="{{ n }}" {% if n == default_count %}selected{% endif %}>
+                {{ n }} matchup{{ 's' if n != 1 }}
+              </option>
               {% endfor %}
             </select>
             {% else %}
@@ -117,22 +129,31 @@ function setMatchupCount(weekNum, count) {
           {% set entry = sched_map.get((wk.week_num, m)) %}
 
           {% if is_indiv %}
-          {# Individual tournament: Solo label + lane pair input only #}
+          {# Individual tournament: Solo/None dropdown + lane pair input #}
+          {% set has_lane = entry and entry.lane_pair %}
           <td data-week="{{ wk.week_num }}" data-matchup="{{ m }}"
-              class="text-center text-muted" style="font-size:.8rem;background:#f8f9fa">Solo</td>
+              style="background:#f8f9fa">
+            <select class="form-select form-select-sm"
+                    style="min-width:70px"
+                    onchange="toggleSoloLane(this, {{ wk.week_num }}, {{ m }})">
+              <option value="solo" {% if has_lane %}selected{% endif %}>Solo</option>
+              <option value="none" {% if not has_lane %}selected{% endif %}>None</option>
+            </select>
+          </td>
           <td data-week="{{ wk.week_num }}" data-matchup="{{ m }}"
               class="text-center text-muted" style="font-size:.8rem;background:#f8f9fa">—</td>
           <td data-week="{{ wk.week_num }}" data-matchup="{{ m }}">
             <input type="text" name="week_{{ wk.week_num }}_matchup_{{ m }}_lane"
                    class="form-control form-control-sm" style="width:60px"
                    placeholder="1-2"
-                   value="{{ entry.lane_pair if entry and entry.lane_pair else '' }}">
+                   {% if not has_lane %}disabled{% endif %}
+                   value="{{ entry.lane_pair if has_lane else '' }}">
           </td>
 
           {% else %}
           {# Regular / championship week: team selects #}
-          {# Determine initial disabled state based on matchup count default #}
-          {% set default_count = 2 if wk.tournament_type == 'club_championship' else 4 %}
+          {% set default_count = week_matchup_counts.get(wk.week_num,
+               2 if wk.tournament_type == 'club_championship' else 4) %}
           {% set is_disabled = m > default_count %}
 
           <td data-week="{{ wk.week_num }}" data-matchup="{{ m }}"
