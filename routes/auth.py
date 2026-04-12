@@ -45,7 +45,7 @@ def _verify_turnstile(cf_token):
         return False
 
 
-def send_otp(bowler):
+def send_otp(bowler, subject=None):
     """Generate a 6-digit OTP, email it, and return (True, None) or (False, error_str)."""
     from routes.admin import _send_via_graph
 
@@ -81,7 +81,7 @@ def send_otp(bowler):
     try:
         _send_via_graph(
             current_app.config,
-            f'{league_name}: Your sign-in code',
+            subject or f'{league_name}: Your sign-in code',
             html_body,
             to_list=[bowler.email],
             bcc_list=[],
