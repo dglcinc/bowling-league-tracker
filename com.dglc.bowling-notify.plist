@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd plist for the bowling push notification sender.
+  Install on utilityserver (Mac Mini M4):
+
+    cp ~/github/bowling-league-tracker/com.dglc.bowling-notify.plist \
+       ~/Library/LaunchAgents/com.dglc.bowling-notify.plist
+    launchctl load ~/Library/LaunchAgents/com.dglc.bowling-notify.plist
+
+  Runs every 10 minutes. Flag guards in send_notifications.py prevent duplicate sends.
+  Logs to /tmp/bowling-notify.log and /tmp/bowling-notify.err.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.dglc.bowling-notify</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/python3.11</string>
+    <string>/Users/utilityserver/github/bowling-league-tracker/send_notifications.py</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/utilityserver/github/bowling-league-tracker</string>
+
+  <key>StartInterval</key>
+  <integer>600</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/bowling-notify.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/bowling-notify.err</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>DYLD_LIBRARY_PATH</key>
+    <string>/opt/homebrew/lib</string>
+  </dict>
+</dict>
+</plist>

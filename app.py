@@ -106,6 +106,23 @@ def _migrate_db(db):
             used_at DATETIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )""",
+        # Web Push subscriptions (one per browser/device per bowler)
+        """CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bowler_id INTEGER NOT NULL REFERENCES bowlers(id),
+            endpoint TEXT NOT NULL UNIQUE,
+            subscription_json TEXT NOT NULL,
+            platform VARCHAR(32),
+            pref_bowling_tomorrow BOOLEAN DEFAULT 1,
+            pref_bowling_tonight BOOLEAN DEFAULT 1,
+            pref_scores_posted BOOLEAN DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
+        # Notification-sent flags on weeks — prevent duplicate sends
+        "ALTER TABLE weeks ADD COLUMN notif_tomorrow_sent BOOLEAN DEFAULT 0",
+        "ALTER TABLE weeks ADD COLUMN notif_tonight_sent BOOLEAN DEFAULT 0",
+        "ALTER TABLE weeks ADD COLUMN notif_scores_sent BOOLEAN DEFAULT 0",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:
