@@ -407,9 +407,16 @@ def schedule(season_id):
     # Build lookup: {(week_num, matchup_num): entry}
     sched_map = {(e.week_num, e.matchup_num): e for e in existing}
 
+    # Highest matchup number that actually has data, per week
+    week_matchup_counts = {}
+    for (wn, mn), e in sched_map.items():
+        if e.team1_id or e.team2_id or e.lane_pair:
+            week_matchup_counts[wn] = max(week_matchup_counts.get(wn, 0), mn)
+
     return render_template('admin/schedule.html',
                            season=season, teams=teams,
-                           weeks=weeks, sched_map=sched_map)
+                           weeks=weeks, sched_map=sched_map,
+                           week_matchup_counts=week_matchup_counts)
 
 
 _INDIV_TOURNAMENT_TYPES = {'indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'}
