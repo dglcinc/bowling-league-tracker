@@ -19,7 +19,7 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/bin/python3.11</string>
+    <string>/opt/homebrew/bin/python3.11</string>
     <string>/Users/utilityserver/github/bowling-league-tracker/send_notifications.py</string>
   </array>
 
