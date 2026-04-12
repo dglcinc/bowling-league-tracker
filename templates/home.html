@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+{% block title %}{{ season.name }} — MLC Bowling{% endblock %}
+
+{% block extra_head %}
+<style>
+  .home-card-header {
+    background: #1b3a6b;
+    color: #fff;
+    font-weight: 600;
+    font-size: .85rem;
+    letter-spacing: .03em;
+    padding: .55rem 1rem;
+  }
+  .home-section-label {
+    font-size: .7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #6c757d;
+    margin-bottom: 4px;
+  }
+  .home-event-name  { font-size: 1.2rem; font-weight: 700; color: #1b3a6b; }
+  .home-event-date  { font-size: .9rem;  color: #495057; margin-top: 2px; }
+  .home-event-times { font-size: .85rem; color: #495057; margin-top: 6px; }
+  .home-lane-badge  {
+    display: inline-block;
+    background: #1b3a6b; color: #fff;
+    border-radius: 6px; padding: 1px 8px;
+    font-size: .8rem; font-weight: 600;
+  }
+  .home-matchup-row {
+    display: flex; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid #f0f0f0;
+    font-size: .9rem;
+  }
+  .home-matchup-row:last-child { border-bottom: none; }
+  .home-my-row {
+    background: #f0f4ff;
+    margin: 0 -1rem; padding: 6px 1rem;
+    font-weight: 700; color: #1b3a6b;
+  }
+  /* Stats boxes */
+  .stat-box {
+    background: #f8f9fa; border-radius: 8px;
+    padding: 10px 12px; text-align: center;
+    border: 1px solid #e9ecef;
+  }
+  .stat-box-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: #6c757d; }
+  .stat-box-value { font-size: 1.5rem; font-weight: 700; color: #1b3a6b; line-height: 1.2; }
+  /* Schedule rows */
+  .sched-row { display: flex; align-items: baseline; padding: 5px 12px; border-bottom: 1px solid #f5f5f5; font-size: .87rem; }
+  .sched-row:last-child { border-bottom: none; }
+  .sched-date { width: 58px; flex-shrink: 0; color: #6c757d; font-size: .8rem; }
+  .sched-label { flex: 1; }
+  .sched-status { font-size: .75rem; color: #adb5bd; margin-left: 8px; }
+  .sched-upcoming { background: #f0f4ff; }
+  /* Standings table tighter */
+  .standings-tbl { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  .standings-tbl th { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em;
+                       color: #6c757d; padding: 5px 8px; border-bottom: 2px solid #dee2e6; }
+  .standings-tbl td { padding: 7px 8px; border-bottom: 1px solid #f0f0f0; }
+  .standings-tbl tr:last-child td { border-bottom: none; }
+  .standings-my-row td { background: #f0f4ff; font-weight: 700; color: #1b3a6b; }
+  /* Result pill */
+  .result-win  { color: #198754; font-weight: 700; }
+  .result-loss { color: #dc3545; font-weight: 700; }
+  .result-tie  { color: #6c757d; font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# Determine upcoming event type (mirrors mobile home.html logic) #}
+{% if upcoming_week %}
+  {% if upcoming_week.tournament_type == 'club_championship' %}
+    {% set event_label = season.tournament_labels['club_championship'] %}
+    {% set event_type  = 'championship' %}
+  {% elif upcoming_week.tournament_type == 'indiv_scratch' %}
+    {% set event_label = season.tournament_labels['indiv_scratch'] %}
+    {% set event_type  = 'indiv_scratch' %}
+  {% elif upcoming_week.tournament_type == 'indiv_hcp_1' %}
+    {% set event_label = season.tournament_labels['indiv_hcp_1'] %}
+    {% set event_type  = 'indiv_hcp_1' %}
+  {% elif upcoming_week.tournament_type == 'indiv_hcp_2' %}
+    {% set event_label = season.tournament_labels['indiv_hcp_2'] %}
+    {% set event_type  = 'indiv_hcp_2' %}
+  {% elif upcoming_week.is_position_night %}
+    {% set event_label = 'Position Night' %}
+    {% set event_type  = 'lanes' %}
+  {% else %}
+    {% set event_label = 'Week ' ~ upcoming_week.week_num %}
+    {% set event_type  = 'lanes' %}
+  {% endif %}
+{% endif %}
+
+<div class="row g-3">
+
+  {# ═══════════════════════════════ UP NEXT ══════════════════════════════════ #}
+  <div class="col-lg-3 col-md-6">
+    <div class="card h-100 shadow-sm">
+      <div class="home-card-header">🗓 Up Next</div>
+      <div class="card-body">
+
+        {% if upcoming_week %}
+
+        <div class="home-event-name">{{ event_label }}</div>
+        {% if upcoming_week.tournament_type and event_type not in ('lanes','championship') %}{% else %}
+        {% if not upcoming_week.tournament_type %}
+        <div style="font-size:.8rem;color:#6c757d">Week {{ upcoming_week.week_num }}</div>
+        {% endif %}
+        {% endif %}
+        {% if upcoming_week.date %}
+        <div class="home-event-date">{{ upcoming_week.date.strftime('%A, %B %-d') }}</div>
+        {% endif %}
+        <div class="home-event-times mt-2">
+          {% if event_type == 'indiv_scratch' %}
+            <strong>Arrive:</strong> 6:45 PM &nbsp;·&nbsp; <strong>Start:</strong> 7:00 PM
+          {% else %}
+            <strong>Arrive:</strong> {{ season.arrival_time or '7:45 PM' }}
+            &nbsp;·&nbsp;
+            <strong>Start:</strong> {{ season.start_time or '8:00 PM' }}
+          {% endif %}
+        </div>
+
+        {# Lane assignments #}
+        {% if event_type in ('lanes', 'championship') and all_matchups %}
+        <div class="mt-3">
+          <div class="home-section-label">
+            {% if event_type == 'championship' %}Team Matchups{% else %}Lane Assignments{% endif %}
+          </div>
+          {% for m in all_matchups %}
+          {% if m.team1 and m.team2 %}
+          {% set is_mine = my_team and (m.team1_id == my_team.id or m.team2_id == my_team.id) %}
+          <div class="home-matchup-row {% if is_mine %}home-my-row{% endif %}">
+            <div style="width:52px;flex-shrink:0">
+              {% if m.lane_pair %}
+              <span class="home-lane-badge">{{ m.lane_pair }}</span>
+              {% else %}
+              <span style="color:#adb5bd;font-size:.75rem">TBD</span>
+              {% endif %}
+            </div>
+            <div class="flex-grow-1 ms-2">
+              {{ m.team1.name }} <span style="color:#6c757d;font-weight:400;font-size:.8rem">vs</span> {{ m.team2.name }}
+            </div>
+            {% if is_mine %}<span style="font-size:.65rem;font-weight:600">YOU</span>{% endif %}
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+
+        {% elif event_type == 'indiv_scratch' %}
+        <div class="mt-3" style="font-size:.85rem;color:#495057">
+          Top 10 scratch bowlers · 30+ games required · Green Jacket Exemption applies.
+          {% if games_played %}
+          <div class="mt-1" style="color:#1b3a6b;font-weight:600">
+            You have {{ games_played }} game{{ 's' if games_played != 1 }}.
+          </div>
+          {% endif %}
+        </div>
+
+        {% elif event_type == 'indiv_hcp_1' %}
+        <div class="mt-3" style="font-size:.85rem;color:#495057">
+          All bowlers with 30+ games this season. 3 games with handicap.
+          {% if games_played %}
+          <div class="mt-1 fw-semibold"
+               style="color:{% if games_played >= 30 %}#198754{% else %}#dc3545{% endif %}">
+            You have {{ games_played }} game{{ 's' if games_played != 1 }}
+            {% if games_played >= 30 %} — eligible ✓{% else %} — need {{ 30 - games_played }} more{% endif %}.
+          </div>
+          {% endif %}
+        </div>
+
+        {% elif event_type == 'indiv_hcp_2' %}
+        <div class="mt-3" style="font-size:.85rem;color:#495057">
+          Bowlers 50+ years old with 30+ games this season. 3 games with handicap.
+          {% if games_played %}
+          <div class="mt-1 fw-semibold"
+               style="color:{% if games_played >= 30 %}#198754{% else %}#dc3545{% endif %}">
+            You have {{ games_played }} game{{ 's' if games_played != 1 }}
+            {% if games_played >= 30 %} — games requirement met ✓{% else %} — need {{ 30 - games_played }} more{% endif %}.
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {# Last week result #}
+        {% if last_week and my_team %}
+        <hr class="my-3">
+        <div class="home-section-label">Last Week</div>
+        {% if last_week_pts is not none and last_week_opp_pts is not none %}
+          {% if last_week_pts > last_week_opp_pts %}
+          <div class="result-win">Won {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
+          {% elif last_week_pts < last_week_opp_pts %}
+          <div class="result-loss">Lost {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
+          {% else %}
+          <div class="result-tie">Tied {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
+          {% endif %}
+        {% else %}
+        <div class="text-muted" style="font-size:.85rem">Result not available.</div>
+        {% endif %}
+        {% endif %}
+
+        {% elif season %}
+        <div class="text-muted">Season complete.</div>
+        {% else %}
+        <div class="text-muted">No active season.</div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+
+  {# ═════════════════════════════ STANDINGS ══════════════════════════════════ #}
+  <div class="col-lg-4 col-md-6">
+    <div class="card h-100 shadow-sm">
+      <div class="home-card-header">🏆 Standings — {{ season.name if season }}</div>
+      <div class="card-body p-0">
+        {% if teams %}
+        <table class="standings-tbl">
+          <thead>
+            <tr>
+              <th style="width:28px">#</th>
+              <th>Team</th>
+              <th style="text-align:right">1st½</th>
+              <th style="text-align:right">2nd½</th>
+              <th style="text-align:right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in teams %}
+            <tr {% if my_team and row.team.id == my_team.id %}class="standings-my-row"{% endif %}>
+              <td style="color:#6c757d;font-weight:700">{{ loop.index }}</td>
+              <td>
+                {{ row.team.name }}
+                {% if league_settings and league_settings.show_captain_name and row.team.captain_name %}
+                <span style="font-size:.75rem;color:#6c757d">({{ row.team.captain_name }})</span>
+                {% endif %}
+              </td>
+              <td style="text-align:right;color:#6c757d">{% if row.fh %}{{ row.fh | int }}{% else %}—{% endif %}</td>
+              <td style="text-align:right;color:#6c757d">{% if row.sh %}{{ row.sh | int }}{% else %}—{% endif %}</td>
+              <td style="text-align:right;font-weight:700;color:#1b3a6b">{{ row.points | int }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="p-3 text-muted">No standings data yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ══════════════════════════════ SCHEDULE ══════════════════════════════════ #}
+  <div class="col-lg-5 col-12">
+    <div class="card h-100 shadow-sm">
+      <div class="home-card-header">📅 Schedule</div>
+      <div class="card-body p-0" style="max-height:420px;overflow-y:auto">
+        {% if schedule_rows %}
+
+        {% for row in schedule_rows %}
+
+        {% if row.is_break %}
+        <div class="sched-row" style="background:#f8f9fa">
+          <span class="sched-date">{{ row.date.strftime('%b %-d') }}</span>
+          <span class="sched-label" style="color:#adb5bd;font-style:italic;font-size:.82rem">No bowling — break</span>
+        </div>
+
+        {% else %}
+        {% set w = row.week %}
+        {% if w.tournament_type == 'club_championship' %}
+          {% set lbl = season.tournament_labels['club_championship'] %}
+          {% set lbl_color = '#8b0000' %}
+        {% elif w.tournament_type == 'indiv_scratch' %}
+          {% set lbl = season.tournament_labels['indiv_scratch'] %}
+          {% set lbl_color = '#5a1a8a' %}
+        {% elif w.tournament_type == 'indiv_hcp_1' %}
+          {% set lbl = season.tournament_labels['indiv_hcp_1'] %}
+          {% set lbl_color = '#5a1a8a' %}
+        {% elif w.tournament_type == 'indiv_hcp_2' %}
+          {% set lbl = season.tournament_labels['indiv_hcp_2'] %}
+          {% set lbl_color = '#5a1a8a' %}
+        {% elif w.is_position_night %}
+          {% set lbl = 'Week ' ~ w.week_num ~ ' — Position Night' %}
+          {% set lbl_color = '#1a5a3a' %}
+        {% elif w.is_cancelled %}
+          {% set lbl = 'Week ' ~ w.week_num ~ ' — Cancelled' %}
+          {% set lbl_color = '#adb5bd' %}
+        {% else %}
+          {% set lbl = 'Week ' ~ w.week_num %}
+          {% set lbl_color = '#212529' %}
+        {% endif %}
+
+        {% set is_upcoming_row = upcoming_week and w.week_num == upcoming_week.week_num %}
+
+        <div class="sched-row {% if is_upcoming_row %}sched-upcoming{% endif %}">
+          <span class="sched-date">
+            {% if row.date %}{{ row.date.strftime('%b %-d') }}{% else %}—{% endif %}
+          </span>
+          <span class="sched-label fw-{% if is_upcoming_row or w.tournament_type or w.is_position_night %}semibold{% else %}normal{% endif %}"
+                style="color:{% if w.is_entered %}#adb5bd{% else %}{{ lbl_color }}{% endif %}">
+            {{ lbl }}
+          </span>
+          <span class="sched-status">
+            {% if w.is_entered %}✓{% endif %}
+          </span>
+        </div>
+        {% endif %}
+
+        {% endfor %}
+
+        {% else %}
+        <div class="p-3 text-muted">No schedule available yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>{# end row #}
+
+{# ══════════════════════════════ MY STATS ══════════════════════════════════ #}
+{% if current_user.is_authenticated and roster %}
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="home-card-header">👤 My Season — {{ current_user.display_name }}
+        {% if my_team %}
+        <span style="font-weight:400;opacity:.8;font-size:.8rem"> · {{ my_team.name }}</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+
+        {# Stat boxes #}
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-sm-3">
+            <div class="stat-box">
+              <div class="stat-box-label">Average</div>
+              <div class="stat-box-value">{{ avg or '—' }}</div>
+            </div>
+          </div>
+          <div class="col-6 col-sm-3">
+            <div class="stat-box">
+              <div class="stat-box-label">High Game</div>
+              <div class="stat-box-value">{{ hg_scratch or '—' }}</div>
+            </div>
+          </div>
+          <div class="col-6 col-sm-3">
+            <div class="stat-box">
+              <div class="stat-box-label">High Series</div>
+              <div class="stat-box-value">{{ hs_scratch or '—' }}</div>
+            </div>
+          </div>
+          <div class="col-6 col-sm-3">
+            <div class="stat-box">
+              <div class="stat-box-label">Games</div>
+              <div class="stat-box-value">
+                {% set total_games = namespace(n=0) %}
+                {% for e in entries %}{% set total_games.n = total_games.n + e.games_night1 | length %}{% endfor %}
+                {{ total_games.n }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {# Week-by-week #}
+        {% if entries %}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0" style="font-size:.88rem;max-width:500px">
+            <thead class="table-light">
+              <tr>
+                <th>Wk</th>
+                <th class="text-end">G1</th>
+                <th class="text-end">G2</th>
+                <th class="text-end">G3</th>
+                <th class="text-end fw-bold" style="color:#1b3a6b">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for e in entries | sort(attribute='week_num') %}
+              {% set games = e.games_night1 %}
+              {% if games %}
+              <tr>
+                <td>{{ e.week_num }}</td>
+                <td class="text-end">{{ e.game1 or '—' }}</td>
+                <td class="text-end">{{ e.game2 or '—' }}</td>
+                <td class="text-end">{{ e.game3 or '—' }}</td>
+                <td class="text-end fw-bold" style="color:#1b3a6b">{{ games | sum }}</td>
+              </tr>
+              {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-muted" style="font-size:.9rem">No scores entered yet this season.</div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

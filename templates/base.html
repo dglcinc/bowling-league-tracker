@@ -46,6 +46,12 @@
       {% set nav_wk = latest_entered.get(nav_s.id, current_week or 0) if nav_s else 0 %}
       <ul class="navbar-nav me-auto">
 
+        {# ── Home ── #}
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}"
+             href="/">Home</a>
+        </li>
+
         {# ── Reports dropdown ── #}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Reports</a>

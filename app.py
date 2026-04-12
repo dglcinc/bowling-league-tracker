@@ -325,19 +325,174 @@ def create_app():
 
     @app.route('/')
     def index():
-        from models import Season
-        active = Season.query.filter_by(is_active=True).first()
-        if active:
-            from models import Week
-            last_entered = (Week.query
-                            .filter_by(season_id=active.id, is_entered=True)
-                            .order_by(Week.week_num.desc())
+        from datetime import timedelta
+        from flask_login import current_user
+        from models import (Season, Week, ScheduleEntry, MatchupEntry,
+                            TeamPoints, Roster)
+        from calculations import get_team_standings
+
+        season = Season.query.filter_by(is_active=True).first()
+        if not season:
+            return redirect(url_for('admin.seasons'))
+
+        # ── Up Next ──────────────────────────────────────────────────────────
+        upcoming_week = (Week.query
+                         .filter_by(season_id=season.id, is_entered=False,
+                                    is_cancelled=False)
+                         .order_by(Week.week_num)
+                         .first())
+
+        roster = None
+        my_team = None
+        my_matchup = None
+        all_matchups = []
+        games_played = 0
+
+        if current_user.is_authenticated:
+            roster = Roster.query.filter_by(
+                bowler_id=current_user.id, season_id=season.id
+            ).first()
+            my_team = roster.team if roster else None
+
+        if upcoming_week:
+            all_matchups = (ScheduleEntry.query
+                            .filter_by(season_id=season.id,
+                                       week_num=upcoming_week.week_num)
+                            .order_by(ScheduleEntry.matchup_num)
+                            .all())
+            if my_team:
+                my_matchup = next(
+                    (m for m in all_matchups
+                     if m.team1_id == my_team.id or m.team2_id == my_team.id),
+                    None,
+                )
+
+        if current_user.is_authenticated:
+            regular_entries = (MatchupEntry.query
+                               .filter_by(season_id=season.id,
+                                          bowler_id=current_user.id,
+                                          is_blind=False)
+                               .filter(MatchupEntry.week_num <= season.num_weeks)
+                               .all())
+            for e in regular_entries:
+                games_played += len(e.games_night1)
+
+        last_week = (Week.query
+                     .filter_by(season_id=season.id, is_entered=True)
+                     .order_by(Week.week_num.desc())
+                     .first())
+        last_week_pts = None
+        last_week_opp_pts = None
+        if my_team and last_week:
+            wk_pts = TeamPoints.query.filter_by(
+                season_id=season.id, week_num=last_week.week_num
+            ).all()
+            totals = {}
+            for p in wk_pts:
+                totals[p.team_id] = totals.get(p.team_id, 0) + p.points_earned
+            last_week_pts = totals.get(my_team.id)
+            last_matchup = (ScheduleEntry.query
+                            .filter_by(season_id=season.id,
+                                       week_num=last_week.week_num)
+                            .filter(db.or_(
+                                ScheduleEntry.team1_id == my_team.id,
+                                ScheduleEntry.team2_id == my_team.id,
+                            ))
                             .first())
-            week_num = last_entered.week_num if last_entered else 0
-            return redirect(url_for('reports.wkly_alpha',
-                                    season_id=active.id,
-                                    week_num=week_num))
-        return redirect(url_for('admin.seasons'))
+            if last_matchup:
+                last_opp = (last_matchup.team2
+                            if last_matchup.team1_id == my_team.id
+                            else last_matchup.team1)
+                last_week_opp_pts = (totals.get(last_opp.id)
+                                     if last_opp else None)
+
+        # ── Standings ────────────────────────────────────────────────────────
+        overall  = get_team_standings(season.id)
+        fh_list  = get_team_standings(season.id, half=1)
+        sh_list  = get_team_standings(season.id, half=2)
+        fh_map   = {r['team'].id: r['points'] for r in fh_list}
+        sh_map   = {r['team'].id: r['points'] for r in sh_list}
+        teams = [
+            {
+                'team':   r['team'],
+                'points': r['points'],
+                'fh':     fh_map.get(r['team'].id, 0),
+                'sh':     sh_map.get(r['team'].id, 0),
+            }
+            for r in overall
+        ]
+
+        # ── Schedule ─────────────────────────────────────────────────────────
+        weeks_all    = (Week.query
+                        .filter_by(season_id=season.id)
+                        .order_by(Week.week_num)
+                        .all())
+        dated_weeks  = [w for w in weeks_all if w.date]
+        schedule_rows = []
+        if dated_weeks:
+            date_to_week = {w.date: w for w in dated_weeks}
+            cur = dated_weeks[0].date
+            end = dated_weeks[-1].date
+            while cur <= end:
+                if cur in date_to_week:
+                    schedule_rows.append(
+                        {'date': cur, 'week': date_to_week[cur], 'is_break': False}
+                    )
+                else:
+                    schedule_rows.append(
+                        {'date': cur, 'week': None, 'is_break': True}
+                    )
+                cur += timedelta(weeks=1)
+        else:
+            schedule_rows = [
+                {'date': None, 'week': w, 'is_break': False}
+                for w in weeks_all
+            ]
+
+        # ── My Stats ─────────────────────────────────────────────────────────
+        entries    = []
+        avg        = None
+        hg_scratch = None
+        hs_scratch = None
+        if current_user.is_authenticated:
+            entries = (MatchupEntry.query
+                       .filter_by(season_id=season.id,
+                                  bowler_id=current_user.id)
+                       .order_by(MatchupEntry.week_num)
+                       .all())
+            all_games = []
+            for e in entries:
+                all_games.extend(e.games_night1)
+            if all_games:
+                avg        = round(sum(all_games) / len(all_games), 1)
+                hg_scratch = max(all_games)
+            week_series = {}
+            for e in entries:
+                g = e.games_night1
+                if len(g) == 3:
+                    week_series[e.week_num] = max(
+                        week_series.get(e.week_num, 0), sum(g)
+                    )
+            if week_series:
+                hs_scratch = max(week_series.values())
+
+        return render_template('home.html',
+                               season=season,
+                               upcoming_week=upcoming_week,
+                               all_matchups=all_matchups,
+                               my_team=my_team,
+                               my_matchup=my_matchup,
+                               games_played=games_played,
+                               last_week=last_week,
+                               last_week_pts=last_week_pts,
+                               last_week_opp_pts=last_week_opp_pts,
+                               teams=teams,
+                               schedule_rows=schedule_rows,
+                               roster=roster,
+                               entries=entries,
+                               avg=avg,
+                               hg_scratch=hg_scratch,
+                               hs_scratch=hs_scratch)
 
     return app
 
