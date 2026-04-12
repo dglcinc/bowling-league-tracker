@@ -257,6 +257,10 @@ def create_app():
         if ep.startswith('auth.'):
             return
 
+        # Mobile routes are accessible to any authenticated user
+        if ep.startswith('mobile.'):
+            return
+
         # Require login for everything else
         if not current_user.is_authenticated:
             return redirect(url_for('auth.login', next=req.url))
