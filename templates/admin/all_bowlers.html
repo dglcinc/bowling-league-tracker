@@ -78,6 +78,14 @@
       <td class="text-nowrap">
         <a href="{{ url_for('admin.edit_bowler', bowler_id=bowler.id) }}"
            class="btn btn-sm btn-outline-secondary me-1">Edit</a>
+        {% if bowler.email %}
+        <form method="post"
+              action="{{ url_for('admin.send_bowler_otp', bowler_id=bowler.id, filter=filter_mode) }}"
+              class="d-inline me-1">
+          <button type="submit" class="btn btn-sm btn-outline-info"
+                  title="Send sign-in code to {{ bowler.email }}">Send OTP</button>
+        </form>
+        {% endif %}
         {% if active_season and bowler.id not in current_season_ids %}
         <a href="{{ url_for('admin.add_bowler', season_id=active_season.id, bowler_id=bowler.id) }}"
            class="btn btn-sm btn-outline-primary">Add to {{ active_season.name }}</a>
