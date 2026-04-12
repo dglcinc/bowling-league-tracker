@@ -169,11 +169,11 @@
   </div>
   {% if last_week_pts is not none and last_week_opp_pts is not none %}
     {% if last_week_pts > last_week_opp_pts %}
-      <div class="m-card-main result-win">Won {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
+      <div class="m-card-main result-win">{{ my_team.name }} won last week {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
     {% elif last_week_pts < last_week_opp_pts %}
-      <div class="m-card-main result-loss">Lost {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
+      <div class="m-card-main result-loss">{{ my_team.name }} lost last week {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
     {% else %}
-      <div class="m-card-main result-tie">Tied {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
+      <div class="m-card-main result-tie">{{ my_team.name }} tied last week {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
     {% endif %}
   {% else %}
     <div class="m-card-sub text-muted">Result not available.</div>

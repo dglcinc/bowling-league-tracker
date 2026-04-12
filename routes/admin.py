@@ -469,16 +469,38 @@ def save_schedule(season_id):
             else:
                 continue
 
-        if t1:
-            entry.team1_id = t1
-        if t2:
-            entry.team2_id = t2
-        if lane:
-            entry.lane_pair = lane
-        elif is_solo and not lane and entry.id:
-            # Lane cleared on a solo entry — delete it
-            db.session.delete(entry)
-            continue
+        if is_solo:
+            if lane:
+                entry.lane_pair = lane
+            else:
+                # Lane cleared on a solo entry — delete it
+                db.session.delete(entry)
+                continue
+        else:
+            # Always write all three fields so clearing "—" takes effect
+            entry.team1_id = t1 or None
+            entry.team2_id = t2 or None
+            entry.lane_pair = lane or None
+            if not t1 and not t2 and not lane:
+                # Everything cleared — remove the entry entirely
+                db.session.delete(entry)
+                continue
+
+    # Delete entries beyond the selected matchup count for non-individual weeks
+    for key, val in request.form.items():
+        parts = key.split('_')
+        # key format: week_{wn}_matchup_count
+        if len(parts) == 4 and parts[0] == 'week' and parts[2] == 'matchup' and parts[3] == 'count':
+            try:
+                wn, count = int(parts[1]), int(val)
+            except ValueError:
+                continue
+            week = week_map.get(wn)
+            if week and week.tournament_type not in _INDIV_TOURNAMENT_TYPES:
+                (ScheduleEntry.query
+                 .filter_by(season_id=season_id, week_num=wn)
+                 .filter(ScheduleEntry.matchup_num > count)
+                 .delete())
 
     db.session.commit()
     flash('Schedule saved.', 'success')

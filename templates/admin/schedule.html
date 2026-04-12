@@ -65,6 +65,8 @@ function setMatchupCount(weekNum, count) {
       }
     });
   }
+  var countField = document.getElementById('matchup_count_' + weekNum);
+  if (countField) countField.value = count;
 }
 </script>
 
@@ -120,6 +122,9 @@ function setMatchupCount(weekNum, count) {
               </option>
               {% endfor %}
             </select>
+            <input type="hidden" id="matchup_count_{{ wk.week_num }}"
+                   name="week_{{ wk.week_num }}_matchup_count"
+                   value="{{ default_count }}">
             {% else %}
             <span class="badge bg-secondary" style="font-size:.7rem">Solo</span>
             {% endif %}
