@@ -51,8 +51,8 @@
       <form method="post">
         <div class="mb-3">
           <label class="form-label fw-bold">Email address</label>
-          <input type="email" name="email" class="form-control" required
-                 placeholder="you@example.com" autocomplete="email">
+          <input type="email" name="email" id="emailInput" class="form-control" required
+                 placeholder="you@example.com" autocomplete="username webauthn">
         </div>
 
         {% if turnstile_site_key %}
@@ -143,15 +143,9 @@
 </script>
 <script>
 (function () {
-  // Only show passkey button if the browser supports WebAuthn platform authenticators
   if (!window.PublicKeyCredential) return;
-  PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (available) {
-    if (!available) return;
-    document.getElementById('passkeyBtn').style.display = '';
-    document.getElementById('passkeyDivider').style.removeProperty('display');
-  });
 
-  // base64url helpers — add padding so atob() is happy with unpadded strings
+  // ── base64url helpers ────────────────────────────────────────────────────
   function b64urlToBuffer(b64url) {
     var base64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
     while (base64.length % 4) base64 += '=';
@@ -174,72 +168,103 @@
     el.style.display = '';
   }
 
-  document.getElementById('passkeyBtn').addEventListener('click', function () {
-    var email = document.querySelector('input[name="email"]').value.trim();
-    document.getElementById('passkeyError').style.display = 'none';
-
-    // Step 1: get authentication options from server
-    fetch('/auth/webauthn/authenticate/begin', {
+  // ── Fetch challenge from server (email optional — falls back to discoverable) ──
+  function fetchOptions(email) {
+    return fetch('/auth/webauthn/authenticate/begin', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({email: email}),
-    })
-    .then(function (r) { return r.json(); })
-    .then(function (opts) {
-      if (opts.error) { showError(opts.error); return; }
+      body: JSON.stringify({email: email || ''}),
+    }).then(function (r) { return r.json(); })
+      .then(function (opts) {
+        if (opts.error) throw new Error(opts.error);
+        opts.challenge = b64urlToBuffer(opts.challenge);
+        if (opts.allowCredentials && opts.allowCredentials.length) {
+          opts.allowCredentials = opts.allowCredentials.map(function (c) {
+            return Object.assign({}, c, {id: b64urlToBuffer(c.id), transports: ['internal']});
+          });
+        } else {
+          delete opts.allowCredentials; // empty list → discoverable
+        }
+        return opts;
+      });
+  }
 
-      // Convert base64url fields to ArrayBuffers
-      opts.challenge = b64urlToBuffer(opts.challenge);
-      if (opts.allowCredentials) {
-        opts.allowCredentials = opts.allowCredentials.map(function (c) {
-          // include transports hint so browser prefers the internal (platform) authenticator
-          return Object.assign({}, c, {id: b64urlToBuffer(c.id), transports: ['internal']});
+  // ── Send assertion to server and redirect ────────────────────────────────
+  function completeAuth(assertion) {
+    if (!assertion) return;
+    var payload = {
+      id: assertion.id,
+      rawId: bufferToB64url(assertion.rawId),
+      type: assertion.type,
+      response: {
+        authenticatorData: bufferToB64url(assertion.response.authenticatorData),
+        clientDataJSON:    bufferToB64url(assertion.response.clientDataJSON),
+        signature:         bufferToB64url(assertion.response.signature),
+        userHandle: assertion.response.userHandle
+          ? bufferToB64url(assertion.response.userHandle) : null,
+      },
+    };
+    return fetch('/auth/webauthn/authenticate/complete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    }).then(function (r) { return r.json(); })
+      .then(function (result) {
+        if (result.error) { showError(result.error); return; }
+        if (result.ok) window.location.href = result.redirect || '/';
+      });
+  }
+
+  // ── AbortController shared between conditional and button flows ──────────
+  var conditionalAbort = null;
+
+  // ── Conditional mediation — fires automatically from email autofill ──────
+  function startConditionalPasskey() {
+    if (typeof PublicKeyCredential.isConditionalMediationAvailable !== 'function') return;
+    PublicKeyCredential.isConditionalMediationAvailable().then(function (available) {
+      if (!available) return;
+      conditionalAbort = new AbortController();
+      fetchOptions('').then(function (opts) {
+        return navigator.credentials.get({
+          mediation: 'conditional',
+          publicKey: opts,
+          signal: conditionalAbort.signal,
         });
-      }
-
-      // Step 2: browser prompts Touch ID / Face ID
-      return navigator.credentials.get({publicKey: opts});
-    })
-    .then(function (assertion) {
-      if (!assertion) return;
-
-      // Step 3: send result to server
-      var payload = {
-        id: assertion.id,
-        rawId: bufferToB64url(assertion.rawId),
-        type: assertion.type,
-        response: {
-          authenticatorData: bufferToB64url(assertion.response.authenticatorData),
-          clientDataJSON:    bufferToB64url(assertion.response.clientDataJSON),
-          signature:         bufferToB64url(assertion.response.signature),
-          userHandle: assertion.response.userHandle
-            ? bufferToB64url(assertion.response.userHandle) : null,
-        },
-      };
-
-      return fetch('/auth/webauthn/authenticate/complete', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload),
-      }).then(function (r) { return r.json(); });
-    })
-    .then(function (result) {
-      if (!result) return;
-      if (result.error) { showError(result.error); return; }
-      if (result.ok) window.location.href = result.redirect || '/';
-    })
-    .catch(function (err) {
-      if (!err) return;
-      // User cancelled or browser found no matching passkey — don't alarm them
-      if (err.name === 'NotAllowedError' || err.name === 'AbortError') return;
-      // Browser has no passkey for this site at all
-      if (err.name === 'NotSupportedError' || (err.message && err.message.toLowerCase().includes('no available'))) {
-        showError('No passkey found on this device. Sign in with a code instead, then set up a passkey from your account settings.');
-        return;
-      }
-      showError('Sign-in failed: ' + err.message);
+      }).then(completeAuth).catch(function () {
+        // Conditional flow was aborted (button clicked) or no passkey — silent
+      });
     });
+  }
+
+  // ── Explicit passkey button ──────────────────────────────────────────────
+  PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (available) {
+    if (!available) return;
+    document.getElementById('passkeyBtn').style.display = '';
+    document.getElementById('passkeyDivider').style.removeProperty('display');
   });
+
+  document.getElementById('passkeyBtn').addEventListener('click', function () {
+    document.getElementById('passkeyError').style.display = 'none';
+    // Abort any running conditional flow before starting a modal one
+    if (conditionalAbort) { conditionalAbort.abort(); conditionalAbort = null; }
+    var email = document.getElementById('emailInput').value.trim();
+    fetchOptions(email)
+      .then(function (opts) {
+        return navigator.credentials.get({publicKey: opts});
+      })
+      .then(completeAuth)
+      .catch(function (err) {
+        if (!err || err.name === 'NotAllowedError' || err.name === 'AbortError') return;
+        if (err.name === 'NotSupportedError' || (err.message && err.message.toLowerCase().includes('no available'))) {
+          showError('No passkey found on this device. Sign in with a code instead, then add a passkey from your account settings.');
+          return;
+        }
+        showError(err.message || 'Sign-in failed');
+      });
+  });
+
+  // Start conditional flow on page load
+  startConditionalPasskey();
 })();
 </script>
 </body>
