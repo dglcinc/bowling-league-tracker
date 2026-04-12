@@ -603,18 +603,18 @@ def get_career_stats(bowler_id):
     results = []
     for r in rosters:
         stats = get_bowler_stats(bowler_id, r.season_id)
-        if stats['cumulative_games'] == 0:
-            continue
+        has_data = stats['cumulative_games'] > 0
         results.append({
             'season':              r.season,
             'team':                r.team,
             'venue':               r.season.venue or 'boonton_lanes',
-            'avg':                 stats['running_avg'],
+            'has_data':            has_data,
+            'avg':                 stats['running_avg']           if has_data else None,
             'games':               stats['cumulative_games'],
-            'high_game_scratch':   stats['ytd_high_game_scratch'],
-            'high_series_scratch': stats['ytd_high_series_scratch'],
-            'high_game_hcp':       stats['ytd_high_game_hcp'],
-            'high_series_hcp':     stats['ytd_high_series_hcp'],
+            'high_game_scratch':   stats['ytd_high_game_scratch'] if has_data else None,
+            'high_series_scratch': stats['ytd_high_series_scratch'] if has_data else None,
+            'high_game_hcp':       stats['ytd_high_game_hcp']     if has_data else None,
+            'high_series_hcp':     stats['ytd_high_series_hcp']   if has_data else None,
             'prior_hcp':           r.prior_handicap,
         })
     return results

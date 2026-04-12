@@ -24,15 +24,21 @@
       <td class="text-nowrap">{{ entry.bowler.last_name }}{% if entry.bowler.first_name %}, {{ entry.bowler.first_name }}{% endif %}</td>
       <td>
         {% for row in entry.career %}
+        {% if row.has_data %}
         <a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=entry.bowler.id) }}"
            class="badge text-decoration-none me-1
                   {% if row.venue == 'mountain_lakes_club' %}text-bg-secondary{% else %}text-bg-primary{% endif %}">
           {{ row.season.name }}
         </a>
+        {% else %}
+        <span class="badge text-bg-light text-muted border me-1" title="No score data for this season">
+          {{ row.season.name }}
+        </span>
+        {% endif %}
         {% endfor %}
       </td>
-      <td>{{ entry.best_avg }}</td>
-      <td>{{ entry.best_hg }}</td>
+      <td>{{ entry.best_avg if entry.best_avg is not none else '—' }}</td>
+      <td>{{ entry.best_hg if entry.best_hg is not none else '—' }}</td>
     </tr>
     {% endfor %}
   </tbody>

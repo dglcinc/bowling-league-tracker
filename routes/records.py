@@ -300,8 +300,9 @@ def bowler_dir():
         career = get_career_stats(bowler.id)
         if not career:
             continue
-        best_avg = max(r['avg'] for r in career)
-        best_hg  = max(r['high_game_scratch'] for r in career)
+        scored = [r for r in career if r['has_data']]
+        best_avg = max(r['avg'] for r in scored) if scored else None
+        best_hg  = max(r['high_game_scratch'] for r in scored) if scored else None
         dir_entries.append({
             'bowler':    bowler,
             'career':    career,
