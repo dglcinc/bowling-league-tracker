@@ -1430,6 +1430,22 @@ def all_bowlers():
                            filter_mode=filter_mode)
 
 
+@admin_bp.route('/bowlers/<int:bowler_id>/send_otp', methods=['POST'])
+def send_bowler_otp(bowler_id):
+    from routes.auth import send_otp
+    filter_mode = request.args.get('filter', 'active')
+    bowler = Bowler.query.get_or_404(bowler_id)
+    if not bowler.email:
+        flash(f'No email on file for {bowler.display_name}.', 'warning')
+        return redirect(url_for('admin.all_bowlers', filter=filter_mode))
+    ok, err = send_otp(bowler)
+    if ok:
+        flash(f'Sign-in code sent to {bowler.email}.', 'success')
+    else:
+        flash(f'Failed to send OTP: {err}', 'danger')
+    return redirect(url_for('admin.all_bowlers', filter=filter_mode))
+
+
 # ---------------------------------------------------------------------------
 # Tournament placement (historical results entry: 1st / 2nd / 3rd place)
 # ---------------------------------------------------------------------------
