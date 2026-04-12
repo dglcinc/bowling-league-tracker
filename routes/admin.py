@@ -254,8 +254,10 @@ def add_bowler(season_id):
         flash('Bowler added to roster.', 'success')
         return redirect(url_for('admin.season_detail', season_id=season_id))
 
+    preselect_id = request.args.get('bowler_id', type=int)
     return render_template('admin/add_bowler.html',
-                           season=season, teams=teams, available=available)
+                           season=season, teams=teams, available=available,
+                           preselect_id=preselect_id)
 
 
 @admin_bp.route('/settings', methods=['GET', 'POST'])
@@ -1377,6 +1379,55 @@ def restore_backup(filename):
     except Exception as e:
         flash(f'Restore failed: {e}', 'danger')
     return redirect(url_for('admin.backup_restore'))
+
+
+# ---------------------------------------------------------------------------
+# All Bowlers (cross-season admin view)
+# ---------------------------------------------------------------------------
+
+@admin_bp.route('/bowlers')
+def all_bowlers():
+    filter_mode = request.args.get('filter', 'active')  # 'active' or 'all'
+
+    active_season = Season.query.filter_by(is_active=True).first()
+
+    # Determine which bowlers to list
+    if filter_mode == 'active' and active_season:
+        active_ids = [r.bowler_id for r in
+                      Roster.query.filter_by(season_id=active_season.id, active=True).all()]
+        bowlers = (Bowler.query
+                   .filter(Bowler.id.in_(active_ids))
+                   .order_by(Bowler.last_name, Bowler.first_name)
+                   .all())
+    else:
+        filter_mode = 'all'
+        rostered_ids = [r.bowler_id for r in
+                        Roster.query.with_entities(Roster.bowler_id).distinct().all()]
+        bowlers = (Bowler.query
+                   .filter(Bowler.id.in_(rostered_ids))
+                   .order_by(Bowler.last_name, Bowler.first_name)
+                   .all())
+
+    # Full season history per bowler
+    roster_map = {}
+    for r in (Roster.query
+              .join(Season)
+              .order_by(Season.name)
+              .all()):
+        roster_map.setdefault(r.bowler_id, []).append(r)
+
+    # Which bowlers are already on the current season's roster (any active flag)
+    current_season_ids = set()
+    if active_season:
+        current_season_ids = {r.bowler_id for r in
+                              Roster.query.filter_by(season_id=active_season.id).all()}
+
+    return render_template('admin/all_bowlers.html',
+                           bowlers=bowlers,
+                           roster_map=roster_map,
+                           active_season=active_season,
+                           current_season_ids=current_season_ids,
+                           filter_mode=filter_mode)
 
 
 # ---------------------------------------------------------------------------

@@ -23,7 +23,7 @@
         <select name="bowler_id" class="form-select" required>
           <option value="">— select —</option>
           {% for b in available %}
-          <option value="{{ b.id }}">{{ b.last_name }}{% if b.first_name %}, {{ b.first_name }}{% endif %}</option>
+          <option value="{{ b.id }}"{% if b.id == preselect_id %} selected{% endif %}>{{ b.last_name }}{% if b.first_name %}, {{ b.first_name }}{% endif %}</option>
           {% endfor %}
         </select>
       </div>

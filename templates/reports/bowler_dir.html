@@ -16,9 +16,6 @@
       <th>Seasons</th>
       <th>Best Avg</th>
       <th>Best HG</th>
-      {% if current_user.is_authenticated and current_user.is_editor %}
-      <th></th>
-      {% endif %}
     </tr>
   </thead>
   <tbody>
@@ -47,12 +44,6 @@
       </td>
       <td>{{ entry.best_avg if entry.best_avg is not none else '—' }}</td>
       <td>{{ entry.best_hg if entry.best_hg is not none else '—' }}</td>
-      {% if current_user.is_authenticated and current_user.is_editor %}
-      <td>
-        <a href="{{ url_for('admin.edit_bowler', bowler_id=entry.bowler.id) }}"
-           class="btn btn-sm btn-outline-secondary">Edit</a>
-      </td>
-      {% endif %}
     </tr>
     {% endfor %}
   </tbody>

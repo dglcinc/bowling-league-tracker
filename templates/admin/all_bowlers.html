@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}All Bowlers — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4>All Bowlers</h4>
+  <a href="{{ url_for('admin.seasons') }}" class="btn btn-outline-secondary btn-sm">← Seasons</a>
+</div>
+
+{# Filter toggle #}
+<div class="btn-group mb-3" role="group">
+  <a href="{{ url_for('admin.all_bowlers', filter='active') }}"
+     class="btn btn-sm {% if filter_mode == 'active' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+    Active this season{% if active_season %} ({{ active_season.name }}){% endif %}
+  </a>
+  <a href="{{ url_for('admin.all_bowlers', filter='all') }}"
+     class="btn btn-sm {% if filter_mode == 'all' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+    All bowlers
+  </a>
+</div>
+
+{% if not bowlers %}
+<p class="text-muted">No bowlers found.</p>
+{% else %}
+<div class="table-scroll">
+<table class="table table-sm table-bordered table-striped">
+  <thead class="table-dark">
+    <tr>
+      <th>Bowler</th>
+      <th>Season History</th>
+      {% if active_season %}
+      <th>{{ active_season.name }}</th>
+      {% endif %}
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for bowler in bowlers %}
+    {% set entries = roster_map.get(bowler.id, []) %}
+    <tr>
+      <td class="text-nowrap">
+        {{ bowler.last_name }}{% if bowler.first_name %}, {{ bowler.first_name }}{% endif %}
+        {% if bowler.is_editor %}
+        <span class="badge bg-warning text-dark ms-1" style="font-size:.7rem">Editor</span>
+        {% endif %}
+      </td>
+      <td>
+        {% for r in entries %}
+          {% set venue = r.season.venue or 'boonton_lanes' %}
+          {% if r.active %}
+            <span class="badge me-1
+              {% if venue == 'mountain_lakes_club' %}text-bg-secondary{% else %}text-bg-primary{% endif %}"
+              title="{{ r.season.name }} — active">
+              {{ r.season.name }}
+            </span>
+          {% else %}
+            <span class="badge text-bg-light text-muted border me-1"
+              title="{{ r.season.name }} — inactive">
+              {{ r.season.name }}
+            </span>
+          {% endif %}
+        {% endfor %}
+      </td>
+      {% if active_season %}
+      <td>
+        {% if bowler.id in current_season_ids %}
+          {% set cur = roster_map.get(bowler.id, []) | selectattr('season_id', 'equalto', active_season.id) | first %}
+          {% if cur and cur.active %}
+            <span class="badge text-bg-success">Active</span>
+          {% else %}
+            <span class="badge text-bg-warning text-dark">Inactive</span>
+          {% endif %}
+        {% else %}
+          <span class="text-muted small">—</span>
+        {% endif %}
+      </td>
+      {% endif %}
+      <td class="text-nowrap">
+        <a href="{{ url_for('admin.edit_bowler', bowler_id=bowler.id) }}"
+           class="btn btn-sm btn-outline-secondary me-1">Edit</a>
+        {% if active_season and bowler.id not in current_season_ids %}
+        <a href="{{ url_for('admin.add_bowler', season_id=active_season.id, bowler_id=bowler.id) }}"
+           class="btn btn-sm btn-outline-primary">Add to {{ active_season.name }}</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="text-muted small mt-2">
+  Badge colors: <span class="badge text-bg-primary">Boonton Lanes</span>
+  <span class="badge text-bg-secondary">Mountain Lakes Club</span>
+  &nbsp; Faded badges = inactive roster entry for that season.
+</p>
+{% endif %}
+{% endblock %}
