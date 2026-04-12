@@ -66,6 +66,7 @@ class Season(db.Model):
     venue = db.Column(db.String(32), default='boonton_lanes')   # 'mountain_lakes_club' or 'boonton_lanes'
     arrival_time = db.Column(db.String(16), default='7:45 PM')
     start_time = db.Column(db.String(16), default='8:00 PM')
+    home_message = db.Column(db.Text, nullable=True)
 
     # Configurable display names for the 4 post-season tournament weeks.
     # These are stored in the DB so personal names never appear in the repo.
