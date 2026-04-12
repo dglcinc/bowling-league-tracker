@@ -95,6 +95,8 @@ def _migrate_db(db):
         # Bowling night times (configurable per season, shown on mobile home screen)
         "ALTER TABLE seasons ADD COLUMN arrival_time VARCHAR(16) DEFAULT '7:45 PM'",
         "ALTER TABLE seasons ADD COLUMN start_time VARCHAR(16) DEFAULT '8:00 PM'",
+        # Optional home-page message (editor-settable, shown below last-week result)
+        "ALTER TABLE seasons ADD COLUMN home_message TEXT",
         # OTP login — replaces magic links for day-to-day sign-in
         """CREATE TABLE IF NOT EXISTS login_otps (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

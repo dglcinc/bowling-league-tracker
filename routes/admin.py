@@ -508,6 +508,22 @@ def save_schedule(season_id):
 
 
 # ---------------------------------------------------------------------------
+# Home message
+# ---------------------------------------------------------------------------
+
+@admin_bp.route('/seasons/<int:season_id>/home-message', methods=['POST'])
+def save_home_message(season_id):
+    """Save the optional home-page message (editor only)."""
+    from flask_login import current_user
+    if not current_user.is_authenticated or not current_user.is_editor:
+        abort(403)
+    season = Season.query.get_or_404(season_id)
+    season.home_message = request.form.get('home_message', '').strip() or None
+    db.session.commit()
+    return redirect(url_for('index'))
+
+
+# ---------------------------------------------------------------------------
 # Week date editing
 # ---------------------------------------------------------------------------
 
