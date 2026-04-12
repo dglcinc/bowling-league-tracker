@@ -229,8 +229,15 @@
       if (result.ok) window.location.href = result.redirect || '/';
     })
     .catch(function (err) {
-      // User cancelled the prompt — don't show an error
-      if (err && err.name !== 'NotAllowedError') showError('Sign-in failed: ' + err.message);
+      if (!err) return;
+      // User cancelled or browser found no matching passkey — don't alarm them
+      if (err.name === 'NotAllowedError' || err.name === 'AbortError') return;
+      // Browser has no passkey for this site at all
+      if (err.name === 'NotSupportedError' || (err.message && err.message.toLowerCase().includes('no available'))) {
+        showError('No passkey found on this device. Sign in with a code instead, then set up a passkey from your account settings.');
+        return;
+      }
+      showError('Sign-in failed: ' + err.message);
     });
   });
 })();
