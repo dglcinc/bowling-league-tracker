@@ -184,19 +184,61 @@
         {% endif %}
 
         {# Last week result #}
-        {% if last_week and my_team %}
+        {% if last_week %}
         <hr class="my-3">
-        <div class="home-section-label">Last Week</div>
-        {% if last_week_pts is not none and last_week_opp_pts is not none %}
-          {% if last_week_pts > last_week_opp_pts %}
-          <div class="result-win">{{ my_team.name }} won last week {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
-          {% elif last_week_pts < last_week_opp_pts %}
-          <div class="result-loss">{{ my_team.name }} lost last week {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
+        <div class="home-section-label">
+          Last Week
+          {% if last_week.tournament_type %}
+            — {{ season.tournament_labels.get(last_week.tournament_type, 'Tournament') }}
+          {% elif last_week.is_position_night %}
+            — Position Night
           {% else %}
-          <div class="result-tie">{{ my_team.name }} tied last week {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
+            (Week {{ last_week.week_num }})
           {% endif %}
+        </div>
+
+        {% if last_week_type == 'championship' and last_week_champ %}
+          {% set w = last_week_champ[0] %}
+          {% set l = last_week_champ[1] if last_week_champ | length > 1 else none %}
+          <div class="result-win" style="font-size:.95rem">
+            {{ w.team.name }} won
+            {% if l %}<span class="fw-normal" style="color:#495057;font-size:.9rem"> over {{ l.team.name }}, {{ w.pts | int }}–{{ l.pts | int }}</span>{% endif %}
+          </div>
+
+        {% elif last_week_type == 'solo' and last_week_top3 %}
+          <div style="font-size:.9rem;line-height:1.8">
+            {% for r in last_week_top3 %}
+            <div>
+              <span style="color:#6c757d;font-size:.75rem">{{ loop.index }}{{ ['st','nd','rd'][loop.index0] if loop.index <= 3 }}</span>
+              <strong>{{ r.name }}</strong>
+              <span style="color:#6c757d"> ({{ r.score }})</span>
+            </div>
+            {% endfor %}
+          </div>
+
+        {% elif last_week_type == 'regular' and my_team and last_week_pts is not none and last_week_opp_pts is not none %}
+          {% if last_week_pts > last_week_opp_pts %}
+          <div class="result-win">
+            Your team beat{% if last_week_opp %} {{ last_week_opp.name }},{% endif %}
+            {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}
+          </div>
+          {% elif last_week_pts < last_week_opp_pts %}
+          <div class="result-loss">
+            Your team lost to{% if last_week_opp %} {{ last_week_opp.name }},{% endif %}
+            {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}
+          </div>
+          {% else %}
+          <div class="result-tie">
+            Your team tied{% if last_week_opp %} {{ last_week_opp.name }},{% endif %}
+            {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}
+          </div>
+          {% endif %}
+
+        {% elif last_week_type == 'regular' and not my_team %}
+          <div class="text-muted" style="font-size:.85rem">Sign in to see your result.</div>
+
         {% else %}
-        <div class="text-muted" style="font-size:.85rem">Result not available.</div>
+          <div class="text-muted" style="font-size:.85rem">Result not available.</div>
         {% endif %}
         {% endif %}
 

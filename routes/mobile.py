@@ -9,7 +9,7 @@ from flask import Blueprint, make_response, redirect, render_template, request, 
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
-from models import MatchupEntry, Roster, ScheduleEntry, Season, Team, TeamPoints, Week, db
+from models import MatchupEntry, Roster, ScheduleEntry, Season, Team, TeamPoints, TournamentEntry, Week, db
 from calculations import get_team_standings
 
 mobile_bp = Blueprint('mobile', __name__)
@@ -76,8 +76,14 @@ def home():
     my_matchup = None       # the user's own ScheduleEntry
     games_played = 0        # user's regular-season games (for tournament eligibility)
     last_week = None
+    last_week_type = None
     last_week_pts = None
     last_week_opp_pts = None
+    last_week_opp = None
+    last_week_champ = []
+    last_week_top3 = []
+
+    _SOLO_TYPES = {'indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'}
 
     if season:
         # Last entered week (any type)
@@ -113,25 +119,56 @@ def home():
         for e in regular_entries:
             games_played += len(e.games_night1)
 
-        if my_team and last_week:
-            week_pts = (TeamPoints.query
-                        .filter_by(season_id=season.id, week_num=last_week.week_num)
-                        .all())
-            totals = {}
-            for p in week_pts:
-                totals[p.team_id] = totals.get(p.team_id, 0) + p.points_earned
-            last_week_pts = totals.get(my_team.id)
-
-            last_matchup = (ScheduleEntry.query
-                            .filter_by(season_id=season.id, week_num=last_week.week_num)
-                            .filter(db.or_(ScheduleEntry.team1_id == my_team.id,
-                                           ScheduleEntry.team2_id == my_team.id))
-                            .first())
-            if last_matchup:
-                last_opp = (last_matchup.team2
-                            if last_matchup.team1_id == my_team.id
-                            else last_matchup.team1)
-                last_week_opp_pts = totals.get(last_opp.id)
+        if last_week:
+            tt = last_week.tournament_type
+            if tt == 'club_championship':
+                last_week_type = 'championship'
+                wk_pts = TeamPoints.query.filter_by(
+                    season_id=season.id, week_num=last_week.week_num
+                ).all()
+                totals = {}
+                for p in wk_pts:
+                    totals[p.team_id] = totals.get(p.team_id, 0) + p.points_earned
+                champ_teams = Team.query.filter(Team.id.in_(totals.keys())).all()
+                last_week_champ = sorted(
+                    [{'team': t, 'pts': totals[t.id]} for t in champ_teams],
+                    key=lambda x: -x['pts']
+                )
+            elif tt in _SOLO_TYPES:
+                last_week_type = 'solo'
+                entries = TournamentEntry.query.filter_by(
+                    season_id=season.id, week_num=last_week.week_num
+                ).all()
+                use_hcp = tt in ('indiv_hcp_1', 'indiv_hcp_2')
+                entries_with_score = [
+                    (e.total_with_hcp if use_hcp else e.total_scratch, e)
+                    for e in entries if e.games
+                ]
+                entries_with_score.sort(key=lambda x: -x[0])
+                last_week_top3 = [
+                    {'name': e.display_name, 'score': score}
+                    for score, e in entries_with_score[:3]
+                ]
+            else:
+                last_week_type = 'regular'
+                if my_team:
+                    week_pts = TeamPoints.query.filter_by(
+                        season_id=season.id, week_num=last_week.week_num
+                    ).all()
+                    totals = {}
+                    for p in week_pts:
+                        totals[p.team_id] = totals.get(p.team_id, 0) + p.points_earned
+                    last_week_pts = totals.get(my_team.id)
+                    last_matchup = (ScheduleEntry.query
+                                    .filter_by(season_id=season.id, week_num=last_week.week_num)
+                                    .filter(db.or_(ScheduleEntry.team1_id == my_team.id,
+                                                   ScheduleEntry.team2_id == my_team.id))
+                                    .first())
+                    if last_matchup:
+                        last_week_opp = (last_matchup.team2
+                                         if last_matchup.team1_id == my_team.id
+                                         else last_matchup.team1)
+                        last_week_opp_pts = totals.get(last_week_opp.id) if last_week_opp else None
 
     return render_template('mobile/home.html',
                            season=season,
@@ -141,8 +178,12 @@ def home():
                            my_matchup=my_matchup,
                            games_played=games_played,
                            last_week=last_week,
+                           last_week_type=last_week_type,
                            last_week_pts=last_week_pts,
-                           last_week_opp_pts=last_week_opp_pts)
+                           last_week_opp_pts=last_week_opp_pts,
+                           last_week_opp=last_week_opp,
+                           last_week_champ=last_week_champ,
+                           last_week_top3=last_week_top3)
 
 
 # ---------------------------------------------------------------------------
