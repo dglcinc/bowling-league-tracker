@@ -135,7 +135,7 @@ def season_detail(season_id):
 
 @admin_bp.route('/seasons/<int:season_id>/send-magic-links', methods=['POST'])
 def send_magic_links(season_id):
-    from routes.auth import send_magic_link
+    from routes.auth import send_otp
     Season.query.get_or_404(season_id)
     bowler_ids = request.form.getlist('bowler_ids', type=int)
     if not bowler_ids:
@@ -147,7 +147,7 @@ def send_magic_links(season_id):
     is_registration = 'registration' in request.form
     subject = (f'{league_name}: App Registration'
                if is_registration else
-               f'{league_name}: Sign-In Instructions')
+               f'{league_name}: Your sign-in code')
 
     sent = failed = no_email = 0
     for bid in bowler_ids:
@@ -157,7 +157,7 @@ def send_magic_links(season_id):
         if not bowler.email:
             no_email += 1
             continue
-        ok, _ = send_magic_link(bowler, subject=subject)
+        ok, _ = send_otp(bowler, subject=subject)
         if ok:
             sent += 1
         else:
@@ -165,7 +165,7 @@ def send_magic_links(season_id):
 
     parts = []
     if sent:
-        parts.append(f'{sent} link(s) sent')
+        parts.append(f'{sent} OTP(s) sent')
     if no_email:
         parts.append(f'{no_email} skipped (no email on file)')
     if failed:
