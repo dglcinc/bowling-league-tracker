@@ -155,7 +155,7 @@
 {% endif %}
 
 {# ── Last week result ── #}
-{% if last_week and my_team %}
+{% if last_week %}
 <div class="m-card">
   <div class="m-card-title">
     Last Week
@@ -167,17 +167,43 @@
       (Week {{ last_week.week_num }})
     {% endif %}
   </div>
-  {% if last_week_pts is not none and last_week_opp_pts is not none %}
-    {% if last_week_pts > last_week_opp_pts %}
-      <div class="m-card-main result-win">{{ my_team.name }} won last week {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
-    {% elif last_week_pts < last_week_opp_pts %}
-      <div class="m-card-main result-loss">{{ my_team.name }} lost last week {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
-    {% else %}
-      <div class="m-card-main result-tie">{{ my_team.name }} tied last week {{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
+
+  {% if last_week_type == 'championship' and last_week_champ %}
+    {% set w = last_week_champ[0] %}
+    {% set l = last_week_champ[1] if last_week_champ | length > 1 else none %}
+    <div class="m-card-main result-win">{{ w.team.name }} won</div>
+    {% if l %}
+    <div class="m-card-sub">over {{ l.team.name }}, {{ w.pts | int }}–{{ l.pts | int }}</div>
     {% endif %}
+
+  {% elif last_week_type == 'solo' and last_week_top3 %}
+    {% for r in last_week_top3 %}
+    <div style="padding:4px 0;{% if not loop.last %}border-bottom:1px solid #f0f0f0{% endif %}">
+      <span style="color:#6c757d;font-size:.75rem;width:1.6em;display:inline-block">
+        {{ loop.index }}{{ ['st','nd','rd'][loop.index0] if loop.index <= 3 }}
+      </span>
+      <strong>{{ r.name }}</strong>
+      <span style="color:#6c757d;font-size:.85rem"> ({{ r.score }})</span>
+    </div>
+    {% endfor %}
+
+  {% elif last_week_type == 'regular' and my_team and last_week_pts is not none and last_week_opp_pts is not none %}
+    {% if last_week_pts > last_week_opp_pts %}
+    <div class="m-card-main result-win">Your team beat{% if last_week_opp %} {{ last_week_opp.name }}{% endif %}</div>
+    {% elif last_week_pts < last_week_opp_pts %}
+    <div class="m-card-main result-loss">Your team lost to{% if last_week_opp %} {{ last_week_opp.name }}{% endif %}</div>
+    {% else %}
+    <div class="m-card-main result-tie">Your team tied{% if last_week_opp %} {{ last_week_opp.name }}{% endif %}</div>
+    {% endif %}
+    <div class="m-card-sub">{{ last_week_pts | int }}–{{ last_week_opp_pts | int }}</div>
+
+  {% elif last_week_type == 'regular' and not my_team %}
+    <div class="m-card-sub text-muted">Sign in to see your result.</div>
+
   {% else %}
     <div class="m-card-sub text-muted">Result not available.</div>
   {% endif %}
+
   <div class="m-card-sub mt-1">
     <a href="{{ url_for('mobile.week_scores', week_num=last_week.week_num) }}"
        style="color:#1b3a6b;font-size:.85rem">View scores →</a>

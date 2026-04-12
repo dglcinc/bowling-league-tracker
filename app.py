@@ -330,7 +330,7 @@ def create_app():
         from datetime import timedelta
         from flask_login import current_user
         from models import (Season, Week, ScheduleEntry, MatchupEntry,
-                            TeamPoints, Roster)
+                            TeamPoints, Roster, TournamentEntry, Team)
         from calculations import get_team_standings
 
         season = Season.query.filter_by(is_active=True).first()
@@ -379,34 +379,81 @@ def create_app():
             for e in regular_entries:
                 games_played += len(e.games_night1)
 
-        last_week = (Week.query
-                     .filter_by(season_id=season.id, is_entered=True)
-                     .order_by(Week.week_num.desc())
-                     .first())
-        last_week_pts = None
-        last_week_opp_pts = None
-        if my_team and last_week:
-            wk_pts = TeamPoints.query.filter_by(
-                season_id=season.id, week_num=last_week.week_num
-            ).all()
-            totals = {}
-            for p in wk_pts:
-                totals[p.team_id] = totals.get(p.team_id, 0) + p.points_earned
-            last_week_pts = totals.get(my_team.id)
-            last_matchup = (ScheduleEntry.query
-                            .filter_by(season_id=season.id,
-                                       week_num=last_week.week_num)
-                            .filter(db.or_(
-                                ScheduleEntry.team1_id == my_team.id,
-                                ScheduleEntry.team2_id == my_team.id,
-                            ))
-                            .first())
-            if last_matchup:
-                last_opp = (last_matchup.team2
-                            if last_matchup.team1_id == my_team.id
-                            else last_matchup.team1)
-                last_week_opp_pts = (totals.get(last_opp.id)
-                                     if last_opp else None)
+        # preview_week param lets an editor preview result display for any week
+        _preview_wn = request.args.get('preview_week', type=int)
+        if _preview_wn and current_user.is_authenticated and current_user.is_editor:
+            last_week = Week.query.filter_by(season_id=season.id, week_num=_preview_wn).first()
+        else:
+            last_week = (Week.query
+                         .filter_by(season_id=season.id, is_entered=True)
+                         .order_by(Week.week_num.desc())
+                         .first())
+
+        # Variables populated below depending on last week's event type
+        last_week_type = None          # 'regular' | 'championship' | 'solo'
+        last_week_pts = None           # my team's points (regular)
+        last_week_opp_pts = None       # opponent's points (regular)
+        last_week_opp = None           # opponent Team object (regular)
+        last_week_champ = []           # [{team, pts}, ...] sorted desc (championship)
+        last_week_top3 = []            # [TournamentEntry, ...] top 3 (solo)
+
+        _SOLO_TYPES = {'indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'}
+
+        if last_week:
+            tt = last_week.tournament_type
+            if tt == 'club_championship':
+                last_week_type = 'championship'
+                wk_pts = TeamPoints.query.filter_by(
+                    season_id=season.id, week_num=last_week.week_num
+                ).all()
+                totals = {}
+                for p in wk_pts:
+                    totals[p.team_id] = totals.get(p.team_id, 0) + p.points_earned
+                teams_in_champ = Team.query.filter(Team.id.in_(totals.keys())).all()
+                last_week_champ = sorted(
+                    [{'team': t, 'pts': totals[t.id]} for t in teams_in_champ],
+                    key=lambda x: -x['pts']
+                )
+            elif tt in _SOLO_TYPES:
+                last_week_type = 'solo'
+                entries = TournamentEntry.query.filter_by(
+                    season_id=season.id, week_num=last_week.week_num
+                ).all()
+                # Sort by total_with_hcp for handicap events, total_scratch for scratch
+                use_hcp = tt in ('indiv_hcp_1', 'indiv_hcp_2')
+                entries_with_score = [
+                    (e.total_with_hcp if use_hcp else e.total_scratch, e)
+                    for e in entries if e.games
+                ]
+                entries_with_score.sort(key=lambda x: -x[0])
+                last_week_top3 = [
+                    {'name': e.display_name, 'score': score}
+                    for score, e in entries_with_score[:3]
+                ]
+            else:
+                last_week_type = 'regular'
+                if my_team:
+                    wk_pts = TeamPoints.query.filter_by(
+                        season_id=season.id, week_num=last_week.week_num
+                    ).all()
+                    totals = {}
+                    for p in wk_pts:
+                        totals[p.team_id] = totals.get(p.team_id, 0) + p.points_earned
+                    last_week_pts = totals.get(my_team.id)
+                    last_matchup = (ScheduleEntry.query
+                                    .filter_by(season_id=season.id,
+                                               week_num=last_week.week_num)
+                                    .filter(db.or_(
+                                        ScheduleEntry.team1_id == my_team.id,
+                                        ScheduleEntry.team2_id == my_team.id,
+                                    ))
+                                    .first())
+                    if last_matchup:
+                        last_week_opp = (last_matchup.team2
+                                         if last_matchup.team1_id == my_team.id
+                                         else last_matchup.team1)
+                        last_week_opp_pts = (totals.get(last_week_opp.id)
+                                             if last_week_opp else None)
 
         # ── Standings ────────────────────────────────────────────────────────
         overall  = get_team_standings(season.id)
@@ -486,8 +533,12 @@ def create_app():
                                my_matchup=my_matchup,
                                games_played=games_played,
                                last_week=last_week,
+                               last_week_type=last_week_type,
                                last_week_pts=last_week_pts,
                                last_week_opp_pts=last_week_opp_pts,
+                               last_week_opp=last_week_opp,
+                               last_week_champ=last_week_champ,
+                               last_week_top3=last_week_top3,
                                teams=teams,
                                schedule_rows=schedule_rows,
                                roster=roster,
