@@ -150,6 +150,10 @@ class Week(db.Model):
     notes = db.Column(db.String(256))
     is_entered = db.Column(db.Boolean, default=False)  # scores have been entered
     tournament_type = db.Column(db.String(32), nullable=True)  # None = regular week; else tournament name
+    # Notification-sent flags — set True after each notification type fires to prevent duplicates
+    notif_tomorrow_sent = db.Column(db.Boolean, default=False)
+    notif_tonight_sent = db.Column(db.Boolean, default=False)
+    notif_scores_sent = db.Column(db.Boolean, default=False)
 
     season = db.relationship('Season', back_populates='weeks')
 
@@ -405,6 +409,30 @@ class WebAuthnCredential(db.Model):
 
     def __repr__(self):
         return f'<WebAuthnCredential bowler={self.bowler_id} device={self.device_name}>'
+
+
+class PushSubscription(db.Model):
+    """Web Push subscription for one browser/device belonging to a bowler."""
+    __tablename__ = 'push_subscriptions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    bowler_id = db.Column(db.Integer, db.ForeignKey('bowlers.id'), nullable=False)
+    # The endpoint URL uniquely identifies a subscription; used for upsert
+    endpoint = db.Column(db.Text, nullable=False, unique=True)
+    # Full JSON blob from browser (endpoint + keys.p256dh + keys.auth)
+    subscription_json = db.Column(db.Text, nullable=False)
+    platform = db.Column(db.String(32))  # 'ios', 'android', 'desktop'
+    # Per-subscription notification preferences
+    pref_bowling_tomorrow = db.Column(db.Boolean, default=True)
+    pref_bowling_tonight = db.Column(db.Boolean, default=True)
+    pref_scores_posted = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    bowler = db.relationship('Bowler')
+
+    def __repr__(self):
+        return f'<PushSubscription bowler={self.bowler_id} platform={self.platform}>'
 
 
 class Snapshot(db.Model):

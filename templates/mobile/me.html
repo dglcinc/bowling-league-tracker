@@ -103,6 +103,85 @@
 </div>
 {% endif %}
 
+{# Notifications #}
+<div class="m-card mt-3" id="notif-card">
+  <div class="m-card-title" style="margin-bottom:8px">Notifications</div>
+
+  {# Shown while JS detects state — replaced immediately #}
+  <div id="notif-loading" style="color:#6c757d;font-size:.9rem">Checking notification status…</div>
+
+  {# iOS not-installed prompt #}
+  <div id="notif-install-prompt" style="display:none">
+    <div class="m-card-sub" style="margin-bottom:10px">
+      To receive notifications, first install this app to your Home Screen, then come back here to enable them.
+    </div>
+    <div style="font-size:.85rem;color:#6c757d">
+      Tap the Share button <strong>⬆</strong> then <strong>"Add to Home Screen"</strong>.
+    </div>
+  </div>
+
+  {# Permission request (PWA installed or Android/desktop, permission not yet granted) #}
+  <div id="notif-permission-prompt" style="display:none">
+    <div class="m-card-sub" style="margin-bottom:10px">Get notified about upcoming bowling nights and when scores are posted.</div>
+    <button id="notif-enable-btn" class="btn btn-sm"
+            style="background:#1b3a6b;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:.9rem">
+      Enable Notifications
+    </button>
+  </div>
+
+  {# Already denied #}
+  <div id="notif-denied" style="display:none;color:#6c757d;font-size:.9rem">
+    Notifications are blocked. To enable, open Safari Settings → MLC Bowling → Notifications.
+  </div>
+
+  {# Subscribed — show preference toggles #}
+  <div id="notif-prefs" style="display:none">
+    <form method="post" action="{{ url_for('mobile.push_preferences') }}" id="notif-prefs-form">
+      <div style="display:flex;flex-direction:column;gap:12px">
+
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+          <div>
+            <div style="font-weight:600;font-size:.95rem">Bowling tomorrow</div>
+            <div style="font-size:.8rem;color:#6c757d">Evening before each bowl night</div>
+          </div>
+          <input type="checkbox" name="pref_bowling_tomorrow" class="notif-toggle"
+                 {% if push_prefs and push_prefs.pref_bowling_tomorrow %}checked{% endif %}
+                 style="width:20px;height:20px;cursor:pointer;accent-color:#1b3a6b">
+        </label>
+
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+          <div>
+            <div style="font-weight:600;font-size:.95rem">Bowling tonight</div>
+            <div style="font-size:.8rem;color:#6c757d">Morning of each bowl night</div>
+          </div>
+          <input type="checkbox" name="pref_bowling_tonight" class="notif-toggle"
+                 {% if push_prefs and push_prefs.pref_bowling_tonight %}checked{% endif %}
+                 style="width:20px;height:20px;cursor:pointer;accent-color:#1b3a6b">
+        </label>
+
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+          <div>
+            <div style="font-weight:600;font-size:.95rem">Scores posted</div>
+            <div style="font-size:.8rem;color:#6c757d">After each week's results are entered</div>
+          </div>
+          <input type="checkbox" name="pref_scores_posted" class="notif-toggle"
+                 {% if push_prefs and push_prefs.pref_scores_posted %}checked{% endif %}
+                 style="width:20px;height:20px;cursor:pointer;accent-color:#1b3a6b">
+        </label>
+
+      </div>
+      <button type="submit" class="btn btn-sm mt-3"
+              style="background:#1b3a6b;color:#fff;border:none;padding:6px 18px;border-radius:8px;font-size:.85rem">
+        Save preferences
+      </button>
+      <button type="button" id="notif-disable-btn"
+              style="background:none;border:none;color:#dc3545;font-size:.8rem;margin-left:12px;cursor:pointer;padding:6px 0">
+        Turn off notifications
+      </button>
+    </form>
+  </div>
+</div>
+
 {# Account actions #}
 <div class="m-card mt-3" style="text-align:center">
   <a href="{{ url_for('mobile.prefer_desktop', next=url_for('index')) }}"
@@ -112,4 +191,126 @@
      style="color:#dc3545;font-size:.9rem;display:block;padding:4px 0">Sign out</a>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const VAPID_PUBLIC_KEY = {{ vapid_public_key | tojson }};
+  const SERVER_SUBS = {{ push_subs | length }};  // subscriptions recorded server-side
+
+  // iOS standalone detection
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.navigator.standalone === true ||
+                       window.matchMedia('(display-mode: standalone)').matches;
+
+  const loading = document.getElementById('notif-loading');
+  const installPrompt = document.getElementById('notif-install-prompt');
+  const permPrompt = document.getElementById('notif-permission-prompt');
+  const denied = document.getElementById('notif-denied');
+  const prefs = document.getElementById('notif-prefs');
+
+  function show(el) {
+    [loading, installPrompt, permPrompt, denied, prefs].forEach(e => e.style.display = 'none');
+    el.style.display = 'block';
+  }
+
+  function urlB64ToUint8(b64) {
+    const pad = '='.repeat((4 - b64.length % 4) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+    const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
+  }
+
+  function detectPlatform() {
+    const ua = navigator.userAgent.toLowerCase();
+    if (/iphone|ipad|ipod/.test(ua)) return 'ios';
+    if (/android/.test(ua)) return 'android';
+    return 'desktop';
+  }
+
+  async function checkAndRender() {
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+      // Push not supported — hide the whole card
+      document.getElementById('notif-card').style.display = 'none';
+      return;
+    }
+
+    const perm = Notification.permission;
+
+    if (perm === 'denied') { show(denied); return; }
+
+    // Check if browser has an active subscription
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+
+    if (sub && SERVER_SUBS > 0) {
+      // Subscribed both browser-side and server-side
+      show(prefs);
+      return;
+    }
+
+    if (sub && SERVER_SUBS === 0) {
+      // Browser thinks it's subscribed but server lost it — re-register silently
+      await registerSubscription(sub, reg);
+      show(prefs);
+      return;
+    }
+
+    // Not subscribed yet
+    if (isIOS && !isStandalone) {
+      show(installPrompt);
+    } else {
+      show(permPrompt);
+    }
+  }
+
+  async function registerSubscription(existingSub, reg) {
+    let sub = existingSub;
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8(VAPID_PUBLIC_KEY),
+      });
+    }
+    await fetch('{{ url_for("mobile.push_subscribe") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: sub.toJSON(), platform: detectPlatform() }),
+    });
+    return sub;
+  }
+
+  // Enable button
+  document.getElementById('notif-enable-btn').addEventListener('click', async () => {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { show(denied); return; }
+    const reg = await navigator.serviceWorker.ready;
+    try {
+      await registerSubscription(null, reg);
+      show(prefs);
+    } catch (err) {
+      console.error('Push subscribe failed:', err);
+    }
+  });
+
+  // Disable button
+  document.getElementById('notif-disable-btn').addEventListener('click', async () => {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      await fetch('{{ url_for("mobile.push_unsubscribe") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub.toJSON() }),
+      });
+      await sub.unsubscribe();
+    }
+    show(permPrompt);
+  });
+
+  checkAndRender();
+})();
+</script>
 {% endblock %}

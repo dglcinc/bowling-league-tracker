@@ -3,13 +3,15 @@ Mobile PWA routes — /m/
 Serves a phone-optimised view of standings, scores, lane assignments, and bowler stats.
 Device detection lives in app.py (before_request). Preference toggle handled here.
 """
+import json
+import os
 from datetime import date, timedelta
 
-from flask import Blueprint, make_response, redirect, render_template, request, url_for
+from flask import Blueprint, jsonify, make_response, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
-from models import MatchupEntry, Roster, ScheduleEntry, Season, Team, TeamPoints, TournamentEntry, Week, db
+from models import MatchupEntry, PushSubscription, Roster, ScheduleEntry, Season, Team, TeamPoints, TournamentEntry, Week, db
 from calculations import get_team_standings
 
 mobile_bp = Blueprint('mobile', __name__)
@@ -58,6 +60,78 @@ def prefer_mobile():
     resp = make_response(redirect(url_for('mobile.home')))
     resp.delete_cookie('prefer_desktop')
     return resp
+
+
+# ---------------------------------------------------------------------------
+# Push notification endpoints
+# ---------------------------------------------------------------------------
+
+@mobile_bp.route('/push/vapid-public-key')
+def push_vapid_key():
+    """Return the VAPID public key so the browser can subscribe."""
+    return jsonify({'publicKey': os.getenv('VAPID_PUBLIC_KEY', '')})
+
+
+@mobile_bp.route('/push/subscribe', methods=['POST'])
+@login_required
+def push_subscribe():
+    """Store or update a push subscription for the current user."""
+    data = request.get_json(force=True)
+    sub_data = data.get('subscription', {})
+    endpoint = sub_data.get('endpoint', '')
+    platform = data.get('platform', 'unknown')
+
+    if not endpoint:
+        return jsonify({'error': 'missing endpoint'}), 400
+
+    sub = PushSubscription.query.filter_by(endpoint=endpoint).first()
+    if sub:
+        # Update ownership and subscription JSON in case keys rotated
+        sub.bowler_id = current_user.id
+        sub.subscription_json = json.dumps(sub_data)
+        sub.platform = platform
+    else:
+        sub = PushSubscription(
+            bowler_id=current_user.id,
+            endpoint=endpoint,
+            subscription_json=json.dumps(sub_data),
+            platform=platform,
+        )
+        db.session.add(sub)
+    db.session.commit()
+    return jsonify({'ok': True}), 201
+
+
+@mobile_bp.route('/push/unsubscribe', methods=['POST'])
+@login_required
+def push_unsubscribe():
+    """Remove a push subscription (user turned off notifications in browser)."""
+    data = request.get_json(force=True)
+    endpoint = (data.get('subscription') or {}).get('endpoint', '')
+    if endpoint:
+        PushSubscription.query.filter_by(
+            endpoint=endpoint, bowler_id=current_user.id
+        ).delete()
+        db.session.commit()
+    return jsonify({'ok': True})
+
+
+@mobile_bp.route('/push/preferences', methods=['POST'])
+@login_required
+def push_preferences():
+    """Update notification preference toggles for all of the current user's subscriptions."""
+    subs = PushSubscription.query.filter_by(bowler_id=current_user.id).all()
+    if not subs:
+        return redirect(url_for('mobile.me'))
+    tomorrow = 'pref_bowling_tomorrow' in request.form
+    tonight = 'pref_bowling_tonight' in request.form
+    scores = 'pref_scores_posted' in request.form
+    for sub in subs:
+        sub.pref_bowling_tomorrow = tomorrow
+        sub.pref_bowling_tonight = tonight
+        sub.pref_scores_posted = scores
+    db.session.commit()
+    return redirect(url_for('mobile.me'))
 
 
 # ---------------------------------------------------------------------------
@@ -342,6 +416,11 @@ def me():
                     'hs': max(wk_series.values()) if wk_series else None,
                 })
 
+    # Push notification state
+    push_subs = PushSubscription.query.filter_by(bowler_id=current_user.id).all()
+    push_prefs = push_subs[0] if push_subs else None
+    vapid_public_key = os.getenv('VAPID_PUBLIC_KEY', '')
+
     return render_template('mobile/me.html',
                            season=season,
                            roster=roster,
@@ -349,7 +428,10 @@ def me():
                            avg=avg,
                            hg_scratch=hg_scratch,
                            hs_scratch=hs_scratch,
-                           prior_seasons=prior_seasons)
+                           prior_seasons=prior_seasons,
+                           push_subs=push_subs,
+                           push_prefs=push_prefs,
+                           vapid_public_key=vapid_public_key)
 
 
 # ---------------------------------------------------------------------------
