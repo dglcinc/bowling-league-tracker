@@ -45,45 +45,47 @@
       {% set nav_s = view_season if view_season else active_season %}
       {% set nav_wk = latest_entered.get(nav_s.id, current_week or 0) if nav_s else 0 %}
       <ul class="navbar-nav me-auto">
+
+        {# ── Reports dropdown ── #}
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Reports</a>
+          <ul class="dropdown-menu">
+            {% if nav_s and nav_wk %}
+            <li><a class="dropdown-item"
+                   href="{{ url_for('reports.wkly_alpha', season_id=nav_s.id, week_num=nav_wk) }}">Weekly Tracker</a></li>
+            <li><a class="dropdown-item"
+                   href="{{ url_for('reports.week_prizes', season_id=nav_s.id, week_num=nav_wk) }}">Prizes &amp; Standings</a></li>
+            {% endif %}
+            {% if nav_s %}
+            <li><a class="dropdown-item"
+                   href="{{ url_for('reports.team_points', season_id=nav_s.id) }}">Points</a></li>
+            {% if nav_wk %}
+            <li><a class="dropdown-item"
+                   href="{{ url_for('reports.ytd_alpha', season_id=nav_s.id, week_num=nav_wk) }}">YTD Alpha</a></li>
+            {% endif %}
+            <li><a class="dropdown-item"
+                   href="{{ url_for('payout.payout_overview', season_id=nav_s.id) }}">Payouts</a></li>
+            <li><hr class="dropdown-divider"></li>
+            {% endif %}
+            <li><a class="dropdown-item" href="{{ url_for('records.records') }}">Records</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('records.bowler_dir') }}">Bowlers</a></li>
+          </ul>
+        </li>
+
+        {# ── Editor-only direct links ── #}
         {% if current_user.is_editor %}
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('entry.week_list', season_id=nav_s.id) if nav_s else url_for('entry.index') }}">Scores</a>
         </li>
-        {% endif %}
-        {% if nav_s %}
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports.team_points', season_id=nav_s.id) }}">Points</a>
-        </li>
-        {% if nav_wk %}
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports.ytd_alpha', season_id=nav_s.id, week_num=nav_wk) }}">YTD Alpha</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports.week_prizes', season_id=nav_s.id, week_num=nav_wk) }}">Prizes &amp; Standings</a>
-        </li>
-        {% if current_user.is_editor %}
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports.print_batch', season_id=nav_s.id, week_num=nav_wk) }}">Print Batch</a>
-        </li>
-        {% endif %}
-        {% endif %}
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('payout.payout_overview', season_id=nav_s.id) }}">Payouts</a>
-        </li>
-        {% endif %}
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('records.records') }}">Records</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('records.bowler_dir') }}">Bowlers</a>
-        </li>
-        {% if current_user.is_editor %}
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('admin.seasons') }}">Admin</a>
         </li>
         {% endif %}
+
       </ul>
-      <ul class="navbar-nav ms-auto">
+      <ul class="navbar-nav ms-auto align-items-center">
+
+        {# ── Season selector ── #}
         {% if seasons_with_data | length > 1 %}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
@@ -107,21 +109,28 @@
           </ul>
         </li>
         {% endif %}
+
+        {# ── PWA install prompt (Android/desktop only) ── #}
         <li class="nav-item">
           <a class="nav-link text-light" href="#" id="installAppLink" style="display:none">Install App</a>
         </li>
+
+        {# ── Print ── #}
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('mobile.prefer_mobile') }}" title="Mobile view">📱</a>
+          <button onclick="window.print()" class="btn btn-sm btn-outline-light my-1 me-1">Print</button>
         </li>
-        <li class="nav-item">
-          <button onclick="window.print()" class="btn btn-sm btn-outline-light my-1 me-2">Print</button>
+
+        {# ── Account dropdown ── #}
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Account</a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="{{ url_for('mobile.prefer_mobile') }}">📱 Mobile view</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('auth.passkeys') }}">Passkeys</a></li>
+            <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">Sign out</a></li>
+          </ul>
         </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('auth.passkeys') }}">Passkeys</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('auth.logout') }}">Sign out</a>
-        </li>
+
       </ul>
     </div>
   </div>

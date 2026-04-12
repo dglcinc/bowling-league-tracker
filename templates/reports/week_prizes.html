@@ -314,12 +314,16 @@
   {% endfor %}
 </div>
 
-<div class="no-print mt-3 d-flex gap-2">
+<div class="no-print mt-3 d-flex gap-2 flex-wrap">
   <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}"
      class="btn btn-outline-secondary btn-sm">Back to Week</a>
   {% if not tournament_type %}
   <a href="{{ url_for('admin.email_compose', season_id=season.id, week_num=week.week_num) }}"
      class="btn btn-outline-primary btn-sm">Send Weekly Email</a>
+  {% endif %}
+  {% if current_user.is_editor %}
+  <a href="{{ url_for('reports.print_batch', season_id=season.id, week_num=week.week_num) }}"
+     class="btn btn-outline-secondary btn-sm">Print Batch</a>
   {% endif %}
 </div>
 
