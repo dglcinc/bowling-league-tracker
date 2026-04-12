@@ -275,6 +275,8 @@ def me():
     hg_scratch = None
     hs_scratch = None
 
+    prior_seasons = []
+
     if season:
         entries = (MatchupEntry.query
                    .filter_by(season_id=season.id, bowler_id=current_user.id)
@@ -300,13 +302,54 @@ def me():
         if week_series:
             hs_scratch = max(week_series.values())
 
+    # If no current-season scores, build a per-season history from prior years
+    has_current_scores = any(e.games_night1 for e in entries)
+    if not has_current_scores:
+        prior_entries = (MatchupEntry.query
+                         .filter_by(bowler_id=current_user.id, is_blind=False)
+                         .filter(MatchupEntry.game1 != None)
+                         .all())
+        season_buckets = {}
+        current_sid = season.id if season else None
+        for e in prior_entries:
+            if e.season_id == current_sid:
+                continue
+            season_buckets.setdefault(e.season_id, []).append(e)
+
+        if season_buckets:
+            all_season_ids = list(season_buckets.keys())
+            seasons_map = {s.id: s for s in
+                           Season.query.filter(Season.id.in_(all_season_ids)).all()}
+            for sid in sorted(all_season_ids,
+                              key=lambda x: seasons_map[x].name if x in seasons_map else '',
+                              reverse=True):
+                ses_entries = season_buckets[sid]
+                games = []
+                for e in ses_entries:
+                    games.extend(e.games_night1)
+                if not games:
+                    continue
+                wk_series = {}
+                for e in ses_entries:
+                    g = e.games_night1
+                    if len(g) == 3:
+                        wk_series[e.week_num] = max(wk_series.get(e.week_num, 0), sum(g))
+                prior_seasons.append({
+                    'season': seasons_map.get(sid),
+                    'games': len(games),
+                    'avg': round(sum(games) / len(games), 1),
+                    'hg': max(games),
+                    'hs': max(wk_series.values()) if wk_series else None,
+                })
+
     return render_template('mobile/me.html',
                            season=season,
                            roster=roster,
                            entries=entries,
                            avg=avg,
                            hg_scratch=hg_scratch,
-                           hs_scratch=hs_scratch)
+                           hs_scratch=hs_scratch,
+                           prior_seasons=prior_seasons)
 
 
 # ---------------------------------------------------------------------------

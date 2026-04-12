@@ -26,13 +26,14 @@
     <div class="m-stat-value">
       {% set total_games = namespace(n=0) %}
       {% for e in entries %}{% set total_games.n = total_games.n + e.games_night1 | length %}{% endfor %}
-      {{ total_games.n }}
+      {{ total_games.n if total_games.n > 0 else '—' }}
     </div>
   </div>
 </div>
 
-{# Week-by-week #}
-{% if entries %}
+{# Week-by-week — current season #}
+{% set has_scores = entries | selectattr('games_night1') | list | length > 0 %}
+{% if has_scores %}
 <div class="m-card">
   <div class="m-card-title" style="margin-bottom:8px">This Season</div>
   <table class="m-score-table">
@@ -61,9 +62,44 @@
     </tbody>
   </table>
 </div>
+
+{% elif roster %}
+<div class="m-card">
+  <div class="m-card-sub text-muted">You're on the roster — scores will appear as weeks are entered.</div>
+</div>
+
 {% else %}
 <div class="m-card">
-  <div class="m-card-sub text-muted">No scores entered yet this season.</div>
+  <div class="m-card-sub text-muted">Not on the roster for this season.</div>
+</div>
+{% endif %}
+
+{# Prior seasons history — shown when no current scores #}
+{% if not has_scores and prior_seasons %}
+<div class="m-card">
+  <div class="m-card-title" style="margin-bottom:8px">Prior Seasons</div>
+  <table class="m-score-table">
+    <thead>
+      <tr>
+        <th>Season</th>
+        <th style="text-align:right">Avg</th>
+        <th style="text-align:right">HG</th>
+        <th style="text-align:right">HS</th>
+        <th style="text-align:right">Gms</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in prior_seasons %}
+      <tr>
+        <td style="font-size:.8rem">{{ row.season.name if row.season else '—' }}</td>
+        <td style="text-align:right">{{ row.avg }}</td>
+        <td style="text-align:right">{{ row.hg }}</td>
+        <td style="text-align:right">{{ row.hs or '—' }}</td>
+        <td style="text-align:right;color:#6c757d">{{ row.games }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 {% endif %}
 
