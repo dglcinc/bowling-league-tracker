@@ -47,8 +47,16 @@ def bowler_detail(season_id, bowler_id):
     roster = Roster.query.filter_by(bowler_id=bowler_id, season_id=season_id).first()
     career = get_career_stats(bowler_id)
 
-    # Tournament placements: all entries for this bowler, any season, 1st/2nd/3rd
+    # Tournament placements: entries linked by bowler_id, plus guest entries where
+    # guest_name contains this bowler's last name (historical seeds store full names
+    # as guest_name when the name couldn't be auto-linked to a bowler record).
     raw_entries = TournamentEntry.query.filter_by(bowler_id=bowler_id).all()
+    if bowler.last_name:
+        guest_entries = (TournamentEntry.query
+                         .filter(TournamentEntry.bowler_id == None,
+                                 TournamentEntry.guest_name.ilike(f'%{bowler.last_name}%'))
+                         .all())
+        raw_entries = raw_entries + guest_entries
     tournament_placements = []
     for te in raw_entries:
         wk = Week.query.filter_by(season_id=te.season_id, week_num=te.week_num).first()
