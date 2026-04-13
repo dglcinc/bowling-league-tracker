@@ -31,10 +31,147 @@ NON_BOWLER = {
     'dummy', 'blinds', 'Payout Formula', 'indiv payout', 'final handicap',
     'Banquet', 'Banquet Pivot', 'Team Counts', 'Club Scoring',
     'Sheet1', 'Prize not paid',  # miscellaneous non-bowler sheets
+    'ytd highs', 'assumptions',  # pre-2008 era sheet names
+}
+
+# Spelling variants that should resolve to a canonical last name
+LAST_NAME_ALIASES = {
+    'Gosset':    'Gossett',
+    'Gradofsky': 'Grodofsky',
 }
 
 # Season configurations
 SEASONS = [
+    {
+        'filename': 'Bowling Spreadsheets/scoring 2004-2005 (week22).xlsx',
+        'name': '2004-2005',
+        'num_weeks': 22,
+        'half_boundary_week': 11,
+        'name_club_championship': 'Club Championship',
+        'name_indiv_scratch':     'Harry E. Russell Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
+        'name_indiv_hcp_2':       'Rose Bowl',
+    },
+    {
+        'filename': 'Bowling Spreadsheets/scoring 2005-2006 (week22).xlsx',
+        'name': '2005-2006',
+        'num_weeks': 22,
+        'half_boundary_week': 11,
+        'name_club_championship': 'Club Championship',
+        'name_indiv_scratch':     'Harry E. Russell Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
+        'name_indiv_hcp_2':       'Rose Bowl',
+    },
+    {
+        'filename': 'Bowling Spreadsheets/scoring 2006-2007 (week22).xlsx',
+        'name': '2006-2007',
+        'num_weeks': 22,
+        'half_boundary_week': 11,
+        'name_club_championship': 'Club Championship',
+        'name_indiv_scratch':     'Harry E. Russell Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
+        'name_indiv_hcp_2':       'Rose Bowl',
+    },
+    {
+        'filename': 'Bowling Spreadsheets/scoring 2007-2008 (week22).xlsx',
+        'name': '2007-2008',
+        'num_weeks': 22,
+        'half_boundary_week': 11,
+        'name_club_championship': 'Club Championship',
+        'name_indiv_scratch':     'Harry E. Russell Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
+        'name_indiv_hcp_2':       'Rose Bowl',
+    },
+    {
+        'filename': 'Bowling Spreadsheets/scoring 2008-2009 (week 22).xlsx',
+        'name': '2008-2009',
+        'num_weeks': 22,
+        'half_boundary_week': 11,
+        'name_club_championship': 'Club Championship',
+        'name_indiv_scratch':     'Harry E. Russell Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
+        'name_indiv_hcp_2':       'Rose Bowl',
+    },
+    {
+        'filename': 'Bowling Spreadsheets/scoring 2009-2010 (week 22).xlsx',
+        'name': '2009-2010',
+        'num_weeks': 22,
+        'half_boundary_week': 11,
+        'name_club_championship': 'Club Championship',
+        'name_indiv_scratch':     'Harry E. Russell Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
+        'name_indiv_hcp_2':       'Rose Bowl',
+    },
+    {
+        'filename': 'Bowling Spreadsheets/scoring 2010-2011 (week 22).xlsx',
+        'name': '2010-2011',
+        'num_weeks': 22,
+        'half_boundary_week': 11,
+        'name_club_championship': 'Club Championship',
+        'name_indiv_scratch':     'Harry E. Russell Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
+        'name_indiv_hcp_2':       'Rose Bowl',
+    },
+    {
+        'filename': 'Bowling Spreadsheets/scoring 2011-2012 (week 22).xlsx',
+        'name': '2011-2012',
+        'num_weeks': 22,
+        'half_boundary_week': 11,
+        'name_club_championship': 'Club Championship',
+        'name_indiv_scratch':     'Harry E. Russell Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
+        'name_indiv_hcp_2':       'Rose Bowl',
+    },
+    {
+        'filename': 'Bowling Spreadsheets/scoring 2012-2013 (week 22).xlsx',
+        'name': '2012-2013',
+        'num_weeks': 22,
+        'half_boundary_week': 11,
+        'name_club_championship': 'Club Championship',
+        'name_indiv_scratch':     'Harry E. Russell Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
+        'name_indiv_hcp_2':       'Rose Bowl',
+    },
+    {
+        'filename': 'Bowling Spreadsheets/scoring 2013-2014 (week22).xlsx',
+        'name': '2013-2014',
+        'num_weeks': 22,
+        'half_boundary_week': 11,
+        'name_club_championship': 'Club Championship',
+        'name_indiv_scratch':     'Harry E. Russell Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
+        'name_indiv_hcp_2':       'Rose Bowl',
+    },
+    {
+        'filename': 'Bowling Spreadsheets/scoring 2014-2015 (week22).xlsx',
+        'name': '2014-2015',
+        'num_weeks': 22,
+        'half_boundary_week': 11,
+        'name_club_championship': 'Club Championship',
+        'name_indiv_scratch':     'Harry E. Russell Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
+        'name_indiv_hcp_2':       'Rose Bowl',
+    },
+    {
+        'filename': 'Bowling Spreadsheets/scoring 2015-2016 (week22).xlsx',
+        'name': '2015-2016',
+        'num_weeks': 22,
+        'half_boundary_week': 11,
+        'name_club_championship': 'Club Championship',
+        'name_indiv_scratch':     'Harry E. Russell Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
+        'name_indiv_hcp_2':       'Rose Bowl',
+    },
+    {
+        'filename': 'Bowling Spreadsheets/scoring 2016-2017 (week 22).xlsx',
+        'name': '2016-2017',
+        'num_weeks': 22,
+        'half_boundary_week': 11,
+        'name_club_championship': 'Club Championship',
+        'name_indiv_scratch':     'Harry E. Russell Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
+        'name_indiv_hcp_2':       'Rose Bowl',
+    },
     {
         'filename': 'scoring 2017-2018 - week 23.xlsx',
         'name': '2017-2018',
@@ -42,7 +179,7 @@ SEASONS = [
         'half_boundary_week': 11,
         'name_club_championship': 'Club Championship',
         'name_indiv_scratch':     'Harry E. Russell Championship',
-        'name_indiv_hcp_1':       'Buz Bedford Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
         'name_indiv_hcp_2':       'Rose Bowl',
     },
     {
@@ -52,7 +189,7 @@ SEASONS = [
         'half_boundary_week': 11,
         'name_club_championship': 'Club Championship',
         'name_indiv_scratch':     'Harry E. Russell Championship',
-        'name_indiv_hcp_1':       'Buz Bedford Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
         'name_indiv_hcp_2':       'Rose Bowl',
     },
     {
@@ -63,7 +200,7 @@ SEASONS = [
         'half_boundary_week': 11,
         'name_club_championship': 'Club Championship',
         'name_indiv_scratch':     'Harry E. Russell Championship',
-        'name_indiv_hcp_1':       'Buz Bedford Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
         'name_indiv_hcp_2':       'Rose Bowl',
         'covid_season': True,
     },
@@ -74,7 +211,7 @@ SEASONS = [
         'half_boundary_week': 11,
         'name_club_championship': 'Club Championship',
         'name_indiv_scratch':     'Harry E. Russell Championship',
-        'name_indiv_hcp_1':       'Buz Bedford Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
         'name_indiv_hcp_2':       'Rose Bowl',
     },
     {
@@ -84,7 +221,7 @@ SEASONS = [
         'half_boundary_week': 11,
         'name_club_championship': 'Club Championship',
         'name_indiv_scratch':     'Harry E. Russell Championship',
-        'name_indiv_hcp_1':       'Buz Bedford Championship',
+        'name_indiv_hcp_1':       'Buzz Bedford Championship',
         'name_indiv_hcp_2':       'Rose Bowl',
     },
     {
@@ -218,11 +355,11 @@ def read_wkly_alpha_roster(wb):
     ws = wb['wkly alpha']
     rows = list(ws.iter_rows(values_only=True))
 
-    # Find header row (has 'Name' in col 0)
+    # Find header row (has 'Name' in col 0 — case-insensitive for pre-2008 sheets)
     header_row = None
     header_idx = None
     for i, row in enumerate(rows):
-        if row and row[0] == 'Name':
+        if row and row[0] is not None and str(row[0]).strip().lower() == 'name':
             header_row = row
             header_idx = i
             break
@@ -254,10 +391,11 @@ def read_wkly_alpha_roster(wb):
     else:
         idx_team = col_map.get('Team', 2)
 
-    idx_prior_hcp = gcol(["Last Year's Handicap", "Last\nYear's\nHandicap"], None)
+    idx_prior_hcp = gcol(["Last Year's Handicap", "Last\nYear's\nHandicap",
+                          "Last Yr Handicap"], None)
     # Normalise multiline
     for k, v in list(col_map.items()):
-        if 'Last' in k and 'Year' in k and 'Handicap' in k:
+        if 'Last' in k and ('Year' in k or 'Yr' in k) and 'Handicap' in k:
             idx_prior_hcp = v
             break
 
@@ -271,6 +409,7 @@ def read_wkly_alpha_roster(wb):
         last = str(row[idx_last]).strip()
         if not last or last.lower() in ('total', 'name', 'ave', 'average'):
             continue
+        last = LAST_NAME_ALIASES.get(last, last)
         first = str(row[idx_first]).strip() if idx_first is not None and row[idx_first] else ''
         team_val = row[idx_team] if idx_team is not None and idx_team < len(row) else None
         team = int(team_val) if isinstance(team_val, (int, float)) and team_val else None
@@ -371,8 +510,9 @@ def read_payout_winners(wb):
     for row in rows:
         if not any(v is not None for v in row):
             continue
-        # Check for "Tournaments" section header
-        if row[0] == 'Tournaments':
+        # Check for "Tournaments" section header (some sheets misspell it)
+        if isinstance(row[0], str) and row[0].strip().lower().startswith('tourna') or \
+                isinstance(row[0], str) and row[0].strip().lower().startswith('tourne'):
             in_tournaments = True
             continue
         if row[0] in ('Sub-Total', 'Weekly Prizes', 'Team Play'):
@@ -397,9 +537,17 @@ def read_payout_winners(wb):
                 results[current_key] = {}
 
         # Third column is place (1st, 2nd, 3rd)
-        elif current_key and row[2] is not None and row[5] is not None:
+        elif current_key and row[2] is not None:
             place_str = str(row[2]).strip().lower()
-            winner = str(row[6]).strip() if row[6] else ''
+            if not any(p in place_str for p in ('1st', '2nd', '3rd')):
+                continue
+            # Winner name: scan from col 5 for first string value (prize amounts are numeric)
+            winner = ''
+            for i in range(5, min(len(row), 10)):
+                v = row[i]
+                if v is not None and isinstance(v, str) and v.strip():
+                    winner = v.strip()
+                    break
             if not winner:
                 continue
             if '1st' in place_str:
@@ -539,7 +687,7 @@ def import_season(cfg, app):
                 if not data or not data['last']:
                     continue
 
-                last = data['last']
+                last = LAST_NAME_ALIASES.get(data['last'], data['last'])
                 first = data['first']
                 team_num = data['team']
                 active = data['active']
@@ -680,14 +828,12 @@ def import_season(cfg, app):
                 wk_num = tt_to_wk.get(tt)
                 if not wk_num:
                     continue
-                for place, raw_name in places.items():
+                for place, raw_name in sorted(places.items()):
                     if not raw_name:
                         continue
-                    # Only seed 1st place for now (highest confidence)
-                    if place != 1:
-                        continue
-                    # Try to find bowler by last name
+                    # Try to find bowler by last name (first word before comma or space)
                     last = raw_name.split(',')[0].strip().split()[0]
+                    last = LAST_NAME_ALIASES.get(last, last)
                     bowler = Bowler.query.filter_by(last_name=last).first()
                     te = TournamentEntry(
                         season_id=season.id,
@@ -695,6 +841,7 @@ def import_season(cfg, app):
                         bowler_id=bowler.id if bowler else None,
                         guest_name=None if bowler else raw_name,
                         handicap=0,
+                        place=place,
                     )
                     db.session.add(te)
                     winners_seeded += 1
