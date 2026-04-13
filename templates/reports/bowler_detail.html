@@ -31,6 +31,25 @@
   <div class="col-auto"><strong>HS Hcp:</strong> {{ stats.ytd_high_series_hcp }}</div>
 </div>
 
+{% if tournament_placements %}
+<h6 class="mt-3">Tournament Placements</h6>
+<table class="table table-sm table-bordered table-striped mb-3" style="max-width:540px">
+  <thead class="table-dark">
+    <tr><th>Season</th><th>Tournament</th><th>Place</th><th>Score</th></tr>
+  </thead>
+  <tbody>
+    {% for tp in tournament_placements %}
+    <tr>
+      <td><a href="{{ url_for('reports.bowler_detail', season_id=tp.season.id, bowler_id=bowler.id) }}">{{ tp.season.name }}</a></td>
+      <td>{{ tp.season.tournament_labels.get(tp.tournament_type, tp.tournament_type) }}</td>
+      <td>{% if tp.place == 1 %}🥇{% elif tp.place == 2 %}🥈{% else %}🥉{% endif %}</td>
+      <td>{{ tp.score if tp.score is not none else '—' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
 {% if career | length > 1 %}
 <h6 class="mt-3">Career History</h6>
 <div class="table-scroll">
@@ -58,25 +77,6 @@
   </tbody>
 </table>
 </div>
-{% endif %}
-
-{% if tournament_placements %}
-<h6 class="mt-3">Tournament Placements</h6>
-<table class="table table-sm table-bordered table-striped mb-3" style="max-width:540px">
-  <thead class="table-dark">
-    <tr><th>Season</th><th>Tournament</th><th>Place</th><th>Score</th></tr>
-  </thead>
-  <tbody>
-    {% for tp in tournament_placements %}
-    <tr>
-      <td><a href="{{ url_for('reports.bowler_detail', season_id=tp.season.id, bowler_id=bowler.id) }}">{{ tp.season.name }}</a></td>
-      <td>{{ tp.season.tournament_labels.get(tp.tournament_type, tp.tournament_type) }}</td>
-      <td>{% if tp.place == 1 %}🥇{% elif tp.place == 2 %}🥈{% else %}🥉{% endif %}</td>
-      <td>{{ tp.score if tp.score is not none else '—' }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
 {% endif %}
 
 <h6>Week-by-Week — {{ season.name }}</h6>
