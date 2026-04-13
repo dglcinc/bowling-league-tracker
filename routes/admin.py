@@ -111,15 +111,14 @@ def new_season():
 def season_detail(season_id):
     season = Season.query.get_or_404(season_id)
     teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
-    roster = (Roster.query
-              .filter_by(season_id=season_id)
-              .join(Bowler)
-              .order_by(Bowler.last_name)
-              .all())
-    entered_weeks = (Week.query
-                     .filter_by(season_id=season_id, is_entered=True)
-                     .order_by(Week.week_num.desc())
-                     .all())
+    roster_filter = request.args.get('roster_filter', 'active')
+    roster_q = (Roster.query
+                .filter_by(season_id=season_id)
+                .join(Bowler)
+                .order_by(Bowler.last_name))
+    if roster_filter == 'active':
+        roster_q = roster_q.filter(Roster.active == True)
+    roster = roster_q.all()
     # Build access map: bowler_id → most recent LinkedAccount (for Access column)
     bowler_ids = [r.bowler_id for r in roster]
     accounts = LinkedAccount.query.filter(LinkedAccount.bowler_id.in_(bowler_ids)).all()
@@ -130,12 +129,12 @@ def season_detail(season_id):
             access_map[a.bowler_id] = a
     return render_template('admin/season_detail.html',
                            season=season, teams=teams, roster=roster,
-                           entered_weeks=entered_weeks, access_map=access_map)
+                           roster_filter=roster_filter, access_map=access_map)
 
 
 @admin_bp.route('/seasons/<int:season_id>/send-magic-links', methods=['POST'])
 def send_magic_links(season_id):
-    from routes.auth import send_otp
+    from routes.auth import send_otp_invite
     Season.query.get_or_404(season_id)
     bowler_ids = request.form.getlist('bowler_ids', type=int)
     if not bowler_ids:
@@ -144,10 +143,10 @@ def send_magic_links(season_id):
 
     settings = db.session.get(LeagueSettings, 1)
     league_name = settings.league_name if settings else 'League Tracker'
-    is_registration = 'registration' in request.form
-    subject = (f'{league_name}: App Registration'
-               if is_registration else
-               f'{league_name}: Your sign-in code')
+    from models import _DEFAULT_INVITE_MESSAGE
+    invite_body = (settings.invite_message if settings and settings.invite_message
+                   else _DEFAULT_INVITE_MESSAGE)
+    subject = f'{league_name}: invitation to the app'
 
     sent = failed = no_email = 0
     for bid in bowler_ids:
@@ -157,7 +156,7 @@ def send_magic_links(season_id):
         if not bowler.email:
             no_email += 1
             continue
-        ok, _ = send_otp(bowler, subject=subject)
+        ok, _ = send_otp_invite(bowler, subject=subject, invite_body=invite_body)
         if ok:
             sent += 1
         else:
@@ -165,7 +164,7 @@ def send_magic_links(season_id):
 
     parts = []
     if sent:
-        parts.append(f'{sent} OTP(s) sent')
+        parts.append(f'{sent} invite(s) sent')
     if no_email:
         parts.append(f'{no_email} skipped (no email on file)')
     if failed:
@@ -274,6 +273,9 @@ def league_settings():
             settings.league_name = league_name
         settings.use_nickname = (request.form.get('use_nickname') == 'on')
         settings.show_captain_name = (request.form.get('show_captain_name') == 'on')
+        invite_msg = request.form.get('invite_message', '').strip()
+        if invite_msg:
+            settings.invite_message = invite_msg
         if active_season:
             try:
                 active_season.handicap_base = int(request.form.get('handicap_base', active_season.handicap_base))
@@ -290,7 +292,10 @@ def league_settings():
         db.session.commit()
         flash('League settings saved.', 'success')
         return redirect(url_for('admin.league_settings'))
-    return render_template('admin/league_settings.html', settings=settings, active_season=active_season)
+    from models import _DEFAULT_INVITE_MESSAGE
+    return render_template('admin/league_settings.html', settings=settings,
+                           active_season=active_season,
+                           default_invite_message=_DEFAULT_INVITE_MESSAGE)
 
 
 @admin_bp.route('/bowlers/<int:bowler_id>/edit', methods=['GET', 'POST'])

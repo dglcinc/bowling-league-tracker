@@ -81,6 +81,13 @@
   </div>
   {% endif %}
 
+  <hr>
+  <div class="mb-3">
+    <label class="form-label fw-bold">Invitation Message</label>
+    <textarea class="form-control" name="invite_message" rows="8">{{ settings.invite_message or default_invite_message }}</textarea>
+    <div class="form-text">Shown in the body of "Send Invite to Selected" emails sent from the season roster page. The bowler's sign-in code is appended automatically.</div>
+  </div>
+
   <button type="submit" class="btn btn-primary">Save Settings</button>
   <a href="{{ url_for('admin.seasons') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
 </form>

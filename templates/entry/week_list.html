@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Score Entry — {{ season.name }}{% endblock %}
+{% block title %}Scores — {{ season.name }}{% endblock %}
 
 {% block content %}
-<h4>Score Entry — {{ season.name }}</h4>
+<h4>Scores — {{ season.name }}</h4>
 
 <table class="table table-sm table-hover">
   <thead>
@@ -36,8 +36,11 @@
       <td class="d-flex gap-1">
         <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=wk.week_num) }}"
            class="btn btn-sm {{ 'btn-outline-danger' if wk.is_cancelled else ('btn-outline-secondary' if wk.is_entered else 'btn-primary') }}">
-          {{ 'Cancelled' if wk.is_cancelled else ('Edit' if wk.is_entered else 'Enter') }}
+          {% if wk.is_cancelled %}Cancelled
+          {% elif wk.is_entered %}{{ 'Edit' if current_user.is_editor else 'View' }}
+          {% else %}Enter{% endif %}
         </a>
+        {% if current_user.is_editor %}
         <form method="post"
               action="{{ url_for('entry.toggle_cancelled', season_id=season.id, week_num=wk.week_num) }}"
               class="mb-0">
@@ -46,6 +49,7 @@
             {{ 'Uncancel' if wk.is_cancelled else 'Cancel' }}
           </button>
         </form>
+        {% endif %}
       </td>
     </tr>
     {% endfor %}

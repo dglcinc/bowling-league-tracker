@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Wkly Alpha — Week {{ week_num }} — {{ season.name }}{% endblock %}
+{% block title %}Weekly Alpha — Week {{ week_num }} — {{ season.name }}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -27,7 +27,7 @@
 {% set _tt_short = season.tournament_labels %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-2 no-print">
-  <h2>Wkly Alpha — {{ season.name }}</h2>
+  <h2>Weekly Alpha — {{ season.name }}</h2>
   <div class="d-flex gap-2">
     <select class="form-select form-select-sm w-auto"
             onchange="location='{{ url_for('reports.wkly_alpha', season_id=season.id, week_num=0) }}'.replace('/0', '/'+this.value)+'{{ ('?team='+team_filter) if team_filter else '' }}'">

@@ -58,7 +58,7 @@
           <ul class="dropdown-menu">
             {% if nav_s and nav_wk %}
             <li><a class="dropdown-item"
-                   href="{{ url_for('reports.wkly_alpha', season_id=nav_s.id, week_num=nav_wk) }}">Weekly Tracker</a></li>
+                   href="{{ url_for('reports.wkly_alpha', season_id=nav_s.id, week_num=nav_wk) }}">Weekly Alpha</a></li>
             <li><a class="dropdown-item"
                    href="{{ url_for('reports.week_prizes', season_id=nav_s.id, week_num=nav_wk) }}">Prizes &amp; Standings</a></li>
             {% endif %}
@@ -78,11 +78,13 @@
           </ul>
         </li>
 
-        {# ── Editor-only direct links ── #}
-        {% if current_user.is_editor %}
+        {# ── Scores link (all authenticated users) and Admin (editors only) ── #}
+        {% if current_user.is_authenticated and nav_s %}
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('entry.week_list', season_id=nav_s.id) if nav_s else url_for('entry.index') }}">Scores</a>
+          <a class="nav-link" href="{{ url_for('entry.week_list', season_id=nav_s.id) }}">Scores</a>
         </li>
+        {% endif %}
+        {% if current_user.is_editor %}
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('admin.seasons') }}">Admin</a>
         </li>
@@ -320,7 +322,9 @@ if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw
   }
 
   function updateDropdownUI(id, name) {
-    var toggle = document.querySelector('#navMenu .dropdown-toggle');
+    // Target the season selector dropdown toggle specifically (the one containing .season-selector-item)
+    var seasonMenu = document.querySelector('.season-selector-item');
+    var toggle = seasonMenu ? seasonMenu.closest('.dropdown').querySelector('.dropdown-toggle') : null;
     if (toggle && toggle.firstChild && toggle.firstChild.nodeType === 3) {
       toggle.firstChild.textContent = name + ' ';
     }
