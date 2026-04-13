@@ -109,6 +109,7 @@ def new_season():
 
 @admin_bp.route('/seasons/<int:season_id>')
 def season_detail(season_id):
+    from types import SimpleNamespace
     season = Season.query.get_or_404(season_id)
     teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
     roster_filter = request.args.get('roster_filter', 'active')
@@ -120,24 +121,28 @@ def season_detail(season_id):
         roster_q = roster_q.filter(Roster.active == True)
     roster = roster_q.all()
 
-    # In 'all' mode, also include bowlers who have been on any roster but are
-    # not on this season's roster at all (e.g. bowlers from prior seasons).
-    unrostered_bowlers = []
+    # In 'all' mode, append bowlers rostered in any prior season but not this
+    # one — shown inline as inactive entries with an Add to Roster action.
     if roster_filter == 'all':
         season_bowler_ids = {r.bowler_id for r in roster}
-        # All bowlers ever rostered anywhere
         ever_rostered_ids = {r.bowler_id for r in
                              Roster.query.with_entities(Roster.bowler_id).distinct().all()}
         unrostered_ids = ever_rostered_ids - season_bowler_ids
         if unrostered_ids:
-            unrostered_bowlers = (Bowler.query
-                                  .filter(Bowler.id.in_(unrostered_ids))
-                                  .order_by(Bowler.last_name)
-                                  .all())
+            for b in (Bowler.query
+                      .filter(Bowler.id.in_(unrostered_ids))
+                      .order_by(Bowler.last_name).all()):
+                roster.append(SimpleNamespace(
+                    id=None, bowler_id=b.id, bowler=b,
+                    team=None, active=False,
+                    prior_handicap=None, joined_week=None,
+                ))
+            roster.sort(key=lambda r: r.bowler.last_name.lower())
 
     # Build access map: bowler_id → most recent LinkedAccount (for Access column)
-    all_bowler_ids = [r.bowler_id for r in roster] + [b.id for b in unrostered_bowlers]
-    accounts = LinkedAccount.query.filter(LinkedAccount.bowler_id.in_(all_bowler_ids)).all()
+    accounts = LinkedAccount.query.filter(
+        LinkedAccount.bowler_id.in_([r.bowler_id for r in roster])
+    ).all()
     access_map = {}
     for a in accounts:
         existing = access_map.get(a.bowler_id)
@@ -145,8 +150,7 @@ def season_detail(season_id):
             access_map[a.bowler_id] = a
     return render_template('admin/season_detail.html',
                            season=season, teams=teams, roster=roster,
-                           roster_filter=roster_filter, access_map=access_map,
-                           unrostered_bowlers=unrostered_bowlers)
+                           roster_filter=roster_filter, access_map=access_map)
 
 
 @admin_bp.route('/seasons/<int:season_id>/send-magic-links', methods=['POST'])
