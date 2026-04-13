@@ -29,6 +29,14 @@ def wkly_alpha(season_id, week_num):
 
 
 
+_PLACEHOLDER_VALUES = {100, 200, 300}
+
+
+def _is_placeholder(te):
+    g = te.games
+    return len(g) == 1 and g[0] in _PLACEHOLDER_VALUES
+
+
 @reports_bp.route('/season/<int:season_id>/bowler/<int:bowler_id>')
 def bowler_detail(season_id, bowler_id):
     season = Season.query.get_or_404(season_id)
@@ -36,10 +44,48 @@ def bowler_detail(season_id, bowler_id):
     stats = get_bowler_stats(bowler_id, season_id)
     roster = Roster.query.filter_by(bowler_id=bowler_id, season_id=season_id).first()
     career = get_career_stats(bowler_id)
+
+    # Tournament placements: all entries for this bowler, any season, 1st/2nd/3rd
+    raw_entries = TournamentEntry.query.filter_by(bowler_id=bowler_id).all()
+    tournament_placements = []
+    for te in raw_entries:
+        wk = Week.query.filter_by(season_id=te.season_id, week_num=te.week_num).first()
+        if not wk or not wk.tournament_type or wk.tournament_type == 'club_championship':
+            continue
+        place = te.place
+        if place is None:
+            # Compute rank from actual scores
+            all_te = TournamentEntry.query.filter_by(
+                season_id=te.season_id, week_num=te.week_num).all()
+            if wk.tournament_type == 'indiv_scratch':
+                ranked = sorted(all_te, key=lambda e: -e.total_scratch)
+            else:
+                ranked = sorted(all_te, key=lambda e: -e.total_with_hcp)
+            for i, r in enumerate(ranked, 1):
+                if r.id == te.id:
+                    place = i
+                    break
+        if not place or place > 3:
+            continue
+        s = Season.query.get(te.season_id)
+        is_ph = _is_placeholder(te)
+        if wk.tournament_type == 'indiv_scratch':
+            score = te.total_scratch if not is_ph else None
+        else:
+            score = te.total_with_hcp if not is_ph else None
+        tournament_placements.append({
+            'season':           s,
+            'tournament_type':  wk.tournament_type,
+            'place':            place,
+            'score':            score,
+        })
+    tournament_placements.sort(key=lambda x: x['season'].name)
+
     return render_template('reports/bowler_detail.html',
                            season=season, bowler=bowler,
                            stats=stats, roster=roster,
-                           career=career)
+                           career=career,
+                           tournament_placements=tournament_placements)
 
 
 def _build_high_games_leaders(season_id, through_week, min_games=0):

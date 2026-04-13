@@ -5,6 +5,23 @@
 <h4 class="mb-3">Bowler Directory</h4>
 <p class="text-muted small">All bowlers who have participated in the league. Click a season badge to view that season's stats.</p>
 
+{% if all_team_names %}
+<div class="mb-3">
+  <span class="text-muted small me-2">Team:</span>
+  <div class="btn-group btn-group-sm" role="group">
+    <a href="{{ url_for('records.bowler_dir') }}"
+       class="btn btn-outline-secondary{% if not team_filter %} active{% endif %}">All</a>
+    {% for name in all_team_names %}
+    <a href="{{ url_for('records.bowler_dir', team=name) }}"
+       class="btn btn-outline-secondary{% if team_filter == name %} active{% endif %}">{{ name }}</a>
+    {% endfor %}
+  </div>
+  {% if team_filter %}
+  <span class="text-muted small ms-2">— {{ dir_entries|length }} bowler{{ 's' if dir_entries|length != 1 else '' }}</span>
+  {% endif %}
+</div>
+{% endif %}
+
 {% if not dir_entries %}
 <p class="text-muted">No bowler data available yet.</p>
 {% else %}

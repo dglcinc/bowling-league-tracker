@@ -9,11 +9,11 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 **Important:** Never put player names, team names (which are player surnames), or any other personal information in the repository, code, comments, or documentation.
 
-## Repo / Branch State (as of 2026-04-11)
+## Repo / Branch State (as of 2026-04-13)
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
-- No open PRs — PRs #37–#41 all merged to main
+- No open PRs — PRs #37–#69 all merged to main
 
 ## League Structure
 
@@ -47,7 +47,7 @@ Four tournament weeks are appended after every regular season. The order is the 
 
 - **Club Championship** (`tournament_type='club_championship'`, `is_position_night=True`): team competition scored as a position night; uses normal matchup entry; auto-assigns lane assignments from standings
 - **Harry E. Russell Championship** (`indiv_scratch`): individual scratch, 5 games; shows all bowlers (active + inactive) + write-in option for non-league participants
-- **Hcp Tournament 1** (`indiv_hcp_1`): individual handicap, 3 games; active bowlers + write-in (named "Buz Bedford Championship" pre-2023, "Shep Belyea Open" 2023+)
+- **Hcp Tournament 1** (`indiv_hcp_1`): individual handicap, 3 games; active bowlers + write-in (named "Buzz Bedford Championship" pre-2023, "Shep Belyea Open" 2023+)
 - **Hcp Tournament 2** (`indiv_hcp_2`): individual handicap, 3 games; active bowlers + write-in (named "Rose Bowl" pre-2023, "Chad Harris Memorial Bowl" 2023+)
 
 Tournament display names are configurable per season via Admin → Week Dates and stored as JSON in `Season.tournament_labels`. Tournament scores stored in `tournament_entries` table (game1=300/200/100 for placement ordering on the prizes page). All tournament weeks excluded from `get_bowler_entries` so they never affect season averages/handicaps. Tournament entry form shows live JS rankings. Top-3 placement can also be set via Admin → Tournament Placements (uses dummy scores 300/200/100).
