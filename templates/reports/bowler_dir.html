@@ -39,7 +39,13 @@
     {% for entry in dir_entries %}
     <tr>
       <td class="text-nowrap">
+        {% set _data_seasons = entry.career | selectattr('has_data', 'equalto', true) | list %}
+        {% set _latest = _data_seasons | last if _data_seasons else none %}
+        {% if _latest %}
+        <a href="{{ url_for('reports.bowler_detail', season_id=_latest.season.id, bowler_id=entry.bowler.id) }}" class="text-decoration-none text-body">{{ entry.bowler.last_name }}{% if entry.bowler.first_name %}, {{ entry.bowler.first_name }}{% endif %}</a>
+        {% else %}
         {{ entry.bowler.last_name }}{% if entry.bowler.first_name %}, {{ entry.bowler.first_name }}{% endif %}
+        {% endif %}
         {% if entry.bowler.is_editor %}
         <span class="badge bg-warning text-dark ms-1" style="font-size:.7rem">Editor</span>
         {% endif %}
