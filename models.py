@@ -290,6 +290,7 @@ class TournamentEntry(db.Model):
     game4 = db.Column(db.Integer)
     game5 = db.Column(db.Integer)
     handicap = db.Column(db.Integer, default=0)
+    place = db.Column(db.Integer, nullable=True)  # 1/2/3 for historical imports; None if unranked
 
     bowler = db.relationship('Bowler')
 

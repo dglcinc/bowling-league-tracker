@@ -127,6 +127,7 @@ def _migrate_db(db):
         "ALTER TABLE weeks ADD COLUMN notif_scores_sent BOOLEAN DEFAULT 0",
         # Configurable invite message for "Send Invite to Selected" on roster page
         "ALTER TABLE league_settings ADD COLUMN invite_message TEXT",
+        "ALTER TABLE tournament_entries ADD COLUMN place INTEGER",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:
