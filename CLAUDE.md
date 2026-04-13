@@ -100,7 +100,7 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 - **weeks**: season_id, week_num, date, is_position_night, is_cancelled, is_entered, notes, tournament_type
 - **matchup_entries**: season_id, week_num, matchup_num, team_id, bowler_id, is_blind, lane_side (A/B), game1–game6
 - **team_points**: season_id, week_num, matchup_num, team_id, points_earned (Float — supports 0.5-pt ties)
-- **tournament_entries**: season_id, week_num, bowler_id (nullable), guest_name (nullable), game1–game5, handicap
+- **tournament_entries**: season_id, week_num, bowler_id (nullable), guest_name (nullable), game1–game5, handicap, place (1/2/3, nullable — set for historical imports)
 - **snapshots**: season_id, week_num, snapshot_json, created_at
 
 ### Key notes
@@ -151,6 +151,7 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 - `assign_matchups_list` / `assign_matchups` — per-week tool to assign bowlers to lane pair A or B
 - `edit_team` — edit team name and captain name (`Team.captain_name` column); team badges on season_detail are clickable links to this page
 - Edit Bowler and Edit Roster are separate buttons on the roster list; edit_bowler no longer includes roster fields
+- Season detail All filter: rostered (active or inactive) and unrostered bowlers appear in one unified alphabetical list; unrostered entries show as Inactive with Add to Roster button (no separate section)
 
 **`payout_bp`** (`/payout/season/<id>`)
 - `payout_overview` — YTD prize counts per bowler, weekly prize history, Most Improved
@@ -167,9 +168,10 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 ### Snapshots
 Written automatically after each week is fully entered. Stored as JSON at OneDrive path next to the DB.
 
-## Current State (as of 2026-04-12)
+## Current State (as of 2026-04-13)
 
 ### Seasons in DB
+- **2004-2005 through 2016-2017** (historical, venue=mountain_lakes_club): imported via `seed_historical_seasons.py`; seasons id=10–22; regular scores + tournament 1st/2nd/3rd place entries with `place` field set
 - **2017-2018 through 2023-2024** (historical, venue=mountain_lakes_club): imported via `seed_historical_seasons.py`; regular scores + tournament 1st/2nd/3rd place entries
 - **2024-2025** (historical, venue=boonton_lanes): imported via `seed_historical_seasons.py`
 - **2025-2026** (active, venue=boonton_lanes): all 22 regular weeks entered; 4 post-season tournament weeks (23–26) added; TeamPoints from spreadsheet
@@ -187,7 +189,7 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 | `seed_historical.py <xlsx>` | Seeds 2025-2026 structure: season, teams, bowlers, roster, weeks, schedule |
 | `seed_week.py <week_num> <xlsx>` | Imports one week's scores + verifies lane assignment; saves JSON snapshot |
 | `seed_all_weeks.py` | Runs `seed_historical.py` then `seed_week.py` for weeks 1–21 in sequence |
-| `seed_historical_seasons.py` | Imports all 6 historical seasons (2017-2018 through 2024-2025) from XLS; idempotent (skips existing seasons) |
+| `seed_historical_seasons.py` | Imports all 20 historical seasons (2004-2005 through 2024-2025) from XLS; idempotent (skips existing seasons); new seasons read from `~/OneDrive - DGLC/Claude/Historic Scoresheets/Bowling Spreadsheets/` |
 | `backfill_tournament_winners.py` | Re-reads XLS Payout Formula sheets to backfill 2nd/3rd place tournament entries; safe to re-run |
 | `crawl_routes.py` | BFS route tester: crawls all GET routes as editor (all 200) and viewer (checks ALLOW/DENY); run after significant changes |
 
