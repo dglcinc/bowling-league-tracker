@@ -818,23 +818,39 @@ def import_season(cfg, app):
         covid = cfg.get('covid_season', False)
         winners_seeded = 0
         if not covid and payout_winners:
-            # Map tournament type → post-season week number
+            # Look up week_num from the Week rows that were just created
             tt_to_wk = {
-                'indiv_scratch': num_weeks + 2,
-                'indiv_hcp_1':   num_weeks + 3,
-                'indiv_hcp_2':   num_weeks + 4,
+                w.tournament_type: w.week_num
+                for w in Week.query.filter_by(season_id=season.id)
+                               .filter(Week.tournament_type.isnot(None)).all()
+                if w.tournament_type in ('indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2')
             }
             for tt, places in payout_winners.items():
                 wk_num = tt_to_wk.get(tt)
                 if not wk_num:
+                    issues.append(f'  No Week row found for tournament_type={tt!r}')
                     continue
                 for place, raw_name in sorted(places.items()):
                     if not raw_name:
                         continue
-                    # Try to find bowler by last name (first word before comma or space)
-                    last = raw_name.split(',')[0].strip().split()[0]
+                    # Parse "First Last" — use last word as last name, first word as first
+                    parts = raw_name.strip().split()
+                    last = parts[-1] if parts else raw_name
+                    first = parts[0] if len(parts) > 1 else None
                     last = LAST_NAME_ALIASES.get(last, last)
-                    bowler = Bowler.query.filter_by(last_name=last).first()
+                    # Find bowler: if multiple share the last name, match on first-name initial
+                    candidates = Bowler.query.filter(Bowler.last_name.ilike(last)).all()
+                    bowler = None
+                    if candidates:
+                        if len(candidates) == 1:
+                            bowler = candidates[0]
+                        elif first:
+                            for c in candidates:
+                                if c.first_name and c.first_name.lower().startswith(first[0].lower()):
+                                    bowler = c
+                                    break
+                            if not bowler:
+                                bowler = candidates[0]
                     te = TournamentEntry(
                         season_id=season.id,
                         week_num=wk_num,
