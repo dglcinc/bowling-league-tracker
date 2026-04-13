@@ -205,11 +205,12 @@ def _tournament_winners_by_season(seasons):
             if not entries:
                 indiv[tt] = []
                 continue
-            # Sort by total_with_hcp desc for hcp events, scratch for indiv_scratch
+            # Sort: (place, -score) — explicit place for historical entries that
+            # have no game scores; score tiebreaks when place is absent.
             if tt == 'indiv_scratch':
-                entries.sort(key=lambda e: -(e.total_scratch))
+                entries.sort(key=lambda e: (e.place or 99, -(e.total_scratch)))
             else:
-                entries.sort(key=lambda e: -(e.total_with_hcp))
+                entries.sort(key=lambda e: (e.place or 99, -(e.total_with_hcp)))
             indiv[tt] = entries[:3]
 
         # Club championship: highest-points team in the club_champ week (team standings)
