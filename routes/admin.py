@@ -119,9 +119,25 @@ def season_detail(season_id):
     if roster_filter == 'active':
         roster_q = roster_q.filter(Roster.active == True)
     roster = roster_q.all()
+
+    # In 'all' mode, also include bowlers who have been on any roster but are
+    # not on this season's roster at all (e.g. bowlers from prior seasons).
+    unrostered_bowlers = []
+    if roster_filter == 'all':
+        season_bowler_ids = {r.bowler_id for r in roster}
+        # All bowlers ever rostered anywhere
+        ever_rostered_ids = {r.bowler_id for r in
+                             Roster.query.with_entities(Roster.bowler_id).distinct().all()}
+        unrostered_ids = ever_rostered_ids - season_bowler_ids
+        if unrostered_ids:
+            unrostered_bowlers = (Bowler.query
+                                  .filter(Bowler.id.in_(unrostered_ids))
+                                  .order_by(Bowler.last_name)
+                                  .all())
+
     # Build access map: bowler_id → most recent LinkedAccount (for Access column)
-    bowler_ids = [r.bowler_id for r in roster]
-    accounts = LinkedAccount.query.filter(LinkedAccount.bowler_id.in_(bowler_ids)).all()
+    all_bowler_ids = [r.bowler_id for r in roster] + [b.id for b in unrostered_bowlers]
+    accounts = LinkedAccount.query.filter(LinkedAccount.bowler_id.in_(all_bowler_ids)).all()
     access_map = {}
     for a in accounts:
         existing = access_map.get(a.bowler_id)
@@ -129,7 +145,8 @@ def season_detail(season_id):
             access_map[a.bowler_id] = a
     return render_template('admin/season_detail.html',
                            season=season, teams=teams, roster=roster,
-                           roster_filter=roster_filter, access_map=access_map)
+                           roster_filter=roster_filter, access_map=access_map,
+                           unrostered_bowlers=unrostered_bowlers)
 
 
 @admin_bp.route('/seasons/<int:season_id>/send-magic-links', methods=['POST'])
@@ -291,7 +308,7 @@ def league_settings():
                 active_season.start_time = start
         db.session.commit()
         flash('League settings saved.', 'success')
-        return redirect(url_for('admin.league_settings'))
+        return redirect(url_for('admin.seasons'))
     from models import _DEFAULT_INVITE_MESSAGE
     return render_template('admin/league_settings.html', settings=settings,
                            active_season=active_season,

@@ -139,4 +139,48 @@
   </tbody>
 </table>
 </form>
+
+{% if roster_filter == 'all' and unrostered_bowlers %}
+<h6 class="mt-4 text-muted">Not on {{ season.name }} roster</h6>
+<table class="table table-sm table-hover">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>First</th>
+      <th>Email / Access</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for b in unrostered_bowlers %}
+  <tr class="text-muted">
+    <td>{{ b.last_name }}</td>
+    <td>{{ b.first_name or '' }}</td>
+    <td>
+      {% if b.email %}
+        <span class="font-monospace" style="font-size:0.75rem">{{ b.email }}</span>
+        {% set acct = access_map.get(b.id) %}
+        {% if acct %}
+        <br><span class="text-muted" style="font-size:0.7rem">
+          {{ acct.auth_method | replace('_', ' ') | title }}
+          — {{ acct.last_login.strftime('%b %d') if acct.last_login else 'never' }}
+        </span>
+        {% else %}
+        <br><span class="text-muted" style="font-size:0.7rem">— no access yet</span>
+        {% endif %}
+      {% else %}
+        <span class="text-muted" style="font-size:0.8rem">— no email</span>
+      {% endif %}
+    </td>
+    <td>
+      <a href="{{ url_for('admin.edit_bowler', bowler_id=b.id, season_id=season.id) }}"
+         class="btn btn-sm btn-outline-secondary">Edit Bowler</a>
+      <a href="{{ url_for('admin.add_bowler', season_id=season.id, bowler_id=b.id) }}"
+         class="btn btn-sm btn-outline-primary">Add to Roster</a>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
 {% endblock %}
