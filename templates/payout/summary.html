@@ -116,7 +116,7 @@
         {% endfor %}
         <tr class="table-light">
           <td colspan="4" class="text-end pe-2 fst-italic small">
-            {{ ind.bowler.last_name }} total
+            <a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=ind.bowler.id) }}" class="text-decoration-none text-reset">{{ ind.bowler.last_name }}</a> total
           </td>
           <td class="text-end fw-bold">${{ ind.total | int }}</td>
         </tr>
@@ -138,7 +138,7 @@
       <tr>
         <td>Wk {{ item.week_num }} — {{ item.tournament_type }}</td>
         <td>{{ item.place }}</td>
-        <td>{{ item.display_name }}</td>
+        <td>{% if item.bowler %}<a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=item.bowler.id) }}" class="text-decoration-none text-body">{{ item.display_name }}</a>{% else %}{{ item.display_name }}{% endif %}</td>
         <td class="text-end">{{ item.score }}</td>
         <td class="text-end">${{ item.amount | int }}</td>
       </tr>
@@ -217,7 +217,7 @@
       {% for ind in payout.individual_payouts %}
       {% set bd = breakdowns[ind.bowler.id] %}
       <tr>
-        <td>{{ ind.bowler.last_name }}{% if ind.bowler.nickname %} ({{ ind.bowler.nickname }}){% endif %}</td>
+        <td><a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=ind.bowler.id) }}" class="text-decoration-none text-body">{{ ind.bowler.last_name }}{% if ind.bowler.nickname %} ({{ ind.bowler.nickname }}){% endif %}</a></td>
         <td class="text-end fw-bold">${{ ind.total | int }}</td>
         {% for d in denoms %}
         <td class="text-end {{ 'text-muted' if bd[d] == 0 else '' }}">{{ bd[d] if bd[d] else '—' }}</td>

@@ -90,7 +90,8 @@ def bowler_detail(season_id, bowler_id):
             'place':            place,
             'score':            score,
         })
-    tournament_placements.sort(key=lambda x: x['season'].name)
+    _tt_order = {'indiv_scratch': 0, 'indiv_hcp_1': 1, 'indiv_hcp_2': 2}
+    tournament_placements.sort(key=lambda x: (_tt_order.get(x['tournament_type'], 99), x['season'].name))
 
     return render_template('reports/bowler_detail.html',
                            season=season, bowler=bowler,
