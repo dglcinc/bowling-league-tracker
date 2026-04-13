@@ -38,6 +38,18 @@ class Bowler(UserMixin, db.Model):
         return f'<Bowler {self.last_name}>'
 
 
+_DEFAULT_INVITE_MESSAGE = (
+    "Please visit https://mlb.dglc.com to access the bowling app for the league and request a "
+    "one-time password to log in. It will run on your Apple or Android device, or your computer. "
+    "Use on your phone for quick information. Use on your tablet or computer for full stats and "
+    "history. The mobile version can be added to your home screen for easy access. Once you have "
+    "entered a one-time password, it will stay active for 90 days. You can set up a passkey or "
+    "touch/face id. On Apple, you must add the icon to your home screen first. You can access the "
+    "full app on your phone by following the link for that, but it will be a little tricky to "
+    "navigate on your phone. Enjoy!"
+)
+
+
 class LeagueSettings(db.Model):
     """Global league-level settings (single row, id=1)."""
     __tablename__ = 'league_settings'
@@ -46,6 +58,7 @@ class LeagueSettings(db.Model):
     league_name = db.Column(db.String(128), default='Mountain Lakes Men\'s Bowling League')
     use_nickname = db.Column(db.Boolean, default=False)
     show_captain_name = db.Column(db.Boolean, default=False)
+    invite_message = db.Column(db.Text)
 
 
 class Season(db.Model):

@@ -57,6 +57,8 @@ _VIEWER_DEFAULTS = [
     ('reports.print_batch',   'Print Batch',         False),
     ('records.records',       'Records',             True),
     ('records.bowler_dir',    'Bowler Directory',    True),
+    ('entry.week_list',       'Scores (week list)',  True),
+    ('entry.week_entry',      'Scores (week view)',  True),
 ]
 
 
@@ -123,6 +125,8 @@ def _migrate_db(db):
         "ALTER TABLE weeks ADD COLUMN notif_tomorrow_sent BOOLEAN DEFAULT 0",
         "ALTER TABLE weeks ADD COLUMN notif_tonight_sent BOOLEAN DEFAULT 0",
         "ALTER TABLE weeks ADD COLUMN notif_scores_sent BOOLEAN DEFAULT 0",
+        # Configurable invite message for "Send Invite to Selected" on roster page
+        "ALTER TABLE league_settings ADD COLUMN invite_message TEXT",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:

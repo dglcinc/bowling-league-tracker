@@ -215,9 +215,13 @@ def ytd_alpha(season_id, week_num):
     rows = get_wkly_alpha(season_id, week_num)
     rows = sorted(rows, key=lambda r: r['bowler'].last_name)
     weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
+    teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
+    team_filter = request.args.get('team', '')
+    if team_filter:
+        rows = [r for r in rows if r.get('team') and r['team'].name == team_filter]
     return render_template('reports/ytd_alpha.html',
                            season=season, week=week, week_num=week_num,
-                           rows=rows, weeks=weeks)
+                           rows=rows, weeks=weeks, teams=teams, team_filter=team_filter)
 
 
 

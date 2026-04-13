@@ -28,26 +28,6 @@
   </div>
 </div>
 
-{% if entered_weeks %}
-<h5>Entered Weeks</h5>
-<table class="table table-sm table-hover mb-4" style="max-width:500px">
-  <thead><tr><th>Week</th><th>Date</th><th>Type</th><th></th></tr></thead>
-  <tbody>
-  {% for w in entered_weeks %}
-  <tr>
-    <td>{{ w.week_num }}</td>
-    <td>{{ w.date.strftime('%b %d, %Y') if w.date else '—' }}</td>
-    <td>{{ w.tournament_type or ('Position Night' if w.is_position_night else 'Regular') }}</td>
-    <td>
-      <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=w.week_num) }}" class="btn btn-xs btn-outline-secondary" style="font-size:0.75rem;padding:1px 6px">Scores</a>
-      <a href="{{ url_for('admin.email_compose', season_id=season.id, week_num=w.week_num) }}" class="btn btn-xs btn-outline-primary" style="font-size:0.75rem;padding:1px 6px">Email</a>
-    </td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% endif %}
-
 <h5>Teams <small class="text-muted fw-normal" style="font-size:0.75rem">Click a team to edit name &amp; captain</small></h5>
 <div class="row mb-4">
   {% for team in teams %}
@@ -60,20 +40,23 @@
   {% endfor %}
 </div>
 
-<h5>Roster ({{ roster|selectattr('active')|list|length }} active, {{ roster|rejectattr('active')|list|length }} inactive)</h5>
+<div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
+  <h5 class="mb-0">Roster</h5>
+  <div class="btn-group btn-group-sm" role="group">
+    <a href="{{ url_for('admin.season_detail', season_id=season.id, roster_filter='active') }}"
+       class="btn btn-outline-secondary {{ 'active' if roster_filter == 'active' else '' }}">Active</a>
+    <a href="{{ url_for('admin.season_detail', season_id=season.id, roster_filter='all') }}"
+       class="btn btn-outline-secondary {{ 'active' if roster_filter == 'all' else '' }}">All</a>
+  </div>
+  <small class="text-muted">{{ roster|length }} bowler{{ 's' if roster|length != 1 else '' }}</small>
+</div>
 
 <form method="post" action="{{ url_for('admin.send_magic_links', season_id=season.id) }}" id="rosterForm">
 <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
   <button type="submit" class="btn btn-sm btn-outline-primary"
           onclick="return document.querySelectorAll('[name=bowler_ids]:checked').length > 0 || (alert('Select at least one bowler.'), false)">
-    Send OTP to Selected
+    Send Invite to Selected
   </button>
-  <div class="form-check mb-0">
-    <input type="checkbox" class="form-check-input" name="registration" id="regInvite" value="1">
-    <label class="form-check-label" for="regInvite" style="font-size:0.85rem">
-      Registration invite <span class="text-muted">(subject: [League Name] App Registration)</span>
-    </label>
-  </div>
   <button type="button" class="btn btn-sm btn-outline-secondary"
           onclick="document.querySelectorAll('[name=bowler_ids]').forEach(function(cb){cb.checked=!cb.checked})">
     Toggle All
