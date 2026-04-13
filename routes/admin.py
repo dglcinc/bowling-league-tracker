@@ -2,7 +2,7 @@
 Admin routes: season setup, roster management, schedule entry, season rollover.
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission, TournamentEntry
 from datetime import date, timedelta
 import io
@@ -148,9 +148,13 @@ def season_detail(season_id):
         existing = access_map.get(a.bowler_id)
         if not existing or (a.last_login and (not existing.last_login or a.last_login > existing.last_login)):
             access_map[a.bowler_id] = a
+    sender_email = current_app.config.get('GRAPH_SENDER_EMAIL', '')
+    graph_configured = bool(current_app.config.get('GRAPH_CLIENT_ID'))
     return render_template('admin/season_detail.html',
                            season=season, teams=teams, roster=roster,
-                           roster_filter=roster_filter, access_map=access_map)
+                           roster_filter=roster_filter, access_map=access_map,
+                           sender_email=sender_email,
+                           graph_configured=graph_configured)
 
 
 @admin_bp.route('/seasons/<int:season_id>/send-magic-links', methods=['POST'])
@@ -191,6 +195,61 @@ def send_magic_links(season_id):
     if failed:
         parts.append(f'{failed} failed — check Graph API config')
     flash(', '.join(parts) + '.', 'success' if not failed else 'warning')
+    return redirect(url_for('admin.season_detail', season_id=season_id))
+
+
+@admin_bp.route('/seasons/<int:season_id>/send-email', methods=['POST'])
+def send_email(season_id):
+    import html as _html
+    season = Season.query.get_or_404(season_id)
+    subject = request.form.get('subject', '').strip()
+    body_text = request.form.get('body', '').strip()
+    recipient_mode = request.form.get('recipient_mode', 'selected')
+    bcc_self = request.form.get('bcc_self') == '1'
+
+    if not subject or not body_text:
+        flash('Subject and body are required.', 'warning')
+        return redirect(url_for('admin.season_detail', season_id=season_id))
+
+    if recipient_mode == 'selected':
+        bowler_ids = request.form.getlist('bowler_ids', type=int)
+        bowlers = Bowler.query.filter(Bowler.id.in_(bowler_ids)).all() if bowler_ids else []
+    elif recipient_mode == 'all_active':
+        active_ids = [r.bowler_id for r in
+                      Roster.query.filter_by(season_id=season_id, active=True).all()]
+        bowlers = Bowler.query.filter(Bowler.id.in_(active_ids)).all()
+    elif recipient_mode == 'team':
+        team_id = request.form.get('team_id', type=int)
+        if team_id:
+            t_ids = [r.bowler_id for r in
+                     Roster.query.filter_by(season_id=season_id, team_id=team_id, active=True).all()]
+            bowlers = Bowler.query.filter(Bowler.id.in_(t_ids)).all()
+        else:
+            bowlers = []
+    else:
+        bowlers = []
+
+    recipient_emails = [b.email for b in bowlers if b.email]
+    if not recipient_emails:
+        flash('No recipients with email addresses found.', 'warning')
+        return redirect(url_for('admin.season_detail', season_id=season_id))
+
+    html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
+
+    sender_email = current_app.config.get('GRAPH_SENDER_EMAIL', '')
+    if bcc_self and sender_email:
+        to_list = [sender_email]
+        bcc_list = recipient_emails
+    else:
+        to_list = recipient_emails
+        bcc_list = []
+
+    try:
+        _send_via_graph(current_app.config, subject, html_body, to_list, bcc_list)
+        flash(f'Email sent to {len(recipient_emails)} recipient(s).', 'success')
+    except Exception as exc:
+        flash(f'Email failed: {exc}', 'danger')
+
     return redirect(url_for('admin.season_detail', season_id=season_id))
 
 

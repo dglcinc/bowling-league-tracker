@@ -4,7 +4,7 @@ Records route: all-time leaderboards and season comparison table.
 
 from collections import defaultdict
 from flask import Blueprint, render_template, request
-from models import (db, Season, Week, Bowler, MatchupEntry, TournamentEntry, TeamPoints, Roster)
+from models import (db, Season, Week, Bowler, MatchupEntry, TournamentEntry, TeamPoints, Roster, Team)
 from calculations import get_bowler_stats, get_team_standings
 
 records_bp = Blueprint('records', __name__)
@@ -294,16 +294,36 @@ def records():
 @records_bp.route('/bowler_dir')
 def bowler_dir():
     from calculations import get_career_stats
+    team_filter = request.args.get('team', '')
+
+    # All distinct team names across all seasons (for filter buttons)
+    all_teams = (db.session.query(Team.name)
+                 .distinct()
+                 .order_by(Team.name)
+                 .all())
+    all_team_names = [t.name for t in all_teams]
+
+    # When a team filter is active, limit to bowlers who ever played for that team
+    if team_filter:
+        filtered_ids = (
+            db.session.query(Roster.bowler_id)
+            .join(Team, Roster.team_id == Team.id)
+            .filter(Team.name == team_filter)
+            .distinct()
+            .all()
+        )
+        allowed_ids = {r.bowler_id for r in filtered_ids}
+    else:
+        allowed_ids = None
+
     bowlers = Bowler.query.order_by(Bowler.last_name, Bowler.first_name).all()
     dir_entries = []
-    # Pre-build a set of bowler IDs that have at least one roster entry so we
-    # can include bowlers whose career stats are all inactive/empty (e.g. legacy
-    # members who were listed but never scored) while still excluding pure
-    # system/admin accounts that were never in any season.
     rostered_ids = {r.bowler_id for r in Roster.query.with_entities(Roster.bowler_id).all()}
 
     for bowler in bowlers:
         if bowler.id not in rostered_ids:
+            continue
+        if allowed_ids is not None and bowler.id not in allowed_ids:
             continue
         career = get_career_stats(bowler.id)
         scored = [r for r in career if r['has_data']]
@@ -315,4 +335,7 @@ def bowler_dir():
             'best_avg':  best_avg,
             'best_hg':   best_hg,
         })
-    return render_template('reports/bowler_dir.html', dir_entries=dir_entries)
+    return render_template('reports/bowler_dir.html',
+                           dir_entries=dir_entries,
+                           team_filter=team_filter,
+                           all_team_names=all_team_names)
