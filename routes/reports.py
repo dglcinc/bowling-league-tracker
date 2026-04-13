@@ -33,8 +33,10 @@ _PLACEHOLDER_VALUES = {100, 200, 300}
 
 
 def _is_placeholder(te):
-    g = te.games
-    return len(g) == 1 and g[0] in _PLACEHOLDER_VALUES
+    """True for entries with only placeholder scores (game1=100/200/300, all others None or 0)."""
+    if te.game1 not in _PLACEHOLDER_VALUES:
+        return False
+    return not any([te.game2, te.game3, te.game4, te.game5])
 
 
 @reports_bp.route('/season/<int:season_id>/bowler/<int:bowler_id>')
@@ -70,9 +72,10 @@ def bowler_detail(season_id, bowler_id):
         s = Season.query.get(te.season_id)
         is_ph = _is_placeholder(te)
         if wk.tournament_type == 'indiv_scratch':
-            score = te.total_scratch if not is_ph else None
+            raw_score = te.total_scratch
         else:
-            score = te.total_with_hcp if not is_ph else None
+            raw_score = te.total_with_hcp
+        score = raw_score if (not is_ph and raw_score > 0) else None
         tournament_placements.append({
             'season':           s,
             'tournament_type':  wk.tournament_type,

@@ -1570,10 +1570,9 @@ def tournament_placement(season_id):
                     season_id=season_id,
                     week_num=wk.week_num,
                     bowler_id=int(bowler_val),
-                    handicap=0,          # no handicap for historical placement entry
+                    handicap=0,
                     game1=score,
-                    game2=0,
-                    game3=0,
+                    place=place,
                 )
                 db.session.add(te)
                 has_entry = True

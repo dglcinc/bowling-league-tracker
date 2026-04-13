@@ -278,8 +278,7 @@
         {% for place in range(3) %}
         {% if entries | length > place %}
         {% set e = entries[place] %}
-        {% set eg = e.games %}
-        {% set is_ph = eg|length == 1 and eg[0] in [100, 200, 300] %}
+        {% set is_ph = e.game1 in [100, 200, 300] and not (e.game2 or e.game3 or e.game4 or e.game5) %}
         <td class="text-nowrap">
           {% if e.bowler %}
           {% set display %}{% if e.bowler.first_name %}{{ e.bowler.first_name[0] }}. {% endif %}{{ e.bowler.last_name }}{% if e.bowler.nickname %} ({{ e.bowler.nickname }}){% endif %}{% endset %}
@@ -288,7 +287,7 @@
           {% elif e.guest_name %}{{ e.guest_name }}{% else %}<span class="text-muted">—</span>{% endif %}
           {% if not is_ph %}
           {% set score = e.total_scratch if tt == 'indiv_scratch' else e.total_with_hcp %}
-          <small class="text-muted ms-1">({{ score }})</small>
+          {% if score > 0 %}<small class="text-muted ms-1">({{ score }})</small>{% endif %}
           {% endif %}
         </td>
         {% else %}
