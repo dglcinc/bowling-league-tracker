@@ -58,6 +58,8 @@ def week_entry(season_id, week_num):
     matchup_data = []
     for sched in matchups:
         for team in [sched.team1, sched.team2]:
+            if team is None:
+                continue
             entries = (MatchupEntry.query
                        .filter_by(season_id=season_id, week_num=week_num,
                                   matchup_num=sched.matchup_num, team_id=team.id)
