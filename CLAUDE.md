@@ -13,7 +13,7 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
-- No open PRs — PRs #37–#69 all merged to main
+- No open PRs — PRs #37–#86 all merged to main
 
 ## League Structure
 
@@ -199,6 +199,11 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 - Historical data uses `matchup_num = team_number` as a simplification; corrected per-week via Assign Matchups admin tool
 - TeamPoints for historical seasons come from the spreadsheet directly, not recomputed from scores
 - Viewer permissions stored in `viewer_permissions` table (endpoint → viewer_accessible bool); managed via Admin → Settings
+- Post-season `ScheduleEntry` rows can have `team1_id = NULL` / `team2_id = NULL` (club championship uses all 4 teams via position night, no fixed pairing). `score_position_night` skips null-team entries; `position_entry` falls back to all season teams when scheds[0].team1/.team2 are None.
+- **Club championship finalists rule**: `tournament_placement` route checks if first-half and second-half points leaders are the same team. If so, that team plays the second-place second-half team (not an automatic win). Otherwise the two half-winners are the finalists.
+- **Season selector JS** (base.html): admin routes use `/seasons/<id>` (plural, no trailing slash); entry routes use `/season/<id>/` (singular, with slash). `replaceSeasonInPath()` handles both patterns. `onSeasonScopedPage` detects both.
+- **Sortable columns**: `sortable-head` class on `<thead>`, `data-sort="num"|"text"` on `<th>`, optional `data-sort-val` on `<td>` when display differs from sort value (e.g. medal emoji, "3, 3, 3" games string, score+name cell). Applied to: Weekly Alpha, YTD Alpha, Bowler Directory, Records (All-Time + By Season + Most Improved), Bowler Detail (all 3 tables).
+- Records By Season tab: two-row merged header was flattened to single row (required for column-index sort to match td positions). Column labels abbreviated to HG Scr / HG Hcp / HS Scr / HS Hcp.
 
 ### Deployment
 
