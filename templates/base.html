@@ -382,5 +382,49 @@ if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw
   });
 })();
 </script>
+
+<script>
+// ── Sortable table columns ──────────────────────────────────────────────────
+// Mark a <thead> as sortable with class="sortable-head".
+// Each <th> may have data-sort="num" (numeric) or data-sort="text" (default).
+// Clicking a <th> sorts the corresponding <tbody> rows; clicking again reverses.
+(function () {
+  document.querySelectorAll('thead.sortable-head').forEach(function (thead) {
+    var table = thead.closest('table');
+    var tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    thead.querySelectorAll('th[data-sort]').forEach(function (th, colIdx) {
+      th.style.cursor = 'pointer';
+      th.title = 'Click to sort';
+      var asc = null; // null = unsorted
+      th.addEventListener('click', function () {
+        asc = (asc === null || asc === false) ? true : false;
+        var rows = Array.from(tbody.querySelectorAll('tr'));
+        var isNum = th.dataset.sort === 'num';
+        rows.sort(function (a, b) {
+          var av = cellVal(a, colIdx), bv = cellVal(b, colIdx);
+          if (isNum) {
+            var an = parseFloat(av) || 0, bn = parseFloat(bv) || 0;
+            return asc ? an - bn : bn - an;
+          }
+          return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+        });
+        rows.forEach(function (r) { tbody.appendChild(r); });
+        // Update sort indicators
+        thead.querySelectorAll('th[data-sort]').forEach(function (h) {
+          h.textContent = h.textContent.replace(/ [▲▼]$/, '');
+        });
+        th.textContent += asc ? ' ▲' : ' ▼';
+      });
+    });
+  });
+
+  function cellVal(row, colIdx) {
+    var cells = row.querySelectorAll('td');
+    var cell = cells[colIdx];
+    return cell ? (cell.dataset.sortVal || cell.textContent.trim().replace(/[,\s]+/g, '')) : '';
+  }
+})();
+</script>
 </body>
 </html>

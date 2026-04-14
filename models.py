@@ -449,6 +449,25 @@ class PushSubscription(db.Model):
         return f'<PushSubscription bowler={self.bowler_id} platform={self.platform}>'
 
 
+class ClubChampionshipResult(db.Model):
+    """
+    Records team placements for the Club Championship (post-season week 23).
+    Determined by total wood in a first-half vs second-half bracket — not
+    computable from regular-season points, so must be entered manually.
+    """
+    __tablename__ = 'club_championship_results'
+
+    id       = db.Column(db.Integer, primary_key=True)
+    season_id = db.Column(db.Integer, db.ForeignKey('seasons.id'), nullable=False)
+    team_id  = db.Column(db.Integer, db.ForeignKey('teams.id'),   nullable=False)
+    place    = db.Column(db.Integer, nullable=False)  # 1 / 2 / 3 / 4
+
+    team = db.relationship('Team')
+
+    def __repr__(self):
+        return f'<ClubChampionshipResult season={self.season_id} place={self.place} team={self.team_id}>'
+
+
 class Snapshot(db.Model):
     """Weekly JSON snapshot of all stats, auto-saved after entry."""
     __tablename__ = 'snapshots'

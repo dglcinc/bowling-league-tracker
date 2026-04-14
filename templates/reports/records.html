@@ -87,7 +87,7 @@
       <h6>All-Time High Game — Scratch</h6>
       <div class="table-scroll">
       <table class="table table-sm table-bordered table-striped mb-0">
-        <thead class="table-dark"><tr><th>#</th><th>Bowler</th><th>Score</th><th>Season</th></tr></thead>
+        <thead class="table-dark sortable-head"><tr><th data-sort="num">#</th><th data-sort="text">Bowler</th><th data-sort="num">Score</th><th data-sort="text">Season</th></tr></thead>
         <tbody>
           {% for row in all_time_hg_s %}
           <tr>
@@ -107,7 +107,7 @@
       <h6>All-Time High Game — Handicap</h6>
       <div class="table-scroll">
       <table class="table table-sm table-bordered table-striped mb-0">
-        <thead class="table-dark"><tr><th>#</th><th>Bowler</th><th>Score</th><th>Season</th></tr></thead>
+        <thead class="table-dark sortable-head"><tr><th data-sort="num">#</th><th data-sort="text">Bowler</th><th data-sort="num">Score</th><th data-sort="text">Season</th></tr></thead>
         <tbody>
           {% for row in all_time_hg_h %}
           <tr>
@@ -131,7 +131,7 @@
       <h6>All-Time High Series — Scratch</h6>
       <div class="table-scroll">
       <table class="table table-sm table-bordered table-striped mb-0">
-        <thead class="table-dark"><tr><th>#</th><th>Bowler</th><th>Score</th><th>Season</th></tr></thead>
+        <thead class="table-dark sortable-head"><tr><th data-sort="num">#</th><th data-sort="text">Bowler</th><th data-sort="num">Score</th><th data-sort="text">Season</th></tr></thead>
         <tbody>
           {% for row in all_time_hs_s %}
           <tr>
@@ -151,7 +151,7 @@
       <h6>All-Time High Series — Handicap</h6>
       <div class="table-scroll">
       <table class="table table-sm table-bordered table-striped mb-0">
-        <thead class="table-dark"><tr><th>#</th><th>Bowler</th><th>Score</th><th>Season</th></tr></thead>
+        <thead class="table-dark sortable-head"><tr><th data-sort="num">#</th><th data-sort="text">Bowler</th><th data-sort="num">Score</th><th data-sort="text">Season</th></tr></thead>
         <tbody>
           {% for row in all_time_hs_h %}
           <tr>
@@ -173,8 +173,8 @@
   <h6>Best Single-Season Averages (min 6 games)</h6>
   <div class="table-scroll">
   <table class="table table-sm table-bordered table-striped mb-0">
-    <thead class="table-dark">
-      <tr><th>#</th><th>Bowler</th><th>Avg</th><th>Games</th><th>Season</th></tr>
+    <thead class="table-dark sortable-head">
+      <tr><th data-sort="num">#</th><th data-sort="text">Bowler</th><th data-sort="num">Avg</th><th data-sort="num">Games</th><th data-sort="text">Season</th></tr>
     </thead>
     <tbody>
       {% for row in top_season_avgs %}
@@ -263,16 +263,28 @@
     </thead>
     {% for row in tournament_winners %}
     <tbody>
+      {# Club Championship row (team competition) #}
+      {% if row.club_by_place %}
+      <tr>
+        <td rowspan="{{ 1 + (['indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'] | length) }}"
+            class="align-top text-nowrap fw-semibold">{{ row.season.name }}</td>
+        <td class="text-muted small">{{ row.season.tournament_labels.get('club_championship', 'Club Championship') }}</td>
+        {% for place in range(3) %}
+        {% set r = row.club_by_place.get(place + 1) %}
+        <td class="text-nowrap">
+          {% if r %}
+            {% if r.team.captain_name %}{{ r.team.captain_name }}{% else %}{{ r.team.name }}{% endif %}
+          {% else %}<span class="text-muted">—</span>{% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endif %}
+      {# Individual tournaments #}
       {% for tt in ['indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'] %}
       {% set entries = row[tt] %}
       <tr>
-        {% if loop.first %}
-        <td rowspan="3" class="align-top text-nowrap fw-semibold">
-          {{ row.season.name }}
-          {% if row.champion_team %}
-          <br><small class="text-muted fw-normal">{{ row.champion_team.name }}</small>
-          {% endif %}
-        </td>
+        {% if loop.first and not row.club_by_place %}
+        <td rowspan="3" class="align-top text-nowrap fw-semibold">{{ row.season.name }}</td>
         {% endif %}
         <td class="text-muted small">{{ row.season.tournament_labels.get(tt, tt) }}</td>
         {% for place in range(3) %}
@@ -315,8 +327,8 @@
   <p class="text-muted small">Largest average increase from one bowled season to the next.</p>
   <div class="table-scroll">
   <table class="table table-sm table-bordered table-striped">
-    <thead class="table-dark">
-      <tr><th>#</th><th>Bowler</th><th>From</th><th>Avg</th><th>To</th><th>Avg</th><th>Gain</th></tr>
+    <thead class="table-dark sortable-head">
+      <tr><th data-sort="num">#</th><th data-sort="text">Bowler</th><th data-sort="text">From</th><th data-sort="num">Avg</th><th data-sort="text">To</th><th data-sort="num">Avg</th><th data-sort="num">Gain</th></tr>
     </thead>
     <tbody>
       {% for row in most_improved %}

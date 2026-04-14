@@ -27,12 +27,12 @@
 {% else %}
 <div class="table-scroll">
 <table class="table table-sm table-bordered table-striped">
-  <thead class="table-dark">
+  <thead class="table-dark sortable-head">
     <tr>
-      <th>Bowler</th>
-      <th>Seasons</th>
-      <th>Best Avg</th>
-      <th>Best HG</th>
+      <th data-sort="text">Bowler</th>
+      <th data-sort="num">Seasons</th>
+      <th data-sort="num">Best Avg</th>
+      <th data-sort="num">Best HG</th>
     </tr>
   </thead>
   <tbody>
@@ -50,7 +50,7 @@
         <span class="badge bg-warning text-dark ms-1" style="font-size:.7rem">Editor</span>
         {% endif %}
       </td>
-      <td>
+      <td data-sort-val="{{ entry.career | selectattr('has_data', 'equalto', true) | list | length }}">
         {% for row in entry.career %}
         {% if row.has_data %}
         <a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=entry.bowler.id) }}"
