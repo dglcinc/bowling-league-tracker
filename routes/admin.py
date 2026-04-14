@@ -1551,14 +1551,15 @@ def tournament_placement(season_id):
     from calculations import get_team_standings
     first_half  = get_team_standings(season_id, half=1)
     second_half = get_team_standings(season_id, half=2)
-    # Build ordered list of the two finalist teams (deduplicated in case same team won both)
-    finalist_teams = []
-    seen_ids = set()
-    for row in [first_half[0] if first_half else None,
-                second_half[0] if second_half else None]:
-        if row and row['team'].id not in seen_ids:
-            finalist_teams.append(row['team'])
-            seen_ids.add(row['team'].id)
+    fh_winner = first_half[0]['team']  if first_half  else None
+    sh_winner = second_half[0]['team'] if second_half else None
+    if fh_winner and sh_winner and fh_winner.id == sh_winner.id:
+        # Same team won both halves: they play the second-place second-half team
+        finalist_teams = [fh_winner]
+        if len(second_half) > 1:
+            finalist_teams.append(second_half[1]['team'])
+    else:
+        finalist_teams = [t for t in [fh_winner, sh_winner] if t is not None]
     # Fall back to all season teams if points data isn't available
     if not finalist_teams:
         finalist_teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
