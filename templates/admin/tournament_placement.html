@@ -25,14 +25,14 @@
   <div class="card mb-4" style="max-width:500px">
     <div class="card-header fw-semibold">
       {{ tournament_labels.get('club_championship', 'Club Championship') }}
-      <small class="text-muted ms-2">Team Competition</small>
+      <small class="text-muted ms-2">Season Championship</small>
     </div>
     <div class="card-body">
-      {% set place_labels = {1: '🥇 Champion', 2: '🥈 2nd Place', 3: '🥉 3rd Place', 4: '4th Place'} %}
-      {% for place in [1, 2, 3, 4] %}
+      <p class="text-muted small mb-3">The first-half and second-half winners face off for the season championship. The winner is shown under the season year on the Records page.</p>
+      {% for place, label in [(1, 'First Half Winner'), (2, 'Second Half Winner')] %}
       {% set result = club_results.get(place) %}
       <div class="mb-2">
-        <label class="form-label small fw-semibold">{{ place_labels[place] }}</label>
+        <label class="form-label small fw-semibold">{{ label }}</label>
         <select name="club_place{{ place }}" class="form-select form-select-sm">
           <option value="">— not recorded —</option>
           {% for team in season_teams %}
