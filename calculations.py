@@ -429,9 +429,11 @@ def score_position_night(season_id, week_num):
         season_id=season_id, week_num=week_num
     ).all()
 
-    # Find unique team pairings
+    # Find unique team pairings (skip post-season entries with null team IDs)
     pairings = {}
     for sched in schedule:
+        if sched.team1_id is None or sched.team2_id is None:
+            continue
         key = tuple(sorted([sched.team1_id, sched.team2_id]))
         if key not in pairings:
             pairings[key] = []
