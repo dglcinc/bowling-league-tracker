@@ -204,18 +204,16 @@
   <p class="text-muted small">High game and series are the best individual score recorded that season (scratch = actual pins; handicap = pins + handicap applied).</p>
   <div class="table-scroll">
   <table class="table table-sm table-bordered table-striped">
-    <thead class="table-dark">
+    <thead class="table-dark sortable-head">
       <tr>
-        <th rowspan="2" class="align-middle">Season</th>
-        <th rowspan="2" class="align-middle">Bowlers</th>
-        <th rowspan="2" class="align-middle">League Avg</th>
-        <th colspan="2" class="text-center">High Game</th>
-        <th colspan="2" class="text-center">High Series</th>
-        <th rowspan="2" class="align-middle">Team Champion</th>
-      </tr>
-      <tr>
-        <th>Scratch</th><th>Hcp</th>
-        <th>Scratch</th><th>Hcp</th>
+        <th data-sort="text">Season</th>
+        <th data-sort="num">Bowlers</th>
+        <th data-sort="num">League Avg</th>
+        <th data-sort="num">HG Scr</th>
+        <th data-sort="num">HG Hcp</th>
+        <th data-sort="num">HS Scr</th>
+        <th data-sort="num">HS Hcp</th>
+        <th data-sort="text">Team Champion</th>
       </tr>
     </thead>
     <tbody>
@@ -224,10 +222,10 @@
         <td>{{ row.season.name }}</td>
         <td>{{ row.bowler_count }}</td>
         <td>{{ row.league_avg }}</td>
-        <td><strong>{{ row.hg_scratch }}</strong> <small class="text-muted"><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.hg_scratch_bowler.id) }}" class="text-decoration-none text-reset">{{ row.hg_scratch_bowler.last_name }}</a></small></td>
-        <td><strong>{{ row.hg_hcp }}</strong> <small class="text-muted"><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.hg_hcp_bowler.id) }}" class="text-decoration-none text-reset">{{ row.hg_hcp_bowler.last_name }}</a></small></td>
-        <td><strong>{{ row.hs_scratch }}</strong> <small class="text-muted"><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.hs_scratch_bowler.id) }}" class="text-decoration-none text-reset">{{ row.hs_scratch_bowler.last_name }}</a></small></td>
-        <td><strong>{{ row.hs_hcp }}</strong> <small class="text-muted"><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.hs_hcp_bowler.id) }}" class="text-decoration-none text-reset">{{ row.hs_hcp_bowler.last_name }}</a></small></td>
+        <td data-sort-val="{{ row.hg_scratch }}"><strong>{{ row.hg_scratch }}</strong> <small class="text-muted"><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.hg_scratch_bowler.id) }}" class="text-decoration-none text-reset">{{ row.hg_scratch_bowler.last_name }}</a></small></td>
+        <td data-sort-val="{{ row.hg_hcp }}"><strong>{{ row.hg_hcp }}</strong> <small class="text-muted"><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.hg_hcp_bowler.id) }}" class="text-decoration-none text-reset">{{ row.hg_hcp_bowler.last_name }}</a></small></td>
+        <td data-sort-val="{{ row.hs_scratch }}"><strong>{{ row.hs_scratch }}</strong> <small class="text-muted"><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.hs_scratch_bowler.id) }}" class="text-decoration-none text-reset">{{ row.hs_scratch_bowler.last_name }}</a></small></td>
+        <td data-sort-val="{{ row.hs_hcp }}"><strong>{{ row.hs_hcp }}</strong> <small class="text-muted"><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.hs_hcp_bowler.id) }}" class="text-decoration-none text-reset">{{ row.hs_hcp_bowler.last_name }}</a></small></td>
         <td>{{ row.champion_team.name if row.champion_team else '—' }}</td>
       </tr>
       {% else %}
