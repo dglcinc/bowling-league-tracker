@@ -272,7 +272,7 @@
           {{ row.season.name }}
           {% if champion %}
           <br><small class="text-muted fw-normal">
-            {% if champion.team.captain_name %}{{ champion.team.captain_name }}{% else %}{{ champion.team.name }}{% endif %}
+            {{ champion.team.name }}{% if champion.team.captain_name %} ({{ champion.team.captain_name }}){% endif %}
           </small>
           {% endif %}
         </td>
