@@ -1584,9 +1584,9 @@ def tournament_placement(season_id):
             if has_entry and not wk.is_entered:
                 wk.is_entered = True
 
-        # ── Club Championship team placements ─────────────────────
+        # ── Club Championship team placements (place 1=first-half winner, 2=second-half winner)
         ClubChampionshipResult.query.filter_by(season_id=season_id).delete()
-        for place in range(1, 5):
+        for place in range(1, 3):
             team_val = request.form.get(f'club_place{place}', '').strip()
             if not team_val:
                 continue

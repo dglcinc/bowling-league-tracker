@@ -262,29 +262,20 @@
       </tr>
     </thead>
     {% for row in tournament_winners %}
+    {% set champion = row.club_by_place.get(1) %}
     <tbody>
-      {# Club Championship row (team competition) #}
-      {% if row.club_by_place %}
-      <tr>
-        <td rowspan="{{ 1 + (['indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'] | length) }}"
-            class="align-top text-nowrap fw-semibold">{{ row.season.name }}</td>
-        <td class="text-muted small">{{ row.season.tournament_labels.get('club_championship', 'Club Championship') }}</td>
-        {% for place in range(3) %}
-        {% set r = row.club_by_place.get(place + 1) %}
-        <td class="text-nowrap">
-          {% if r %}
-            {% if r.team.captain_name %}{{ r.team.captain_name }}{% else %}{{ r.team.name }}{% endif %}
-          {% else %}<span class="text-muted">—</span>{% endif %}
-        </td>
-        {% endfor %}
-      </tr>
-      {% endif %}
-      {# Individual tournaments #}
       {% for tt in ['indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'] %}
       {% set entries = row[tt] %}
       <tr>
-        {% if loop.first and not row.club_by_place %}
-        <td rowspan="3" class="align-top text-nowrap fw-semibold">{{ row.season.name }}</td>
+        {% if loop.first %}
+        <td rowspan="3" class="align-top text-nowrap fw-semibold">
+          {{ row.season.name }}
+          {% if champion %}
+          <br><small class="text-muted fw-normal">
+            {% if champion.team.captain_name %}{{ champion.team.captain_name }}{% else %}{{ champion.team.name }}{% endif %}
+          </small>
+          {% endif %}
+        </td>
         {% endif %}
         <td class="text-muted small">{{ row.season.tournament_labels.get(tt, tt) }}</td>
         {% for place in range(3) %}
