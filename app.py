@@ -14,7 +14,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config
 from models import db
 from flask_mail import Mail
-from extensions import login_manager, limiter
+from extensions import login_manager, limiter, cache
 
 mail = Mail()
 
@@ -128,6 +128,13 @@ def _migrate_db(db):
         # Configurable invite message for "Send Invite to Selected" on roster page
         "ALTER TABLE league_settings ADD COLUMN invite_message TEXT",
         "ALTER TABLE tournament_entries ADD COLUMN place INTEGER",
+        # Club Championship team placements (manually entered; not derivable from scores)
+        """CREATE TABLE IF NOT EXISTS club_championship_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            season_id INTEGER NOT NULL REFERENCES seasons(id),
+            team_id   INTEGER NOT NULL REFERENCES teams(id),
+            place     INTEGER NOT NULL
+        )""",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:
@@ -208,6 +215,7 @@ def create_app():
     mail.init_app(app)
     login_manager.init_app(app)
     limiter.init_app(app)
+    cache.init_app(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 600})
 
     app.jinja_env.globals['enumerate'] = enumerate
 

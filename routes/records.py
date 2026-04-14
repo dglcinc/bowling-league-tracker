@@ -4,8 +4,9 @@ Records route: all-time leaderboards and season comparison table.
 
 from collections import defaultdict
 from flask import Blueprint, render_template, request
-from models import (db, Season, Week, Bowler, MatchupEntry, TournamentEntry, TeamPoints, Roster, Team)
+from models import (db, Season, Week, Bowler, MatchupEntry, TournamentEntry, TeamPoints, Roster, Team, ClubChampionshipResult)
 from calculations import get_bowler_stats, get_team_standings
+from extensions import cache
 
 records_bp = Blueprint('records', __name__)
 
@@ -184,12 +185,9 @@ def _season_comparison(seasons, summaries):
 def _tournament_winners_by_season(seasons):
     """
     For each season, return the top-3 placement for each individual tournament
-    (indiv_scratch, indiv_hcp_1, indiv_hcp_2) plus the club_championship team winner.
+    (indiv_scratch, indiv_hcp_1, indiv_hcp_2) plus club championship team results.
     Returns list of dicts, one per season with data.
     """
-    from calculations import get_team_standings
-
-    # Map tournament_type → week_num per season
     rows = []
     for season in seasons:
         # Individual tournament top-3 (from TournamentEntry, sorted by total desc)
@@ -213,19 +211,20 @@ def _tournament_winners_by_season(seasons):
                 entries.sort(key=lambda e: (e.place or 99, -(e.total_with_hcp)))
             indiv[tt] = entries[:3]
 
-        # Club championship: highest-points team in the club_champ week (team standings)
-        champion_team = None
-        standings = get_team_standings(season.id)
-        if standings:
-            champion_team = standings[0]['team']
+        # Club championship: from manually entered ClubChampionshipResult rows
+        club_results = (ClubChampionshipResult.query
+                        .filter_by(season_id=season.id)
+                        .order_by(ClubChampionshipResult.place)
+                        .all())
+        club_by_place = {r.place: r for r in club_results}
 
-        if any(indiv[tt] for tt in indiv) or champion_team:
+        if any(indiv[tt] for tt in indiv) or club_by_place:
             rows.append({
-                'season':         season,
-                'indiv_scratch':  indiv['indiv_scratch'],
-                'indiv_hcp_1':    indiv['indiv_hcp_1'],
-                'indiv_hcp_2':    indiv['indiv_hcp_2'],
-                'champion_team':  champion_team,
+                'season':        season,
+                'indiv_scratch': indiv['indiv_scratch'],
+                'indiv_hcp_1':   indiv['indiv_hcp_1'],
+                'indiv_hcp_2':   indiv['indiv_hcp_2'],
+                'club_by_place': club_by_place,  # {1: result, 2: result, ...}
             })
     return rows
 
@@ -237,6 +236,7 @@ _VENUE_LABELS = {
 
 
 @records_bp.route('/records')
+@cache.cached(timeout=600, query_string=True)
 def records():
     seasons, tournament_weeks = _get_season_data()
     venue_filter = request.args.get('venue', 'all')
@@ -293,6 +293,7 @@ def records():
 
 
 @records_bp.route('/bowler_dir')
+@cache.cached(timeout=600, query_string=True)
 def bowler_dir():
     from calculations import get_career_stats
     team_filter = request.args.get('team', '')

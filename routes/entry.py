@@ -8,6 +8,7 @@ from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
 from calculations import (score_matchup, score_position_night, calculate_handicap,
                           get_weekly_prizes, get_team_standings, get_matchup_breakdown,
                           get_position_night_breakdown)
+from extensions import cache
 from snapshots import save_snapshot
 from config import Config
 
@@ -537,6 +538,7 @@ def position_entry(season_id, week_num, pairing_num):
         if other_has_entries:
             week.is_entered = True
             db.session.commit()
+            cache.clear()  # bust Records and Bowler Directory caches
             try:
                 save_snapshot(season_id, week_num, Config.SNAPSHOT_DIR)
             except Exception as e:

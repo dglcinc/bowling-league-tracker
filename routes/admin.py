@@ -3,7 +3,8 @@ Admin routes: season setup, roster management, schedule entry, season rollover.
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
-from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission, TournamentEntry
+from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission, TournamentEntry, ClubChampionshipResult
+from extensions import cache
 from datetime import date, timedelta
 import io
 
@@ -1546,6 +1547,9 @@ def tournament_placement(season_id):
                    .order_by(Week.week_num)
                    .all())
 
+    # Teams for this season (for club championship dropdowns)
+    season_teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
+
     # All roster bowlers for this season (active + inactive), for the dropdowns
     roster_bowlers = (Bowler.query
                       .join(Roster, Roster.bowler_id == Bowler.id)
@@ -1554,7 +1558,7 @@ def tournament_placement(season_id):
                       .all())
 
     if request.method == 'POST':
-        # Scores assigned per placement — large enough spread to always sort correctly
+        # ── Individual tournament placements ──────────────────────
         PLACE_SCORES = {1: 300, 2: 200, 3: 100}
 
         for wk in indiv_weeks:
@@ -1580,11 +1584,24 @@ def tournament_placement(season_id):
             if has_entry and not wk.is_entered:
                 wk.is_entered = True
 
+        # ── Club Championship team placements ─────────────────────
+        ClubChampionshipResult.query.filter_by(season_id=season_id).delete()
+        for place in range(1, 5):
+            team_val = request.form.get(f'club_place{place}', '').strip()
+            if not team_val:
+                continue
+            db.session.add(ClubChampionshipResult(
+                season_id=season_id,
+                team_id=int(team_val),
+                place=place,
+            ))
+
         db.session.commit()
+        cache.clear()  # bust Records cache so new placements are visible immediately
         flash('Tournament placements saved.', 'success')
         return redirect(url_for('admin.season_detail', season_id=season_id))
 
-    # GET — pre-populate from existing entries (sorted by game1 desc = placement order)
+    # GET — pre-populate individual entries (sorted by game1 desc = placement order)
     existing = {}
     for wk in indiv_weeks:
         entries = (TournamentEntry.query
@@ -1593,9 +1610,15 @@ def tournament_placement(season_id):
                    .all())
         existing[wk.tournament_type] = entries
 
+    # GET — pre-populate club championship results
+    club_results = {r.place: r for r in
+                    ClubChampionshipResult.query.filter_by(season_id=season_id).all()}
+
     return render_template('admin/tournament_placement.html',
                            season=season,
                            indiv_weeks=indiv_weeks,
                            roster_bowlers=roster_bowlers,
                            existing=existing,
+                           season_teams=season_teams,
+                           club_results=club_results,
                            tournament_labels=season.tournament_labels)
