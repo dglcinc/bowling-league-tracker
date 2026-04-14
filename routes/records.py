@@ -162,8 +162,15 @@ def _season_comparison(seasons, summaries):
         best_hg_h = max(season_rows, key=lambda r: r['high_game_hcp'])
         best_hs_h = max(season_rows, key=lambda r: r['high_series_hcp'])
 
-        standings = get_team_standings(season.id)
-        champion_team = standings[0]['team'] if standings else None
+        # Prefer the recorded club championship winner; fall back to season points leader
+        ccr = ClubChampionshipResult.query.filter_by(
+            season_id=season.id, place=1
+        ).first()
+        if ccr:
+            champion_team = ccr.team
+        else:
+            standings = get_team_standings(season.id)
+            champion_team = standings[0]['team'] if standings else None
 
         rows.append({
             'season':            season,
