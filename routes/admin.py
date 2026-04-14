@@ -1547,8 +1547,22 @@ def tournament_placement(season_id):
                    .order_by(Week.week_num)
                    .all())
 
-    # Teams for this season (for club championship dropdowns)
-    season_teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
+    # Club championship finalists: first-half and second-half points leaders
+    from calculations import get_team_standings
+    first_half  = get_team_standings(season_id, half=1)
+    second_half = get_team_standings(season_id, half=2)
+    # Build ordered list of the two finalist teams (deduplicated in case same team won both)
+    finalist_teams = []
+    seen_ids = set()
+    for row in [first_half[0] if first_half else None,
+                second_half[0] if second_half else None]:
+        if row and row['team'].id not in seen_ids:
+            finalist_teams.append(row['team'])
+            seen_ids.add(row['team'].id)
+    # Fall back to all season teams if points data isn't available
+    if not finalist_teams:
+        finalist_teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
+    season_teams = finalist_teams
 
     # All roster bowlers for this season (active + inactive), for the dropdowns
     roster_bowlers = (Bowler.query
