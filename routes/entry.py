@@ -4,7 +4,7 @@ Score entry routes: weekly matchup entry, blind management, points calculation.
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
-                    TeamPoints, Roster, Bowler, TournamentEntry)
+                    TeamPoints, Roster, Bowler, TournamentEntry, Team)
 from calculations import (score_matchup, score_position_night, calculate_handicap,
                           get_weekly_prizes, get_team_standings, get_matchup_breakdown,
                           get_position_night_breakdown)
@@ -78,7 +78,6 @@ def week_entry(season_id, week_num):
             })
 
     # Weekly team points (shown whether entered or partially entered)
-    from models import Team
     teams_all = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
     wk_pts_raw = TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).all()
     wk_pts_by_team = {}
@@ -477,7 +476,10 @@ def position_entry(season_id, week_num, pairing_num):
 
     team1 = scheds[0].team1
     team2 = scheds[0].team2
-    teams = [team1, team2]
+    teams = [t for t in [team1, team2] if t is not None]
+    if not teams:
+        # Club championship: schedule entries have null team assignments; use all season teams
+        teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
 
     if request.method == 'POST':
         # Delete existing entries for both matchups in this pairing
