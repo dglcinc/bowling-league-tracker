@@ -333,7 +333,18 @@ if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw
     });
   }
 
-  var onSeasonScopedPage = /\/season\/\d+\//.test(window.location.pathname);
+  // Matches entry routes (/season/123/) and admin routes (/seasons/123)
+  var onSeasonScopedPage = /\/season\/\d+\//.test(window.location.pathname) ||
+                           /\/seasons\/\d+/.test(window.location.pathname);
+
+  // Rewrite a season ID in either URL pattern
+  function replaceSeasonInPath(path, newId) {
+    // Entry routes: /season/123/...
+    var r = path.replace(/\/season\/\d+\//, '/season/' + newId + '/');
+    if (r !== path) return r;
+    // Admin routes: /seasons/123 or /seasons/123/sub/path
+    return path.replace(/\/seasons\/\d+/, '/seasons/' + newId);
+  }
 
   // On season-scoped pages: persist the current season to localStorage so
   // non-season-scoped pages can pick up the user's last viewed season.
@@ -365,7 +376,7 @@ if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw
 
       storeSelection(newId, newWk, newName);
 
-      var updated = path.replace(/\/season\/\d+\//, '/season/' + newId + '/');
+      var updated = replaceSeasonInPath(path, newId);
       if (updated === path) {
         // Non-season-scoped page: update links without navigating away
         updateNavLinks(newId, newWk);
