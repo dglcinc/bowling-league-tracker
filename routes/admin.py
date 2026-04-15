@@ -151,11 +151,39 @@ def season_detail(season_id):
             access_map[a.bowler_id] = a
     sender_email = current_app.config.get('GRAPH_SENDER_EMAIL', '')
     graph_configured = bool(current_app.config.get('GRAPH_CLIENT_ID'))
+
+    # Avg leaders for High Averages email option — use latest entered week
+    import json as _json
+    from calculations import get_bowler_stats
+    latest_week = (Week.query
+                   .filter_by(season_id=season_id, is_entered=True)
+                   .order_by(Week.week_num.desc())
+                   .first())
+    avg_leaders_json = '[]'
+    if latest_week:
+        active_roster = Roster.query.filter_by(season_id=season_id, active=True).join(Bowler).all()
+        _leaders = []
+        for r in active_roster:
+            stats = get_bowler_stats(r.bowler_id, season_id, latest_week.week_num)
+            if stats['cumulative_games'] == 0:
+                continue
+            _leaders.append({
+                'bowler_id': r.bowler.id,
+                'last_name':  r.bowler.last_name,
+                'email':      r.bowler.email or '',
+                'games':      stats['cumulative_games'],
+                'average':    stats['running_avg'],
+                'handicap':   stats['display_handicap'],
+            })
+        _leaders.sort(key=lambda x: (-x['average'], x['last_name']))
+        avg_leaders_json = _json.dumps(_leaders)
+
     return render_template('admin/season_detail.html',
                            season=season, teams=teams, roster=roster,
                            roster_filter=roster_filter, access_map=access_map,
                            sender_email=sender_email,
-                           graph_configured=graph_configured)
+                           graph_configured=graph_configured,
+                           avg_leaders_json=avg_leaders_json)
 
 
 @admin_bp.route('/seasons/<int:season_id>/send-magic-links', methods=['POST'])
@@ -227,6 +255,29 @@ def send_email(season_id):
             bowlers = Bowler.query.filter(Bowler.id.in_(t_ids)).all()
         else:
             bowlers = []
+    elif recipient_mode == 'high_avg':
+        from calculations import get_bowler_stats
+        min_games = int(request.form.get('ha_min_games', 9) or 9)
+        top10     = request.form.get('ha_top10') == '1'
+        latest_week = (Week.query
+                       .filter_by(season_id=season_id, is_entered=True)
+                       .order_by(Week.week_num.desc())
+                       .first())
+        bowlers = []
+        if latest_week:
+            active_roster = (Roster.query
+                             .filter_by(season_id=season_id, active=True)
+                             .join(Bowler).all())
+            leaders = []
+            for r in active_roster:
+                stats = get_bowler_stats(r.bowler_id, season_id, latest_week.week_num)
+                if stats['cumulative_games'] >= min_games:
+                    leaders.append((r.bowler, stats['running_avg'], stats['display_handicap']))
+            leaders.sort(key=lambda x: (-x[1], x[0].last_name))
+            if top10:
+                top10_hcps = set(sorted({hcp for _, _, hcp in leaders})[:10])
+                leaders = [(b, avg, hcp) for b, avg, hcp in leaders if hcp in top10_hcps]
+            bowlers = [b for b, _, _ in leaders]
     else:
         bowlers = []
 

@@ -186,6 +186,26 @@
                   </select>
                 </label>
               </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="recipient_mode" id="rm_high_avg" value="high_avg">
+                <label class="form-check-label" for="rm_high_avg">
+                  High Averages (<span id="haCount">…</span>)
+                </label>
+                <div class="d-flex align-items-center gap-3 ms-4 mt-1" id="haControls" style="display:none!important">
+                  <div class="d-flex align-items-center gap-1">
+                    <label class="form-label mb-0 small text-muted">Min games:</label>
+                    <input type="number" name="ha_min_games" id="haMinGames" value="9" min="0" max="99"
+                           class="form-control form-control-sm" style="width:65px"
+                           onclick="document.getElementById('rm_high_avg').checked=true">
+                  </div>
+                  <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" name="ha_top10" value="1" id="haTop10chk"
+                           onclick="document.getElementById('rm_high_avg').checked=true">
+                    <label class="form-check-label small text-muted" for="haTop10chk">Top 10 only</label>
+                  </div>
+                </div>
+                <div id="haPreview" class="small text-muted ms-4 mt-1" style="display:none"></div>
+              </div>
             </div>
             <div class="form-check mt-2">
               <input class="form-check-input" type="checkbox" name="bcc_self" id="bccSelf" value="1">
@@ -238,6 +258,60 @@ document.getElementById('emailModal').addEventListener('show.bs.modal', function
     preview.style.display = 'none';
   }
 });
+
+// High Averages option
+(function() {
+  var LS_MG  = 'bowling_prizes_min_games';
+  var LS_T10 = 'bowling_prizes_top10';
+  var AVG_DATA = {{ avg_leaders_json | safe }};
+
+  function getFilteredLeaders() {
+    var mg  = parseInt(document.getElementById('haMinGames').value || '9', 10);
+    var t10 = document.getElementById('haTop10chk').checked;
+    var filtered = AVG_DATA.filter(function(l) { return l.games >= mg; });
+    if (t10 && filtered.length) {
+      var hcps = filtered.map(function(l) { return l.handicap; })
+                         .filter(function(v, i, a) { return a.indexOf(v) === i; })
+                         .sort(function(a, b) { return a - b; }).slice(0, 10);
+      var hcpSet = {};
+      hcps.forEach(function(h) { hcpSet[h] = true; });
+      filtered = filtered.filter(function(l) { return hcpSet[l.handicap]; });
+    }
+    return filtered;
+  }
+
+  function updateHA() {
+    var filtered  = getFilteredLeaders();
+    var countEl   = document.getElementById('haCount');
+    var previewEl = document.getElementById('haPreview');
+    var ctrlEl    = document.getElementById('haControls');
+    var rmHA      = document.getElementById('rm_high_avg');
+    if (countEl)   countEl.textContent   = filtered.length;
+    if (previewEl) {
+      previewEl.textContent = filtered.map(function(l) { return l.last_name; }).join(', ') || '—';
+      previewEl.style.display = (rmHA && rmHA.checked) ? '' : 'none';
+    }
+    if (ctrlEl)    ctrlEl.style.display  = '';
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var mgInput  = document.getElementById('haMinGames');
+    var t10Input = document.getElementById('haTop10chk');
+    var radios   = document.querySelectorAll('[name=recipient_mode]');
+
+    // Sync with shared localStorage values from email_compose
+    var mg  = localStorage.getItem(LS_MG);
+    var t10 = localStorage.getItem(LS_T10);
+    if (mg  !== null && mgInput)  mgInput.value    = mg;
+    if (t10 !== null && t10Input) t10Input.checked = (t10 === '1');
+
+    updateHA();
+
+    if (mgInput)  mgInput.addEventListener('change',  function() { localStorage.setItem(LS_MG,  mgInput.value); updateHA(); });
+    if (t10Input) t10Input.addEventListener('change', function() { localStorage.setItem(LS_T10, t10Input.checked ? '1' : '0'); updateHA(); });
+    radios.forEach(function(r) { r.addEventListener('change', updateHA); });
+  });
+})();
 </script>
 {% endif %}
 
