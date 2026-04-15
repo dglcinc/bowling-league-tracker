@@ -8,6 +8,7 @@ from flask_limiter.util import get_remote_address
 from flask_caching import Cache
 
 login_manager = LoginManager()
+login_manager.login_view = 'auth.login'
 login_manager.login_message_category = 'warning'
 
 # In-memory rate limiting (single process, no Redis needed at this scale)
