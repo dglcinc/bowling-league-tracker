@@ -1,6 +1,6 @@
 """
 Configuration for Bowling League Tracker.
-DB is stored in OneDrive for automatic backup.
+DB is stored in ~/bowling-data/ (NOT OneDrive — cloud sync corrupts SQLite).
 """
 
 import os
@@ -9,10 +9,9 @@ from pathlib import Path
 
 
 def get_db_path():
-    """Locate OneDrive folder; fall back to local directory."""
+    """Use ~/bowling-data/ as the canonical DB location."""
     candidates = [
-        Path.home() / "OneDrive - DGLC" / "Claude" / "bowling-league-tracker",
-        Path.home() / "OneDrive" / "Claude" / "bowling-league-tracker",
+        Path.home() / "bowling-data",
         Path(__file__).parent / "data",
     ]
     for path in candidates:
