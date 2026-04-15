@@ -6,18 +6,59 @@
 (function() {
   var LS_MG  = 'bowling_prizes_min_games';
   var LS_T10 = 'bowling_prizes_top10';
+  var AVG_DATA = {{ avg_leaders_json | safe }};
+
+  function getFilteredLeaders() {
+    var mg  = parseInt(document.getElementById('pdfMinGames').value || '9', 10);
+    var t10 = document.getElementById('pdfTop10chk').checked;
+    var filtered = AVG_DATA.filter(function(l) { return l.games >= mg; });
+    if (t10 && filtered.length) {
+      var hcps = filtered.map(function(l) { return l.handicap; })
+                         .filter(function(v, i, a) { return a.indexOf(v) === i; })
+                         .sort(function(a, b) { return a - b; })
+                         .slice(0, 10);
+      var hcpSet = {};
+      hcps.forEach(function(h) { hcpSet[h] = true; });
+      filtered = filtered.filter(function(l) { return hcpSet[l.handicap]; });
+    }
+    return filtered;
+  }
+
+  function updateHighAvg() {
+    var filtered = getFilteredLeaders();
+    var countEl = document.getElementById('highAvgCount');
+    var listEl  = document.getElementById('highAvgPreviewList');
+    var wrapEl  = document.getElementById('highAvgPreview');
+    if (countEl) countEl.textContent = filtered.length;
+    if (listEl)  listEl.textContent  = filtered.map(function(l) { return l.last_name; }).join(', ') || '—';
+    var scope = document.getElementById('bccScope');
+    if (wrapEl && scope) wrapEl.style.display = (scope.value === 'high_avg') ? '' : 'none';
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
     var mgInput  = document.getElementById('pdfMinGames');
     var t10Input = document.getElementById('pdfTop10chk');
+    var scopeSel = document.getElementById('bccScope');
     if (!mgInput) return;
+
     // Restore saved values
     var mg  = localStorage.getItem(LS_MG);
     var t10 = localStorage.getItem(LS_T10);
     if (mg  !== null) mgInput.value = mg;
     if (t10 !== null) t10Input.checked = (t10 === '1');
-    // Save on change
-    mgInput.addEventListener('change',  function() { localStorage.setItem(LS_MG,  mgInput.value); });
-    t10Input.addEventListener('change', function() { localStorage.setItem(LS_T10, t10Input.checked ? '1' : '0'); });
+
+    updateHighAvg();
+
+    // Save on change and refresh high-avg display
+    mgInput.addEventListener('change', function() {
+      localStorage.setItem(LS_MG, mgInput.value);
+      updateHighAvg();
+    });
+    t10Input.addEventListener('change', function() {
+      localStorage.setItem(LS_T10, t10Input.checked ? '1' : '0');
+      updateHighAvg();
+    });
+    if (scopeSel) scopeSel.addEventListener('change', updateHighAvg);
   });
 })();
 </script>
@@ -69,8 +110,9 @@
 
       <div class="mb-3">
         <label class="form-label fw-bold">BCC — Players</label>
-        <select name="bcc_scope" class="form-select form-select-sm w-auto">
+        <select name="bcc_scope" id="bccScope" class="form-select form-select-sm w-auto">
           <option value="all">All active players ({{ all_roster|length }})</option>
+          <option value="high_avg">High Averages (<span id="highAvgCount">…</span>)</option>
           {% for team in teams %}
           <option value="{{ team.number }}">{{ team.name }} only</option>
           {% endfor %}
@@ -168,6 +210,13 @@
         </table>
         {% endif %}
 
+      </div>
+    </div>
+
+    <div id="highAvgPreview" class="card mt-3" style="display:none">
+      <div class="card-header fw-bold">High Averages recipients</div>
+      <div class="card-body" style="font-size:0.85rem">
+        <p class="mb-0 text-muted" id="highAvgPreviewList"></p>
       </div>
     </div>
 

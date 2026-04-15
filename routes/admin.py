@@ -1105,7 +1105,8 @@ def _get_above_average_bowlers(season_id, week_num, threshold=30):
 
 @admin_bp.route('/seasons/<int:season_id>/week/<int:week_num>/email', methods=['GET', 'POST'])
 def email_compose(season_id, week_num):
-    from calculations import get_weekly_prizes, get_team_standings
+    import json as _json
+    from calculations import get_weekly_prizes, get_team_standings, get_bowler_stats
     from flask import current_app
 
     season = Season.query.get_or_404(season_id)
@@ -1115,8 +1116,6 @@ def email_compose(season_id, week_num):
     league_name = (settings.league_name if settings else 'MLC Pirate Bowling League')
 
     captain_info = _resolve_captain_emails(teams, season_id)
-    # TO: all captains that have emails (sender's own team excluded only if they want;
-    # for now include all 4 — sender can remove themselves from the form)
     to_captains = [(t, b, e) for t, b, e in captain_info if e]
     missing_captains = [(t, b, e) for t, b, e in captain_info if not e]
 
@@ -1126,6 +1125,23 @@ def email_compose(season_id, week_num):
                   .join(Bowler)
                   .order_by(Bowler.last_name)
                   .all())
+
+    # Avg leaders for High Averages BCC option (sorted by avg desc, then last name)
+    avg_leaders = []
+    for r in all_roster:
+        stats = get_bowler_stats(r.bowler_id, season_id, week_num)
+        if stats['cumulative_games'] == 0:
+            continue
+        avg_leaders.append({
+            'bowler_id': r.bowler.id,
+            'last_name':  r.bowler.last_name,
+            'email':      r.bowler.email or '',
+            'games':      stats['cumulative_games'],
+            'average':    stats['running_avg'],
+            'handicap':   stats['display_handicap'],
+        })
+    avg_leaders.sort(key=lambda x: (-x['average'], x['last_name']))
+    avg_leaders_json = _json.dumps(avg_leaders)
 
     prizes = get_weekly_prizes(season_id, week_num)
     above_avg = _get_above_average_bowlers(season_id, week_num)
@@ -1144,9 +1160,20 @@ def email_compose(season_id, week_num):
         # Build TO list
         to_list = [e.strip() for e in to_emails_raw.split(',') if e.strip()]
 
+        # PDF filter settings (also drive the High Averages BCC scope)
+        pdf_min_games = int(request.form.get('pdf_min_games', 9) or 9)
+        pdf_top10 = request.form.get('pdf_top10') == '1'
+
         # Build BCC list
         if bcc_scope == 'all':
             bcc_roster = all_roster
+        elif bcc_scope == 'high_avg':
+            filtered = [l for l in avg_leaders if l['games'] >= pdf_min_games]
+            if pdf_top10:
+                top10_hcps = set(sorted({l['handicap'] for l in filtered})[:10])
+                filtered = [l for l in filtered if l['handicap'] in top10_hcps]
+            bcc_list = list({l['email'] for l in filtered if l['email']})
+            bcc_roster = None  # handled directly below
         else:
             try:
                 team_num = int(bcc_scope)
@@ -1154,7 +1181,8 @@ def email_compose(season_id, week_num):
             except ValueError:
                 bcc_roster = all_roster
 
-        bcc_list = list({r.bowler.email for r in bcc_roster if r.bowler.email})
+        if bcc_roster is not None:
+            bcc_list = list({r.bowler.email for r in bcc_roster if r.bowler.email})
 
         test_only = request.form.get('test_only') == '1'
         if test_only:
@@ -1167,8 +1195,6 @@ def email_compose(season_id, week_num):
         html_body = _build_email_html(body_text, above_avg, season, week)
 
         # Build optional PDF attachment
-        pdf_min_games = int(request.form.get('pdf_min_games', 9) or 9)
-        pdf_top10 = request.form.get('pdf_top10') == '1'
         pdf_bytes = None
         if attach_pdf:
             try:
@@ -1204,6 +1230,7 @@ def email_compose(season_id, week_num):
                            to_captains=to_captains,
                            missing_captains=missing_captains,
                            all_roster=all_roster,
+                           avg_leaders_json=avg_leaders_json,
                            prizes=prizes,
                            above_avg=above_avg,
                            standings=standings,
