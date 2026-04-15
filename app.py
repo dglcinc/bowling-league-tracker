@@ -314,6 +314,29 @@ def create_app():
     def forbidden(e):
         return render_template('errors/403.html'), 403
 
+    # Request logging — written after every response except static files
+    from sqlalchemy import text as _text
+
+    @app.after_request
+    def log_request(response):
+        try:
+            ep = request.endpoint
+            if ep and ep != 'static' and ep != 'admin.activity':
+                from flask_login import current_user
+                bid = current_user.id if current_user.is_authenticated else None
+                ua  = (request.user_agent.string or '')[:256]
+                with db.engine.begin() as _conn:
+                    _conn.execute(_text(
+                        "INSERT INTO request_log "
+                        "(timestamp, bowler_id, endpoint, path, method, status_code, remote_addr, user_agent) "
+                        "VALUES (datetime('now','localtime'), :bid, :ep, :path, :meth, :sc, :ip, :ua)"
+                    ), {'bid': bid, 'ep': ep, 'path': request.path,
+                        'meth': request.method, 'sc': response.status_code,
+                        'ip': request.remote_addr, 'ua': ua})
+        except Exception:
+            pass
+        return response
+
     @app.context_processor
     def inject_globals():
         from models import Season, Week, LeagueSettings, WebAuthnCredential

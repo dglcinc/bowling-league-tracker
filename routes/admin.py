@@ -3,7 +3,7 @@ Admin routes: season setup, roster management, schedule entry, season rollover.
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
-from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission, TournamentEntry, ClubChampionshipResult
+from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission, TournamentEntry, ClubChampionshipResult, RequestLog
 from extensions import cache
 from datetime import date, timedelta
 import io
@@ -1715,3 +1715,46 @@ def tournament_placement(season_id):
                            season_teams=season_teams,
                            club_results=club_results,
                            tournament_labels=season.tournament_labels)
+
+
+@admin_bp.route('/activity')
+def activity():
+    from datetime import datetime, timedelta
+
+    # Filters
+    days      = request.args.get('days', 1, type=int)
+    bowler_id = request.args.get('bowler_id', type=int)
+    errors_only = request.args.get('errors_only') == '1'
+
+    since = datetime.now() - timedelta(days=days)
+
+    q = RequestLog.query.filter(RequestLog.timestamp >= since)
+    if bowler_id:
+        q = q.filter_by(bowler_id=bowler_id)
+    if errors_only:
+        q = q.filter(RequestLog.status_code >= 400)
+
+    logs = q.order_by(RequestLog.timestamp.desc()).limit(500).all()
+
+    # Summary stats for the selected window
+    all_in_window = RequestLog.query.filter(RequestLog.timestamp >= since).all()
+    total    = len(all_in_window)
+    errors   = sum(1 for r in all_in_window if r.status_code >= 400)
+    active_users = len({r.bowler_id for r in all_in_window if r.bowler_id})
+
+    # Bowlers with any activity (for filter dropdown)
+    active_bowler_ids = {r.bowler_id for r in all_in_window if r.bowler_id}
+    bowlers_with_activity = (Bowler.query
+                             .filter(Bowler.id.in_(active_bowler_ids))
+                             .order_by(Bowler.last_name)
+                             .all()) if active_bowler_ids else []
+
+    return render_template('admin/activity.html',
+                           logs=logs,
+                           total=total,
+                           errors=errors,
+                           active_users=active_users,
+                           bowlers_with_activity=bowlers_with_activity,
+                           days=days,
+                           bowler_id=bowler_id,
+                           errors_only=errors_only)

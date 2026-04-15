@@ -480,3 +480,23 @@ class Snapshot(db.Model):
 
     def __repr__(self):
         return f'<Snapshot season={self.season_id} week={self.week_num}>'
+
+
+class RequestLog(db.Model):
+    """Per-request access log stored in the DB for the activity dashboard."""
+    __tablename__ = 'request_log'
+
+    id          = db.Column(db.Integer, primary_key=True)
+    timestamp   = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    bowler_id   = db.Column(db.Integer, db.ForeignKey('bowlers.id'), nullable=True)
+    endpoint    = db.Column(db.String(128))
+    path        = db.Column(db.String(512))
+    method      = db.Column(db.String(8))
+    status_code = db.Column(db.Integer, index=True)
+    remote_addr = db.Column(db.String(45))
+    user_agent  = db.Column(db.String(256))
+
+    bowler = db.relationship('Bowler', foreign_keys=[bowler_id])
+
+    def __repr__(self):
+        return f'<RequestLog {self.method} {self.path} {self.status_code}>'
