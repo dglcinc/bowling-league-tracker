@@ -311,7 +311,7 @@ class TournamentEntry(db.Model):
 
     @property
     def total_with_hcp(self):
-        return self.total_scratch + self.handicap * len(self.games)
+        return self.total_scratch + (self.handicap or 0) * len(self.games)
 
     def __repr__(self):
         return f'<TournamentEntry week={self.week_num} bowler={self.bowler_id}>'
