@@ -53,8 +53,7 @@
 
 <form method="post" action="{{ url_for('admin.send_magic_links', season_id=season.id) }}" id="rosterForm">
 <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
-  <button type="submit" class="btn btn-sm btn-outline-primary"
-          onclick="return document.querySelectorAll('[name=bowler_ids]:checked').length > 0 || (alert('Select at least one bowler.'), false)">
+  <button type="button" class="btn btn-sm btn-outline-primary" onclick="openInviteConfirm()">
     Send Invite to Selected
   </button>
   <button type="button" class="btn btn-sm btn-outline-secondary"
@@ -149,6 +148,41 @@
   </tbody>
 </table>
 </form>
+
+<div class="modal fade" id="inviteConfirmModal" tabindex="-1" aria-labelledby="inviteConfirmLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="inviteConfirmLabel">Send Invite — Confirm</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">The following bowlers will receive an invite email:</p>
+        <ul id="inviteNameList" class="mb-0" style="font-size:0.9rem"></ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('rosterForm').submit()">Send Invites</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function openInviteConfirm() {
+  var checked = document.querySelectorAll('#rosterForm [name=bowler_ids]:checked');
+  if (!checked.length) { alert('Select at least one bowler.'); return; }
+  var list = document.getElementById('inviteNameList');
+  list.innerHTML = '';
+  checked.forEach(function(cb) {
+    var row = cb.closest('tr');
+    var name = row ? (row.cells[1] ? row.cells[1].innerText.trim() : '') + ', ' + (row.cells[2] ? row.cells[2].innerText.trim() : '') : cb.value;
+    var li = document.createElement('li');
+    li.textContent = name;
+    list.appendChild(li);
+  });
+  new bootstrap.Modal(document.getElementById('inviteConfirmModal')).show();
+}
+</script>
 
 {% if graph_configured %}
 <div class="modal fade" id="emailModal" tabindex="-1" aria-labelledby="emailModalLabel" aria-hidden="true">
