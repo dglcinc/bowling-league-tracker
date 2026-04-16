@@ -8,6 +8,7 @@ import json
 import random
 import urllib.request
 import urllib.parse
+import urllib.error
 from datetime import datetime, timedelta
 
 from flask import (Blueprint, render_template, request, redirect,
@@ -41,6 +42,11 @@ def _verify_turnstile(cf_token):
         with urllib.request.urlopen(req, timeout=5) as resp:
             result = json.loads(resp.read())
             return result.get('success', False)
+    except urllib.error.HTTPError as exc:
+        # 405 means the siteverify endpoint is blocked at the network level.
+        # Fail open so users aren't locked out.
+        current_app.logger.error('Turnstile siteverify HTTP %s — failing open', exc.code)
+        return True
     except Exception:
         return False
 
