@@ -1290,6 +1290,21 @@ def email_compose(season_id, week_num):
                            mail_configured=graph_configured)
 
 
+# Module-level MSAL app cache — reuse the same ConfidentialClientApplication
+# instance across calls so its internal token cache is preserved. This avoids
+# a separate OAuth round-trip for every email when sending bulk invites.
+_msal_app_cache: dict = {}
+
+
+def _get_msal_app(tenant_id, client_id, client_secret):
+    import msal
+    if client_id not in _msal_app_cache:
+        authority = f'https://login.microsoftonline.com/{tenant_id}'
+        _msal_app_cache[client_id] = msal.ConfidentialClientApplication(
+            client_id, authority=authority, client_credential=client_secret)
+    return _msal_app_cache[client_id]
+
+
 def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
                     pdf_attachment=None, pdf_filename=None):
     """Send email via Microsoft Graph API using client-credentials OAuth2."""
@@ -1297,7 +1312,6 @@ def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
     import json
     import urllib.request
     import urllib.parse
-    import msal
 
     tenant_id    = app_config['GRAPH_TENANT_ID']
     client_id    = app_config['GRAPH_CLIENT_ID']
@@ -1309,10 +1323,9 @@ def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
                            'Set GRAPH_TENANT_ID, GRAPH_CLIENT_ID, '
                            'GRAPH_CLIENT_SECRET, GRAPH_SENDER_EMAIL in .env')
 
-    # Acquire access token
-    authority = f'https://login.microsoftonline.com/{tenant_id}'
-    app = msal.ConfidentialClientApplication(
-        client_id, authority=authority, client_credential=client_secret)
+    # Acquire access token — reuses cached app instance and token within the
+    # same worker process, so bulk sends only hit Microsoft's token endpoint once.
+    app = _get_msal_app(tenant_id, client_id, client_secret)
     result = app.acquire_token_for_client(
         scopes=['https://graph.microsoft.com/.default'])
 
