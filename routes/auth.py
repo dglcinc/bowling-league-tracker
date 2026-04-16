@@ -98,25 +98,12 @@ def send_otp(bowler, subject=None):
 
 
 def send_otp_invite(bowler, subject=None, invite_body=None):
-    """Send an invitation email with an OTP and a welcome/invite message.
+    """Send an invitation email directing the bowler to the login page.
+    No OTP is included — the code expires in 10 minutes anyway and most people
+    won't visit within that window. They request a fresh code at login time.
     Returns (True, None) on success or (False, error_str) on failure."""
     from routes.admin import _send_via_graph
     import html as _html
-
-    now = datetime.utcnow()
-
-    # Invalidate any unused OTPs for this bowler
-    LoginOtp.query.filter_by(bowler_id=bowler.id, used_at=None).update({'used_at': now})
-
-    code = f"{random.randint(0, 999999):06d}"
-    otp = LoginOtp(
-        bowler_id=bowler.id,
-        code=code,
-        expires_at=now + timedelta(minutes=10),
-        created_at=now,
-    )
-    db.session.add(otp)
-    db.session.commit()
 
     name = bowler.first_name or bowler.last_name
     from models import LeagueSettings, _DEFAULT_INVITE_MESSAGE
@@ -124,13 +111,21 @@ def send_otp_invite(bowler, subject=None, invite_body=None):
     league_name = settings.league_name if settings else 'League Tracker'
     body_text = invite_body or _DEFAULT_INVITE_MESSAGE
 
+    login_url = url_for('auth.login', _external=True)
+
     html_body = f"""
 <p>Hello {_html.escape(name)},</p>
 <p>{_html.escape(body_text)}</p>
-<hr>
-<p>Your sign-in code for {_html.escape(league_name)} is:</p>
-<p style="font-size:2.5rem;font-weight:bold;letter-spacing:.25rem;margin:24px 0;color:#1b3a6b">{code}</p>
-<p>Enter this code on the sign-in screen. It expires in 10 minutes.</p>
+<p style="margin:24px 0">
+  <a href="{login_url}"
+     style="background:#1b3a6b;color:#fff;padding:12px 24px;
+            border-radius:4px;text-decoration:none;font-size:1rem">
+    Sign in to {_html.escape(league_name)}
+  </a>
+</p>
+<p style="color:#888;font-size:0.85em">
+  Enter your email address on the sign-in page and we'll send you a 6-digit code.
+</p>
 """
     try:
         _send_via_graph(
