@@ -97,7 +97,7 @@ def send_otp(bowler, subject=None):
         return False, str(exc)
 
 
-def send_otp_invite(bowler, subject=None, invite_body=None):
+def send_otp_invite(bowler, subject=None, invite_body=None, bcc_admin=None):
     """Send an invitation email directing the bowler to the login page.
     No OTP is included — the code expires in 10 minutes anyway and most people
     won't visit within that window. They request a fresh code at login time.
@@ -133,7 +133,7 @@ def send_otp_invite(bowler, subject=None, invite_body=None):
             subject or f'{league_name}: invitation to the app',
             html_body,
             to_list=[bowler.email],
-            bcc_list=[],
+            bcc_list=[bcc_admin] if bcc_admin else [],
         )
         return True, None
     except Exception as exc:
