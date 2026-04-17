@@ -202,6 +202,8 @@ def send_magic_links(season_id):
                    else _DEFAULT_INVITE_MESSAGE)
     subject = f'{league_name}: invitation to the app'
 
+    admin_bcc = current_app.config.get('GRAPH_SENDER_EMAIL', '') if len(bowler_ids) > 1 else ''
+
     sent = failed = no_email = 0
     for bid in bowler_ids:
         bowler = Bowler.query.get(bid)
@@ -210,7 +212,8 @@ def send_magic_links(season_id):
         if not bowler.email:
             no_email += 1
             continue
-        ok, _ = send_otp_invite(bowler, subject=subject, invite_body=invite_body)
+        ok, _ = send_otp_invite(bowler, subject=subject, invite_body=invite_body,
+                                bcc_admin=admin_bcc)
         if ok:
             sent += 1
         else:
@@ -289,7 +292,7 @@ def send_email(season_id):
     html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
 
     sender_email = current_app.config.get('GRAPH_SENDER_EMAIL', '')
-    if bcc_self and sender_email:
+    if len(recipient_emails) > 1 and sender_email:
         to_list = [sender_email]
         bcc_list = recipient_emails
     else:
@@ -1241,6 +1244,13 @@ def email_compose(season_id, week_num):
             to_list = [my_email] if my_email else []
             bcc_list = []
             subject = f'[TEST] {subject}'
+        else:
+            thomson = Bowler.query.filter(
+                Bowler.last_name.ilike('Thomson'),
+                Bowler.first_name.ilike('Mark')
+            ).first()
+            if thomson and thomson.email and thomson.email not in bcc_list:
+                bcc_list.append(thomson.email)
 
         # Build HTML email body
         html_body = _build_email_html(body_text, above_avg, season, week)
