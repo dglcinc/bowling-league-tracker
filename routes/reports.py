@@ -3,11 +3,15 @@ Report routes: Wkly Alpha (printable), standings, bowler detail, high games.
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for
-from models import Season, Week, Roster, Bowler, Team, MatchupEntry, TeamPoints, TournamentEntry, PayoutConfig
+from models import Season, Week, Roster, Bowler, Team, MatchupEntry, TeamPoints, TournamentEntry, PayoutConfig, LeagueSettings, db
 from calculations import (get_wkly_alpha, get_team_standings, get_bowler_stats,
                            get_iron_man_status, get_most_improved, get_weekly_prizes,
                            calculate_handicap, get_weekly_team_points, get_matchup_breakdown,
                            get_career_stats)
+
+
+def _get_settings():
+    return db.session.get(LeagueSettings, 1) or LeagueSettings(id=1)
 
 reports_bp = Blueprint('reports', __name__)
 
@@ -133,8 +137,19 @@ def week_prizes(season_id, week_num):
     season = Season.query.get_or_404(season_id)
     week   = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
 
-    # Regular weekly stats — always computed (tournament weeks show these too)
-    prizes = get_weekly_prizes(season_id, week_num)
+    settings = _get_settings()
+
+    # If min_games/top10 params provided, save to DB and redirect to clean URL
+    if 'min_games' in request.args or 'top10' in request.args:
+        settings.prizes_min_games = request.args.get('min_games', settings.prizes_min_games, type=int)
+        settings.prizes_top10 = bool(request.args.get('top10', 0, type=int))
+        db.session.add(settings)
+        db.session.commit()
+        return redirect(url_for('reports.week_prizes', season_id=season_id, week_num=week_num))
+
+    min_games = settings.prizes_min_games if settings.prizes_min_games is not None else 9
+    top10 = bool(settings.prizes_top10)
+
     all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
     total_wood = sum(
         e.total_pins + (
@@ -147,34 +162,36 @@ def week_prizes(season_id, week_num):
     player_count = sum(1 for e in all_entries if not e.is_blind)
     blind_games  = sum(e.game_count for e in all_entries if e.is_blind)
 
-    min_games = request.args.get('min_games', 9, type=int)
-    top10 = request.args.get('top10', 0, type=int)
-    roster_entries = (Roster.query
-                      .filter_by(season_id=season_id, active=True)
-                      .join(Bowler).order_by(Bowler.last_name).all())
+    # Prizes and high-average table only apply to regular (non-tournament) weeks
+    prizes = None
     leaders = []
-    for r in roster_entries:
-        stats = get_bowler_stats(r.bowler_id, season_id, week_num)
-        if stats['cumulative_games'] == 0:
-            continue
-        leaders.append({
-            'bowler': r.bowler, 'team': r.team,
-            'average':             stats['running_avg'],
-            'games':               stats['cumulative_games'],
-            'handicap':            stats['display_handicap'],
-            'high_game_scratch':   stats['ytd_high_game_scratch'],
-            'high_game_hcp':       stats['ytd_high_game_hcp'],
-            'high_series_scratch': stats['ytd_high_series_scratch'],
-            'high_series_hcp':     stats['ytd_high_series_hcp'],
-        })
-
-    avg_rows = sorted(
-        [l for l in leaders if l['games'] >= min_games],
-        key=lambda x: (-x['average'], x['bowler'].last_name)
-    )
-    if top10:
-        top10_hcps = set(sorted({r['handicap'] for r in avg_rows})[:10])
-        avg_rows = [r for r in avg_rows if r['handicap'] in top10_hcps]
+    avg_rows = []
+    if not week.tournament_type:
+        prizes = get_weekly_prizes(season_id, week_num)
+        roster_entries = (Roster.query
+                          .filter_by(season_id=season_id, active=True)
+                          .join(Bowler).order_by(Bowler.last_name).all())
+        for r in roster_entries:
+            stats = get_bowler_stats(r.bowler_id, season_id, week_num)
+            if stats['cumulative_games'] == 0:
+                continue
+            leaders.append({
+                'bowler': r.bowler, 'team': r.team,
+                'average':             stats['running_avg'],
+                'games':               stats['cumulative_games'],
+                'handicap':            stats['display_handicap'],
+                'high_game_scratch':   stats['ytd_high_game_scratch'],
+                'high_game_hcp':       stats['ytd_high_game_hcp'],
+                'high_series_scratch': stats['ytd_high_series_scratch'],
+                'high_series_hcp':     stats['ytd_high_series_hcp'],
+            })
+        avg_rows = sorted(
+            [l for l in leaders if l['games'] >= min_games],
+            key=lambda x: (-x['average'], x['bowler'].last_name)
+        )
+        if top10:
+            top10_avgs = set(sorted({r['average'] for r in avg_rows}, reverse=True)[:10])
+            avg_rows = [r for r in avg_rows if r['average'] in top10_avgs]
 
     full_year = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
     fh_list = get_team_standings(season_id, half=1, through_week=week_num)
@@ -298,20 +315,21 @@ def print_batch(season_id, week_num):
                     .order_by(Week.week_num.desc())
                     .first())
     hg_through = last_entered.week_num if last_entered else week_num
-    min_games = request.args.get('min_games', 9, type=int)
-    top10 = request.args.get('top10', 0, type=int)
+    settings = _get_settings()
+    min_games = settings.prizes_min_games if settings.prizes_min_games is not None else 9
+    top10 = bool(settings.prizes_top10)
     hg_leaders = _build_high_games_leaders(season_id, hg_through, min_games=min_games)
     by_avg  = sorted(hg_leaders, key=lambda x: x['average'], reverse=True)
     if top10:
-        top10_hcps = set(sorted({r['handicap'] for r in by_avg})[:10])
-        by_avg = [r for r in by_avg if r['handicap'] in top10_hcps]
+        top10_avgs = set(sorted({r['average'] for r in by_avg}, reverse=True)[:10])
+        by_avg = [r for r in by_avg if r['average'] in top10_avgs]
     by_hgs  = sorted(hg_leaders, key=lambda x: x['high_game_scratch'], reverse=True)
     by_hgh  = sorted(hg_leaders, key=lambda x: x['high_game_hcp'], reverse=True)
     by_hss  = sorted(hg_leaders, key=lambda x: x['high_series_scratch'], reverse=True)
     by_hsh  = sorted(hg_leaders, key=lambda x: x['high_series_hcp'], reverse=True)
 
-    # Prizes & Standings data for Group 2 page 4
-    prizes = get_weekly_prizes(season_id, week_num)
+    # Prizes & Standings data for Group 2 page 4 (regular weeks only)
+    prizes = get_weekly_prizes(season_id, week_num) if not week.tournament_type else None
     all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
     total_wood = sum(
         e.total_pins + (

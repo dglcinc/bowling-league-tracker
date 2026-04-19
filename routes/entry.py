@@ -128,7 +128,7 @@ def week_entry(season_id, week_num):
             )
             for e in all_entries
         )
-        prizes = get_weekly_prizes(season_id, week_num)
+        prizes = get_weekly_prizes(season_id, week_num) if not week.tournament_type else None
         recon = {'player_count': player_count, 'blind_games': blind_games,
                  'total_wood': total_wood, 'prizes': prizes}
 

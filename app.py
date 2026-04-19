@@ -128,6 +128,8 @@ def _migrate_db(db):
         # Configurable invite message for "Send Invite to Selected" on roster page
         "ALTER TABLE league_settings ADD COLUMN invite_message TEXT",
         "ALTER TABLE tournament_entries ADD COLUMN place INTEGER",
+        "ALTER TABLE league_settings ADD COLUMN prizes_min_games INTEGER DEFAULT 9",
+        "ALTER TABLE league_settings ADD COLUMN prizes_top10 BOOLEAN DEFAULT 0",
         # Club Championship team placements (manually entered; not derivable from scores)
         """CREATE TABLE IF NOT EXISTS club_championship_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
