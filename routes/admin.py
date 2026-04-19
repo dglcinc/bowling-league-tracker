@@ -295,7 +295,7 @@ def send_email(season_id):
     html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
 
     sender_email = current_app.config.get('GRAPH_SENDER_EMAIL', '')
-    if len(recipient_emails) > 1 and sender_email:
+    if bcc_self and sender_email:
         to_list = [sender_email]
         bcc_list = recipient_emails
     else:
