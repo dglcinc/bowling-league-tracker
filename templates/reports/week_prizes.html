@@ -205,8 +205,7 @@
     </div>
   </div>
 
-  {% if not tournament_type %}
-  {# YTD leaders — regular weeks only #}
+  {# YTD leaders #}
   <div class="col-12 col-xl">
     <div class="section-head">YTD Leaders Through Week {{ week.week_num }}</div>
     <div class="row g-2">
@@ -230,12 +229,10 @@
       {% endfor %}
     </div>
   </div>
-  {% endif %}
 
 </div>
 
-{% if not tournament_type %}
-{# High averages — regular weeks only #}
+{# High averages #}
 <hr>
 <div class="d-flex align-items-center gap-3 mb-2 no-print">
   <h6 class="mb-0">High Averages</h6>
@@ -295,7 +292,6 @@
   </div>
   {% endfor %}
 </div>
-{% endif %}
 
 <div class="no-print mt-3 d-flex gap-2 flex-wrap">
   <a href="{{ url_for('entry.week_entry', season_id=season.id, week_num=week.week_num) }}"
@@ -310,7 +306,6 @@
   {% endif %}
 </div>
 
-{% if not tournament_type %}
 {# Print section 2: YTD High Games (print only) #}
 <div class="print-page-2">
   <div class="row g-2 mt-1">
@@ -332,5 +327,4 @@
     {% endfor %}
   </div>
 </div>
-{% endif %}
 {% endblock %}
