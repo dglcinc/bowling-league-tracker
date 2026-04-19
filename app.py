@@ -571,10 +571,9 @@ def create_app():
 
         if not show_all_sched:
             schedule_rows = [r for r in schedule_rows
-                             if r['is_break'] or not r['week'].is_entered]
-            # Trim leading break rows that precede the first upcoming week
-            while schedule_rows and schedule_rows[0]['is_break']:
-                schedule_rows.pop(0)
+                             if not r['is_break']
+                             and not r['week'].is_entered
+                             and not r['week'].is_cancelled]
 
         # ── My Stats ─────────────────────────────────────────────────────────
         entries    = []
