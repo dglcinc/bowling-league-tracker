@@ -529,11 +529,22 @@ def create_app():
         ]
 
         # ── Schedule ─────────────────────────────────────────────────────────
+        show_all_sched = request.args.get('show_all') == '1'
+
         weeks_all    = (Week.query
                         .filter_by(season_id=season.id)
                         .order_by(Week.week_num)
                         .all())
         dated_weeks  = [w for w in weeks_all if w.date]
+
+        all_sched_entries = (ScheduleEntry.query
+                             .filter_by(season_id=season.id)
+                             .order_by(ScheduleEntry.week_num, ScheduleEntry.matchup_num)
+                             .all())
+        matchups_by_week = {}
+        for se in all_sched_entries:
+            matchups_by_week.setdefault(se.week_num, []).append(se)
+
         schedule_rows = []
         if dated_weeks:
             date_to_week = {w.date: w for w in dated_weeks}
@@ -541,19 +552,29 @@ def create_app():
             end = dated_weeks[-1].date
             while cur <= end:
                 if cur in date_to_week:
+                    wk = date_to_week[cur]
                     schedule_rows.append(
-                        {'date': cur, 'week': date_to_week[cur], 'is_break': False}
+                        {'date': cur, 'week': wk, 'is_break': False,
+                         'matchups': matchups_by_week.get(wk.week_num, [])}
                     )
                 else:
                     schedule_rows.append(
-                        {'date': cur, 'week': None, 'is_break': True}
+                        {'date': cur, 'week': None, 'is_break': True, 'matchups': []}
                     )
                 cur += timedelta(weeks=1)
         else:
             schedule_rows = [
-                {'date': None, 'week': w, 'is_break': False}
+                {'date': None, 'week': w, 'is_break': False,
+                 'matchups': matchups_by_week.get(w.week_num, [])}
                 for w in weeks_all
             ]
+
+        if not show_all_sched:
+            schedule_rows = [r for r in schedule_rows
+                             if r['is_break'] or not r['week'].is_entered]
+            # Trim leading break rows that precede the first upcoming week
+            while schedule_rows and schedule_rows[0]['is_break']:
+                schedule_rows.pop(0)
 
         # ── My Stats ─────────────────────────────────────────────────────────
         entries    = []
@@ -598,6 +619,7 @@ def create_app():
                                last_week_top3=last_week_top3,
                                teams=teams,
                                schedule_rows=schedule_rows,
+                               show_all_sched=show_all_sched,
                                roster=roster,
                                entries=entries,
                                avg=avg,

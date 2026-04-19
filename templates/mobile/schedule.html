@@ -4,6 +4,14 @@
 
 {% block content %}
 
+{# ── Upcoming / Show all toggle ── #}
+<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+  <a href="{{ url_for('mobile.schedule') }}{% if show_all %}{% else %}?show_all=1{% endif %}"
+     style="font-size:.8rem;color:#1b3a6b;text-decoration:none;font-weight:600">
+    {{ 'Upcoming only' if show_all else 'Show all' }}
+  </a>
+</div>
+
 {% if not season %}
 <div class="m-card">
   <div class="m-card-main text-muted">No active season.</div>
@@ -11,7 +19,9 @@
 
 {% elif not schedule_rows %}
 <div class="m-card">
-  <div class="m-card-sub text-muted">No schedule available yet.</div>
+  <div class="m-card-sub text-muted">
+    {% if not show_all %}No upcoming events.{% else %}No schedule available yet.{% endif %}
+  </div>
 </div>
 
 {% else %}

@@ -315,7 +315,13 @@
   {# ══════════════════════════════ SCHEDULE ══════════════════════════════════ #}
   <div class="col-lg-5 col-12">
     <div class="card h-100 shadow-sm">
-      <div class="home-card-header">📅 Schedule</div>
+      <div class="home-card-header" style="display:flex;justify-content:space-between;align-items:center">
+        📅 Schedule
+        <a href="/?show_all={{ '0' if show_all_sched else '1' }}"
+           style="font-size:.75rem;font-weight:400;color:rgba(255,255,255,.75);text-decoration:none">
+          {{ 'Upcoming only' if show_all_sched else 'Show all' }}
+        </a>
+      </div>
       <div class="card-body p-0" style="max-height:420px;overflow-y:auto">
         {% if schedule_rows %}
 
@@ -332,35 +338,59 @@
         {% if w.tournament_type == 'club_championship' %}
           {% set lbl = season.tournament_labels['club_championship'] %}
           {% set lbl_color = '#8b0000' %}
+          {% set show_matchups = true %}
         {% elif w.tournament_type == 'indiv_scratch' %}
           {% set lbl = season.tournament_labels['indiv_scratch'] %}
           {% set lbl_color = '#5a1a8a' %}
+          {% set show_matchups = false %}
         {% elif w.tournament_type == 'indiv_hcp_1' %}
           {% set lbl = season.tournament_labels['indiv_hcp_1'] %}
           {% set lbl_color = '#5a1a8a' %}
+          {% set show_matchups = false %}
         {% elif w.tournament_type == 'indiv_hcp_2' %}
           {% set lbl = season.tournament_labels['indiv_hcp_2'] %}
           {% set lbl_color = '#5a1a8a' %}
+          {% set show_matchups = false %}
         {% elif w.is_position_night %}
           {% set lbl = 'Week ' ~ w.week_num ~ ' — Position Night' %}
           {% set lbl_color = '#1a5a3a' %}
+          {% set show_matchups = true %}
         {% elif w.is_cancelled %}
           {% set lbl = 'Week ' ~ w.week_num ~ ' — Cancelled' %}
           {% set lbl_color = '#adb5bd' %}
+          {% set show_matchups = false %}
         {% else %}
           {% set lbl = 'Week ' ~ w.week_num %}
           {% set lbl_color = '#212529' %}
+          {% set show_matchups = true %}
         {% endif %}
 
         {% set is_upcoming_row = upcoming_week and w.week_num == upcoming_week.week_num %}
 
-        <div class="sched-row {% if is_upcoming_row %}sched-upcoming{% endif %}">
-          <span class="sched-date">
+        <div class="sched-row {% if is_upcoming_row %}sched-upcoming{% endif %}" style="align-items:flex-start">
+          <span class="sched-date" style="padding-top:1px">
             {% if row.date %}{{ row.date.strftime('%b %-d') }}{% else %}—{% endif %}
           </span>
           <span class="sched-label fw-{% if is_upcoming_row or w.tournament_type or w.is_position_night %}semibold{% else %}normal{% endif %}"
                 style="color:{% if w.is_entered %}#adb5bd{% else %}{{ lbl_color }}{% endif %}">
             {{ lbl }}
+            {# Lane assignments #}
+            {% if show_matchups and row.matchups %}
+            <div style="margin-top:3px">
+              {% for m in row.matchups %}
+              {% if m.team1 and m.team2 %}
+              <div style="font-size:.78rem;font-weight:400;color:{% if w.is_entered %}#adb5bd{% else %}#495057{% endif %};
+                          display:flex;align-items:center;gap:5px;padding:1px 0">
+                {% if m.lane_pair %}
+                <span class="home-lane-badge" style="font-size:.7rem;padding:0 6px;
+                      {% if w.is_entered %}background:#adb5bd{% endif %}">{{ m.lane_pair }}</span>
+                {% endif %}
+                {{ m.team1.name }} <span style="color:#adb5bd;font-weight:400">vs</span> {{ m.team2.name }}
+              </div>
+              {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
           </span>
           <span class="sched-status">
             {% if w.is_entered %}✓{% endif %}

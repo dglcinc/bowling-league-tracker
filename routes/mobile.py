@@ -463,7 +463,8 @@ def me():
 @login_required
 def schedule():
     season = _active_season()
-    schedule_rows = []   # list of dicts: {date, week, is_break}
+    show_all = request.args.get('show_all') == '1'
+    schedule_rows = []   # list of dicts: {date, week, is_break, matchups}
 
     if season:
         weeks = (Week.query
@@ -515,4 +516,11 @@ def schedule():
                     'matchups': matchups_by_week.get(w.week_num, []),
                 })
 
-    return render_template('mobile/schedule.html', season=season, schedule_rows=schedule_rows)
+    if not show_all:
+        schedule_rows = [r for r in schedule_rows
+                         if r['is_break'] or not r['week'].is_entered]
+        while schedule_rows and schedule_rows[0]['is_break']:
+            schedule_rows.pop(0)
+
+    return render_template('mobile/schedule.html', season=season,
+                           schedule_rows=schedule_rows, show_all=show_all)
