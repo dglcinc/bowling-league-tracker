@@ -1225,16 +1225,16 @@ def email_compose(season_id, week_num):
         # Build TO list
         to_list = [e.strip() for e in to_emails_raw.split(',') if e.strip()]
 
-        # PDF filter settings — save to DB for persistence
+        # PDF filter settings — always save to DB for persistence
+        from sqlalchemy import text as _text
         pdf_min_games = int(request.form.get('pdf_min_games', db_min_games) or db_min_games)
         pdf_top10 = request.form.get('pdf_top10') == '1'
-        if pdf_min_games != db_min_games or pdf_top10 != db_top10:
-            db_settings.prizes_min_games = pdf_min_games
-            db_settings.prizes_top10 = pdf_top10
-            db.session.add(db_settings)
-            db.session.commit()
-            db_min_games = pdf_min_games
-            db_top10 = pdf_top10
+        db.session.execute(_text(
+            'UPDATE league_settings SET prizes_min_games=:mg, prizes_top10=:t10 WHERE id=1'
+        ), {'mg': pdf_min_games, 't10': 1 if pdf_top10 else 0})
+        db.session.commit()
+        db_min_games = pdf_min_games
+        db_top10 = pdf_top10
 
         # Build BCC list
         bcc_list = []

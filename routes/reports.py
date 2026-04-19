@@ -141,9 +141,12 @@ def week_prizes(season_id, week_num):
 
     # If min_games/top10 params provided, save to DB and redirect to clean URL
     if 'min_games' in request.args or 'top10' in request.args:
-        settings.prizes_min_games = request.args.get('min_games', settings.prizes_min_games, type=int)
-        settings.prizes_top10 = bool(request.args.get('top10', 0, type=int))
-        db.session.add(settings)
+        from sqlalchemy import text as _text
+        new_mg = request.args.get('min_games', settings.prizes_min_games, type=int)
+        new_t10 = bool(request.args.get('top10', 0, type=int))
+        db.session.execute(_text(
+            'UPDATE league_settings SET prizes_min_games=:mg, prizes_top10=:t10 WHERE id=1'
+        ), {'mg': new_mg, 't10': 1 if new_t10 else 0})
         db.session.commit()
         return redirect(url_for('reports.week_prizes', season_id=season_id, week_num=week_num))
 
