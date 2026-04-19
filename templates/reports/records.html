@@ -463,6 +463,34 @@
   </div>
 
 </div>{# /row #}
+<div class="row g-4 mb-4">
+
+  {# Lowest individual scratch games ever rolled #}
+  <div class="col-md-6">
+    <h6>Lowest Individual Scratch Games — All Time</h6>
+    <div class="table-scroll">
+    <table class="table table-sm table-bordered table-striped mb-0">
+      <thead class="table-dark sortable-head">
+        <tr><th data-sort="num">#</th><th data-sort="text">Bowler</th><th data-sort="num">Score</th><th data-sort="text">Season</th><th data-sort="num">Wk</th></tr>
+      </thead>
+      <tbody>
+        {% for row in fun_stats.lowest_games %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</td>
+          <td><strong>{{ row.score }}</strong></td>
+          <td>{{ row.season.name }}</td>
+          <td>{{ row.week_num }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-muted text-center">No data</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+</div>{# /row #}
 {% endif %}
 </div>{# /tab-funstats #}
 
