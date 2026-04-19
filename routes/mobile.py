@@ -518,9 +518,9 @@ def schedule():
 
     if not show_all:
         schedule_rows = [r for r in schedule_rows
-                         if r['is_break'] or not r['week'].is_entered]
-        while schedule_rows and schedule_rows[0]['is_break']:
-            schedule_rows.pop(0)
+                         if not r['is_break']
+                         and not r['week'].is_entered
+                         and not r['week'].is_cancelled]
 
     return render_template('mobile/schedule.html', season=season,
                            schedule_rows=schedule_rows, show_all=show_all)

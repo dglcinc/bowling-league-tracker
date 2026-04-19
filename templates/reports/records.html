@@ -83,6 +83,20 @@
 {# ════════════════════════════════════════════════════════════════════════════ #}
 <div class="tab-pane fade" id="tab-alltime">
 
+  {# ── Bowler count filter ── #}
+  <div class="mb-3 no-print">
+    <span class="text-muted small me-2">Show:</span>
+    <div class="btn-group btn-group-sm" role="group">
+      {% for val, label in [('top','Top 20'),('bottom','Bottom 20'),('all','All')] %}
+      <a href="{{ url_for('records.records', venue=venue_filter, at=val) }}#tab-alltime"
+         class="btn btn-outline-secondary{% if at_filter == val %} active{% endif %}">{{ label }}</a>
+      {% endfor %}
+    </div>
+    {% if at_filter == 'bottom' %}
+    <span class="text-muted small ms-2">— showing lowest scores in each category</span>
+    {% endif %}
+  </div>
+
   {# ── High Game row ── #}
   <div class="row g-4 mb-4">
     <div class="col-md-6">

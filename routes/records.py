@@ -117,11 +117,11 @@ def _all_time_records(summaries):
 
     bests = list(bowler_best.values())
 
-    all_time_hg_s  = sorted(bests, key=lambda x: -x['hg_scratch'])[:20]
-    all_time_hs_s  = sorted(bests, key=lambda x: -x['hs_scratch'])[:20]
-    all_time_hg_h  = sorted(bests, key=lambda x: -x['hg_hcp'])[:20]
-    all_time_hs_h  = sorted(bests, key=lambda x: -x['hs_hcp'])[:20]
-    all_time_avg   = sorted(bests, key=lambda x: -x['best_avg'])[:20]
+    all_time_hg_s  = sorted(bests, key=lambda x: -x['hg_scratch'])
+    all_time_hs_s  = sorted(bests, key=lambda x: -x['hs_scratch'])
+    all_time_hg_h  = sorted(bests, key=lambda x: -x['hg_hcp'])
+    all_time_hs_h  = sorted(bests, key=lambda x: -x['hs_hcp'])
+    all_time_avg   = sorted(bests, key=lambda x: -x['best_avg'])
     return all_time_hg_s, all_time_hs_s, all_time_hg_h, all_time_hs_h, all_time_avg
 
 
@@ -332,6 +332,11 @@ def records():
     seasons, tournament_weeks = _get_season_data()
     venue_filter = request.args.get('venue', 'all')
 
+    # All-Time tab filter
+    at_filter = request.args.get('at', 'top')
+    if at_filter not in ('top', 'bottom', 'all'):
+        at_filter = 'top'
+
     # Stat builder params
     builder_metric   = request.args.get('bm', 'avg')
     builder_season   = request.args.get('bs', '')
@@ -342,6 +347,7 @@ def records():
 
     empty_ctx = dict(
         seasons=[], venue_filter=venue_filter, venue_labels=_VENUE_LABELS,
+        at_filter=at_filter,
         all_time_hg_s=[], all_time_hs_s=[], all_time_hg_h=[], all_time_hs_h=[],
         all_time_avg=[], top_season_avgs=[], most_improved=[], season_comparison=[],
         tournament_winners=[], tournament_labels={},
@@ -368,6 +374,19 @@ def records():
     all_time_hg_s, all_time_hs_s, all_time_hg_h, all_time_hs_h, all_time_avg = (
         _all_time_records(filtered)
     )
+
+    def _apply_at_filter(lst):
+        if at_filter == 'bottom':
+            return list(reversed(lst[-20:]))
+        if at_filter == 'top':
+            return lst[:20]
+        return lst  # 'all'
+
+    all_time_hg_s = _apply_at_filter(all_time_hg_s)
+    all_time_hs_s = _apply_at_filter(all_time_hs_s)
+    all_time_hg_h = _apply_at_filter(all_time_hg_h)
+    all_time_hs_h = _apply_at_filter(all_time_hs_h)
+    all_time_avg  = _apply_at_filter(all_time_avg)
     most_improved = _most_improved(filtered)
     season_comp   = _season_comparison(filtered_seasons, filtered)
     top_season_avgs = sorted(filtered, key=lambda r: -r['avg'])[:25]
@@ -395,6 +414,7 @@ def records():
                            seasons=seasons,
                            venue_filter=venue_filter,
                            venue_labels=_VENUE_LABELS,
+                           at_filter=at_filter,
                            all_time_hg_s=all_time_hg_s,
                            all_time_hs_s=all_time_hs_s,
                            all_time_hg_h=all_time_hg_h,
