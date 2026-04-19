@@ -4,8 +4,6 @@
 {% block extra_head %}
 <script>
 (function() {
-  var LS_MG  = 'bowling_prizes_min_games';
-  var LS_T10 = 'bowling_prizes_top10';
   var AVG_DATA = {{ avg_leaders_json | safe }};
 
   function getFilteredLeaders() {
@@ -13,13 +11,13 @@
     var t10 = document.getElementById('pdfTop10chk').checked;
     var filtered = AVG_DATA.filter(function(l) { return l.games >= mg; });
     if (t10 && filtered.length) {
-      var hcps = filtered.map(function(l) { return l.handicap; })
+      var avgs = filtered.map(function(l) { return l.average; })
                          .filter(function(v, i, a) { return a.indexOf(v) === i; })
-                         .sort(function(a, b) { return a - b; })
+                         .sort(function(a, b) { return b - a; })
                          .slice(0, 10);
-      var hcpSet = {};
-      hcps.forEach(function(h) { hcpSet[h] = true; });
-      filtered = filtered.filter(function(l) { return hcpSet[l.handicap]; });
+      var avgSet = {};
+      avgs.forEach(function(a) { avgSet[a] = true; });
+      filtered = filtered.filter(function(l) { return avgSet[l.average]; });
     }
     return filtered;
   }
@@ -41,23 +39,9 @@
     var scopeSel = document.getElementById('bccScope');
     if (!mgInput) return;
 
-    // Restore saved values
-    var mg  = localStorage.getItem(LS_MG);
-    var t10 = localStorage.getItem(LS_T10);
-    if (mg  !== null) mgInput.value = mg;
-    if (t10 !== null) t10Input.checked = (t10 === '1');
-
     updateHighAvg();
-
-    // Save on change and refresh high-avg display
-    mgInput.addEventListener('change', function() {
-      localStorage.setItem(LS_MG, mgInput.value);
-      updateHighAvg();
-    });
-    t10Input.addEventListener('change', function() {
-      localStorage.setItem(LS_T10, t10Input.checked ? '1' : '0');
-      updateHighAvg();
-    });
+    mgInput.addEventListener('change', updateHighAvg);
+    t10Input.addEventListener('change', updateHighAvg);
     if (scopeSel) scopeSel.addEventListener('change', updateHighAvg);
   });
 })();
@@ -139,11 +123,12 @@
         <div class="d-flex align-items-center gap-3 ms-4">
           <div class="d-flex align-items-center gap-1">
             <label class="form-label mb-0 small text-muted">Min games:</label>
-            <input type="number" name="pdf_min_games" id="pdfMinGames" value="9" min="0" max="99"
+            <input type="number" name="pdf_min_games" id="pdfMinGames" value="{{ db_min_games }}" min="0" max="99"
                    class="form-control form-control-sm" style="width:65px">
           </div>
           <div class="form-check mb-0">
-            <input class="form-check-input" type="checkbox" name="pdf_top10" value="1" id="pdfTop10chk">
+            <input class="form-check-input" type="checkbox" name="pdf_top10" value="1" id="pdfTop10chk"
+                   {{ 'checked' if db_top10 else '' }}>
             <label class="form-check-label small text-muted" for="pdfTop10chk">Top 10 only</label>
           </div>
         </div>
@@ -152,7 +137,7 @@
       <input type="hidden" name="test_only" value="0" id="testOnlyFlag">
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary" {{ 'disabled' if not mail_configured }}>
-          Send Email
+          Review &amp; Send
         </button>
         <button type="submit" class="btn btn-outline-secondary"
                 {{ 'disabled' if not mail_configured }}
@@ -226,4 +211,47 @@
     </div>
   </div>
 </div>
+
+{% if email_preview %}
+<div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,0.5)">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Review Email Before Sending</h5>
+      </div>
+      <form method="post">
+        <input type="hidden" name="send_confirmed" value="1">
+        <input type="hidden" name="body_text" value="{{ email_preview.body_text | e }}">
+        <input type="hidden" name="attach_pdf" value="{{ '1' if email_preview.attach_pdf else '0' }}">
+        <input type="hidden" name="pdf_min_games" value="{{ email_preview.pdf_min_games }}">
+        {% if email_preview.pdf_top10 %}<input type="hidden" name="pdf_top10" value="1">{% endif %}
+        <input type="hidden" name="bcc_scope" value="{{ email_preview.bcc_scope }}">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Subject</label>
+            <input type="text" name="subject" class="form-control"
+                   value="{{ email_preview.subject | e }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">TO — Captains</label>
+            <input type="text" name="to_emails" class="form-control font-monospace"
+                   value="{{ email_preview.to_emails_raw | e }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">BCC — {{ email_preview.bcc_list | length }} recipients</label>
+            <textarea name="bcc_override" class="form-control font-monospace" rows="4"
+                      style="font-size:0.8rem">{{ email_preview.bcc_list | join('\n') }}</textarea>
+            <div class="form-text">One address per line. Edit to add or remove recipients.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <a href="{{ url_for('admin.email_compose', season_id=season.id, week_num=week_num) }}"
+             class="btn btn-outline-secondary">Back to Edit</a>
+          <button type="submit" class="btn btn-primary">Send Now</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

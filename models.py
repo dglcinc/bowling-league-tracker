@@ -59,6 +59,8 @@ class LeagueSettings(db.Model):
     use_nickname = db.Column(db.Boolean, default=False)
     show_captain_name = db.Column(db.Boolean, default=False)
     invite_message = db.Column(db.Text)
+    prizes_min_games = db.Column(db.Integer, default=9)
+    prizes_top10 = db.Column(db.Boolean, default=False)
 
 
 class Season(db.Model):

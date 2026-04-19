@@ -2,25 +2,6 @@
 {% block title %}Print Batch — Week {{ week_num }} — {{ season.name }}{% endblock %}
 
 {% block extra_head %}
-<script>
-(function() {
-  var LS_MG  = 'bowling_prizes_min_games';
-  var LS_T10 = 'bowling_prizes_top10';
-  var params = new URLSearchParams(window.location.search);
-  if (params.has('min_games') || params.has('top10')) {
-    localStorage.setItem(LS_MG,  params.get('min_games') || '9');
-    localStorage.setItem(LS_T10, params.has('top10') ? '1' : '0');
-  } else {
-    var mg  = localStorage.getItem(LS_MG);
-    var t10 = localStorage.getItem(LS_T10);
-    if (mg !== null) {
-      params.set('min_games', mg);
-      if (t10 === '1') params.set('top10', '1');
-      window.location.search = params.toString();
-    }
-  }
-})();
-</script>
 <style>
   .batch-section { margin-bottom: 2rem; }
 

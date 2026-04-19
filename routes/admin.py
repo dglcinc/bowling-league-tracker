@@ -178,12 +178,15 @@ def season_detail(season_id):
         _leaders.sort(key=lambda x: (-x['average'], x['last_name']))
         avg_leaders_json = _json.dumps(_leaders)
 
+    _db_settings = db.session.get(LeagueSettings, 1) or LeagueSettings(id=1)
     return render_template('admin/season_detail.html',
                            season=season, teams=teams, roster=roster,
                            roster_filter=roster_filter, access_map=access_map,
                            sender_email=sender_email,
                            graph_configured=graph_configured,
-                           avg_leaders_json=avg_leaders_json)
+                           avg_leaders_json=avg_leaders_json,
+                           db_min_games=_db_settings.prizes_min_games if _db_settings.prizes_min_games is not None else 9,
+                           db_top10=bool(_db_settings.prizes_top10))
 
 
 @admin_bp.route('/seasons/<int:season_id>/send-magic-links', methods=['POST'])
@@ -278,8 +281,8 @@ def send_email(season_id):
                     leaders.append((r.bowler, stats['running_avg'], stats['display_handicap']))
             leaders.sort(key=lambda x: (-x[1], x[0].last_name))
             if top10:
-                top10_hcps = set(sorted({hcp for _, _, hcp in leaders})[:10])
-                leaders = [(b, avg, hcp) for b, avg, hcp in leaders if hcp in top10_hcps]
+                top10_avgs = set(sorted({avg for _, avg, _ in leaders}, reverse=True)[:10])
+                leaders = [(b, avg, hcp) for b, avg, hcp in leaders if avg in top10_avgs]
             bowlers = [b for b, _, _ in leaders]
     else:
         bowlers = []
@@ -1204,46 +1207,58 @@ def email_compose(season_id, week_num):
     week_date_str = week.date.strftime('%B %d, %Y') if week.date else f'Week {week_num}'
     default_subject = f'{league_name} Standings -- Week {week_num}'
 
+    # Read persisted filter settings from DB
+    db_settings = db.session.get(LeagueSettings, 1) or LeagueSettings(id=1)
+    db_min_games = db_settings.prizes_min_games if db_settings.prizes_min_games is not None else 9
+    db_top10 = bool(db_settings.prizes_top10)
+
+    email_preview = None
     if request.method == 'POST':
         subject = request.form.get('subject', default_subject).strip()
         body_text = request.form.get('body_text', '').strip()
         bcc_scope = request.form.get('bcc_scope', 'all')
         attach_pdf = request.form.get('attach_pdf') == '1'
         to_emails_raw = request.form.get('to_emails', '').strip()
+        send_confirmed = request.form.get('send_confirmed') == '1'
+        test_only = request.form.get('test_only') == '1'
 
         # Build TO list
         to_list = [e.strip() for e in to_emails_raw.split(',') if e.strip()]
 
-        # PDF filter settings (also drive the High Averages BCC scope)
-        pdf_min_games = int(request.form.get('pdf_min_games', 9) or 9)
+        # PDF filter settings — save to DB for persistence
+        pdf_min_games = int(request.form.get('pdf_min_games', db_min_games) or db_min_games)
         pdf_top10 = request.form.get('pdf_top10') == '1'
+        if pdf_min_games != db_min_games or pdf_top10 != db_top10:
+            db_settings.prizes_min_games = pdf_min_games
+            db_settings.prizes_top10 = pdf_top10
+            db.session.add(db_settings)
+            db.session.commit()
+            db_min_games = pdf_min_games
+            db_top10 = pdf_top10
 
         # Build BCC list
+        bcc_list = []
         if bcc_scope == 'all':
-            bcc_roster = all_roster
+            bcc_list = list({r.bowler.email for r in all_roster if r.bowler.email})
         elif bcc_scope == 'high_avg':
             filtered = [l for l in avg_leaders if l['games'] >= pdf_min_games]
             if pdf_top10:
-                top10_hcps = set(sorted({l['handicap'] for l in filtered})[:10])
-                filtered = [l for l in filtered if l['handicap'] in top10_hcps]
+                top10_avgs = set(sorted({l['average'] for l in filtered}, reverse=True)[:10])
+                filtered = [l for l in filtered if l['average'] in top10_avgs]
             bcc_list = list({l['email'] for l in filtered if l['email']})
-            bcc_roster = None  # handled directly below
         else:
             try:
                 team_num = int(bcc_scope)
-                bcc_roster = [r for r in all_roster if r.team.number == team_num]
+                bcc_list = list({r.bowler.email for r in all_roster
+                                 if r.team.number == team_num and r.bowler.email})
             except ValueError:
-                bcc_roster = all_roster
+                bcc_list = list({r.bowler.email for r in all_roster if r.bowler.email})
 
-        if bcc_roster is not None:
-            bcc_list = list({r.bowler.email for r in bcc_roster if r.bowler.email})
-
-        test_only = request.form.get('test_only') == '1'
         if test_only:
-            my_email = current_app.config.get('GRAPH_SENDER_EMAIL', '')
-            to_list = [my_email] if my_email else []
-            bcc_list = []
-            subject = f'[TEST] {subject}'
+            send_to = [current_app.config.get('GRAPH_SENDER_EMAIL', '')]
+            send_to = [e for e in send_to if e]
+            send_bcc = []
+            send_subject = f'[TEST] {subject}'
         else:
             thomson = Bowler.query.filter(
                 Bowler.last_name.ilike('Thomson'),
@@ -1251,38 +1266,57 @@ def email_compose(season_id, week_num):
             ).first()
             if thomson and thomson.email and thomson.email not in bcc_list:
                 bcc_list.append(thomson.email)
+            send_to = to_list
+            send_bcc = bcc_list
+            send_subject = subject
 
-        # Build HTML email body
-        html_body = _build_email_html(body_text, above_avg, season, week)
+        if send_confirmed or test_only:
+            # If the preview modal had an editable BCC textarea, use those addresses
+            bcc_override_raw = request.form.get('bcc_override', '').strip()
+            if bcc_override_raw and not test_only:
+                send_bcc = [e.strip() for e in bcc_override_raw.splitlines() if e.strip()]
 
-        # Build optional PDF attachment
-        pdf_bytes = None
-        if attach_pdf:
+            # Confirmed — send now
+            html_body = _build_email_html(body_text, above_avg, season, week)
+
+            pdf_bytes = None
+            if attach_pdf and not week.tournament_type:
+                try:
+                    pdf_bytes = _generate_prizes_pdf(season_id, week_num,
+                                                     min_games=pdf_min_games, top10=pdf_top10)
+                except Exception as pdf_err:
+                    flash(f'PDF generation failed (email sent without attachment): {pdf_err}', 'warning')
+
             try:
-                pdf_bytes = _generate_prizes_pdf(season_id, week_num,
-                                                 min_games=pdf_min_games, top10=pdf_top10)
-            except Exception as pdf_err:
-                flash(f'PDF generation failed (email sent without attachment): {pdf_err}', 'warning')
-
-        # Send via Microsoft Graph API
-        try:
-            _send_via_graph(
-                app_config=current_app.config,
-                subject=subject,
-                html_body=html_body,
-                to_list=to_list,
-                bcc_list=bcc_list,
-                pdf_attachment=pdf_bytes,
-                pdf_filename=f'Week{week_num}_Standings.pdf',
-            )
-            if test_only:
-                flash(f'Test email sent to {to_list[0] if to_list else "you"}.', 'success')
-            else:
-                flash(f'Email sent to {len(to_list)} captain(s) with {len(bcc_list)} BCC recipients.', 'success')
-            return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
-
-        except Exception as e:
-            flash(f'Email send failed: {e}', 'danger')
+                _send_via_graph(
+                    app_config=current_app.config,
+                    subject=send_subject,
+                    html_body=html_body,
+                    to_list=send_to,
+                    bcc_list=send_bcc,
+                    pdf_attachment=pdf_bytes,
+                    pdf_filename=f'Week{week_num}_Standings.pdf',
+                )
+                if test_only:
+                    flash(f'Test email sent to {send_to[0] if send_to else "you"}.', 'success')
+                else:
+                    flash(f'Email sent to {len(send_to)} captain(s) with {len(send_bcc)} BCC recipients.', 'success')
+                return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+            except Exception as e:
+                flash(f'Email send failed: {e}', 'danger')
+        else:
+            # Show preview panel for review before sending
+            email_preview = {
+                'subject':      subject,
+                'body_text':    body_text,
+                'to_list':      send_to,
+                'bcc_list':     send_bcc,
+                'bcc_scope':    bcc_scope,
+                'attach_pdf':   attach_pdf,
+                'pdf_min_games': pdf_min_games,
+                'pdf_top10':    pdf_top10,
+                'to_emails_raw': ', '.join(send_to),
+            }
 
     graph_configured = bool(current_app.config.get('GRAPH_CLIENT_ID'))
     return render_template('admin/email_compose.html',
@@ -1297,7 +1331,10 @@ def email_compose(season_id, week_num):
                            standings=standings,
                            default_subject=default_subject,
                            league_name=league_name,
-                           mail_configured=graph_configured)
+                           mail_configured=graph_configured,
+                           db_min_games=db_min_games,
+                           db_top10=db_top10,
+                           email_preview=email_preview)
 
 
 # Module-level MSAL app cache — reuse the same ConfidentialClientApplication
@@ -1464,8 +1501,8 @@ def _generate_prizes_pdf(season_id, week_num, min_games=9, top10=False):
     avg_rows = sorted([l for l in leaders if l['games'] >= min_games],
                       key=lambda x: (-x['average'], x['bowler'].last_name))
     if top10:
-        top10_hcps = set(sorted({r['handicap'] for r in avg_rows})[:10])
-        avg_rows = [r for r in avg_rows if r['handicap'] in top10_hcps]
+        top10_avgs = set(sorted({r['average'] for r in avg_rows}, reverse=True)[:10])
+        avg_rows = [r for r in avg_rows if r['average'] in top10_avgs]
     full_year       = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
     fh_list         = get_team_standings(season_id, half=1, through_week=week_num)
     sh_list         = get_team_standings(season_id, half=2, through_week=week_num)
