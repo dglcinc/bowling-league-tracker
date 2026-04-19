@@ -50,50 +50,6 @@
   </div>
 </div>
 
-{# ── Lane assignments (regular week, position night, club championship) ── #}
-{% if event_type in ('lanes', 'championship') %}
-
-{% if all_matchups %}
-<div class="m-card">
-  <div class="m-card-title">
-    {% if event_type == 'championship' %}Team Matchups{% else %}Lane Assignments{% endif %}
-  </div>
-  {% for m in all_matchups %}
-  {% if m.team1 and m.team2 %}
-  {% set is_mine = my_team and (m.team1_id == my_team.id or m.team2_id == my_team.id) %}
-  <div style="display:flex;align-items:center;padding:9px 0;
-              border-bottom:1px solid #f0f0f0;
-              {% if is_mine %}background:#f0f4ff;margin:0 -16px;padding:9px 16px;{% endif %}">
-    <div style="width:64px;flex-shrink:0">
-      {% if m.lane_pair %}
-      <span class="lane-badge">{{ m.lane_pair }}</span>
-      {% else %}
-      <span style="color:#adb5bd;font-size:.8rem">TBD</span>
-      {% endif %}
-    </div>
-    <div style="flex:1;font-size:.95rem;{% if is_mine %}font-weight:700;color:#1b3a6b{% endif %}">
-      {{ m.team1.name }} <span style="color:#6c757d;font-weight:400">vs</span> {{ m.team2.name }}
-    </div>
-    {% if is_mine %}
-    <div style="font-size:.7rem;color:#1b3a6b;font-weight:600">YOU</div>
-    {% endif %}
-  </div>
-  {% endif %}
-  {% endfor %}
-</div>
-{% elif my_team %}
-<div class="m-card">
-  <div class="m-card-sub text-muted" style="font-size:.85rem">Lane assignments not yet posted for this week.</div>
-</div>
-{% endif %}
-
-{% if event_type == 'championship' %}
-<div class="m-card" style="font-size:.85rem;color:#495057">
-  Top two teams from regular season standings. Handicaps count. Three games.
-  Top two teams on lanes 13–16; bottom two on lanes 17–20.
-</div>
-{% endif %}
-
 {# ── Individual tournament eligibility ── #}
 {% elif event_type == 'indiv_scratch' %}
 <div class="m-card">
@@ -209,6 +165,74 @@
        style="color:#1b3a6b;font-size:.85rem">View scores →</a>
   </div>
 </div>
+{% endif %}
+
+{# ── Handicap roster ── #}
+{% if roster_by_team %}
+<div class="m-card" style="padding-bottom:8px">
+  <div class="m-card-title">Current Handicaps</div>
+
+  {# Team filter chips #}
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="teamFilters">
+    <button class="roster-filter-btn" data-team="all"
+            style="border:none;border-radius:16px;padding:4px 12px;font-size:.78rem;
+                   font-weight:600;cursor:pointer;background:#e9ecef;color:#495057">
+      All
+    </button>
+    {% for row in roster_by_team %}
+    <button class="roster-filter-btn" data-team="{{ row.team.id }}"
+            style="border:none;border-radius:16px;padding:4px 12px;font-size:.78rem;
+                   font-weight:600;cursor:pointer;background:#e9ecef;color:#495057">
+      {{ row.team.name }}
+    </button>
+    {% endfor %}
+  </div>
+
+  {# Bowler list grouped by team #}
+  {% for row in roster_by_team %}
+  <div class="roster-team-group" data-team="{{ row.team.id }}">
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+                color:#6c757d;margin:8px 0 4px">{{ row.team.name }}</div>
+    {% for b in row.bowlers %}
+    <div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid #f5f5f5">
+      <div style="flex:1;font-size:.92rem;color:#212529">
+        {{ b.last_name }}, {{ b.first_name }}
+        {% if b.nickname %}<span style="color:#6c757d;font-size:.82rem"> ({{ b.nickname }})</span>{% endif %}
+      </div>
+      <div style="background:#c3e6cb;color:#155724;font-weight:700;font-size:.85rem;
+                  border-radius:6px;padding:2px 8px;min-width:32px;text-align:center">
+        {{ b.handicap }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+(function () {
+  var myTeamId = '{{ my_team.id if my_team else "all" }}';
+  var btns = document.querySelectorAll('.roster-filter-btn');
+  var groups = document.querySelectorAll('.roster-team-group');
+
+  function activate(teamId) {
+    btns.forEach(function (b) {
+      var active = b.dataset.team === teamId;
+      b.style.background = active ? '#1b3a6b' : '#e9ecef';
+      b.style.color = active ? '#fff' : '#495057';
+    });
+    groups.forEach(function (g) {
+      g.style.display = (teamId === 'all' || g.dataset.team === teamId) ? '' : 'none';
+    });
+  }
+
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () { activate(b.dataset.team); });
+  });
+
+  activate(myTeamId);
+})();
+</script>
 {% endif %}
 
 {# ── Full site link ── #}

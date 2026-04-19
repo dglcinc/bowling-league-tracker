@@ -30,6 +30,8 @@
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-seasons">By Season</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-winners">Tournament Winners</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-improved">Most Improved</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-funstats">Fun Stats</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-builder">Stat Builder</a></li>
 </ul>
 {% block extra_js %}
 <script>
@@ -338,6 +340,245 @@
   </div>
 
 </div>{# /tab-improved #}
+
+{# ════════════════════════════════════════════════════════════════════════════ #}
+{# FUN STATS tab                                                               #}
+{# ════════════════════════════════════════════════════════════════════════════ #}
+<div class="tab-pane fade" id="tab-funstats">
+{% if fun_stats %}
+
+<div class="row g-4 mb-4">
+
+  {# Worst average #}
+  <div class="col-md-6">
+    <h6>Lowest Season Average <small class="text-muted">(min {{ fun_stats.min_qualified }} games)</small></h6>
+    <div class="table-scroll">
+    <table class="table table-sm table-bordered table-striped mb-0">
+      <thead class="table-dark sortable-head">
+        <tr><th data-sort="num">#</th><th data-sort="text">Bowler</th><th data-sort="num">Avg</th><th data-sort="num">Games</th><th data-sort="text">Season</th></tr>
+      </thead>
+      <tbody>
+        {% for row in fun_stats.worst_avg %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.bowler.id) }}" class="text-decoration-none text-body">{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</a></td>
+          <td>{{ row.avg }}</td>
+          <td>{{ row.games }}</td>
+          <td>{{ row.season.name }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-muted text-center">No data</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  {# Most 200+ games (career) #}
+  <div class="col-md-6">
+    <h6>Most 200+ Games (Career, Scratch)</h6>
+    <div class="table-scroll">
+    <table class="table table-sm table-bordered table-striped mb-0">
+      <thead class="table-dark sortable-head">
+        <tr><th data-sort="num">#</th><th data-sort="text">Bowler</th><th data-sort="num">Count</th></tr>
+      </thead>
+      <tbody>
+        {% for row in fun_stats.most_200 %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</td>
+          <td><strong>{{ row.count }}</strong></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="text-muted text-center">No data</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+</div>{# /row #}
+<div class="row g-4 mb-4">
+
+  {# Most games in a season #}
+  <div class="col-md-6">
+    <h6>Most Games Bowled — Single Season</h6>
+    <div class="table-scroll">
+    <table class="table table-sm table-bordered table-striped mb-0">
+      <thead class="table-dark sortable-head">
+        <tr><th data-sort="num">#</th><th data-sort="text">Bowler</th><th data-sort="num">Games</th><th data-sort="text">Season</th></tr>
+      </thead>
+      <tbody>
+        {% for row in fun_stats.most_season_games %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.bowler.id) }}" class="text-decoration-none text-body">{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</a></td>
+          <td><strong>{{ row.games }}</strong></td>
+          <td>{{ row.season.name }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted text-center">No data</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  {# Most career games #}
+  <div class="col-md-6">
+    <h6>Most Games Bowled — Career</h6>
+    <div class="table-scroll">
+    <table class="table table-sm table-bordered table-striped mb-0">
+      <thead class="table-dark sortable-head">
+        <tr><th data-sort="num">#</th><th data-sort="text">Bowler</th><th data-sort="num">Games</th><th data-sort="num">Seasons</th></tr>
+      </thead>
+      <tbody>
+        {% for row in fun_stats.most_career_games %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</td>
+          <td><strong>{{ row.total }}</strong></td>
+          <td>{{ row.seasons }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted text-center">No data</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+</div>{# /row #}
+{% endif %}
+</div>{# /tab-funstats #}
+
+{# ════════════════════════════════════════════════════════════════════════════ #}
+{# STAT BUILDER tab                                                            #}
+{# ════════════════════════════════════════════════════════════════════════════ #}
+<div class="tab-pane fade" id="tab-builder">
+
+<div class="row mb-4">
+  <div class="col-lg-8">
+    <h6 class="mb-3">Build a Custom Stat</h6>
+    <form method="get" action="{{ url_for('records.records') }}" id="builderForm">
+      <input type="hidden" name="venue" value="{{ venue_filter }}">
+      <div class="row g-2 align-items-end">
+        <div class="col-sm-4">
+          <label class="form-label small fw-semibold">Metric</label>
+          <select name="bm" class="form-select form-select-sm">
+            {% for key, (_, label) in [
+              ('avg',       ('avg',        'Season Average')),
+              ('games',     ('games',      'Games Bowled')),
+              ('hg_scratch',('high_game_scratch','High Game (Scratch)')),
+              ('hg_hcp',    ('high_game_hcp',   'High Game (Hcp)')),
+              ('hs_scratch',('high_series_scratch','High Series (Scratch)')),
+              ('hs_hcp',    ('high_series_hcp',  'High Series (Hcp)')),
+            ] %}
+            <option value="{{ key }}" {% if builder_metric == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-3">
+          <label class="form-label small fw-semibold">Season</label>
+          <select name="bs" class="form-select form-select-sm">
+            <option value="">All seasons</option>
+            {% for s in seasons | sort(attribute='name', reverse=True) %}
+            <option value="{{ s.id }}" {% if builder_season == s.id | string %}selected{% endif %}>{{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-3">
+          <label class="form-label small fw-semibold">Team</label>
+          <select name="bt" class="form-select form-select-sm">
+            <option value="">All teams</option>
+            {% for tn in all_team_names %}
+            <option value="{{ tn }}" {% if builder_team == tn %}selected{% endif %}>{{ tn }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-2">
+          <label class="form-label small fw-semibold">Min games</label>
+          <input type="number" name="bmg" class="form-control form-control-sm"
+                 min="0" max="100" value="{{ builder_mingames or '' }}" placeholder="0">
+        </div>
+      </div>
+      <div class="row g-2 mt-1 align-items-center">
+        <div class="col-auto">
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="basc" id="sortDesc" value=""
+                   {% if not builder_asc %}checked{% endif %}>
+            <label class="form-check-label small" for="sortDesc">Highest first</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="basc" id="sortAsc" value="1"
+                   {% if builder_asc %}checked{% endif %}>
+            <label class="form-check-label small" for="sortAsc">Lowest first</label>
+          </div>
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-sm btn-primary">Run</button>
+          <a href="{{ url_for('records.records') }}#tab-builder" class="btn btn-sm btn-outline-secondary ms-1">Reset</a>
+        </div>
+      </div>
+    </form>
+
+    {% if builder_results %}
+    <div class="mt-4">
+      <h6>{{ builder_label }}{% if builder_asc %} — Lowest First{% else %} — Highest First{% endif %}</h6>
+      <div class="table-scroll">
+      <table class="table table-sm table-bordered table-striped mb-0">
+        <thead class="table-dark sortable-head">
+          <tr>
+            <th data-sort="num">#</th>
+            <th data-sort="text">Bowler</th>
+            <th data-sort="num">{{ builder_label }}</th>
+            <th data-sort="num">Games</th>
+            <th data-sort="text">Season</th>
+            {% if not builder_season %}<th data-sort="text">Team</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in builder_results %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.bowler.id) }}" class="text-decoration-none text-body">{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</a></td>
+            <td><strong>
+              {%- if builder_metric == 'avg' %}{{ row.avg }}
+              {%- elif builder_metric == 'games' %}{{ row.games }}
+              {%- elif builder_metric == 'hg_scratch' %}{{ row.high_game_scratch }}
+              {%- elif builder_metric == 'hg_hcp' %}{{ row.high_game_hcp }}
+              {%- elif builder_metric == 'hs_scratch' %}{{ row.high_series_scratch }}
+              {%- elif builder_metric == 'hs_hcp' %}{{ row.high_series_hcp }}
+              {%- endif -%}
+            </strong></td>
+            <td>{{ row.games }}</td>
+            <td>{{ row.season.name }}</td>
+            {% if not builder_season %}<td>{{ row.team.name if row.team else '—' }}</td>{% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    {% elif request.args.get('bm') %}
+    <p class="text-muted mt-3">No results match your filters.</p>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    <h6 class="mb-3">Suggest a Stat</h6>
+    <p class="small text-muted">Have an idea for a stat that isn't here? Submit it and it may get added.</p>
+    <form method="post" action="{{ url_for('records.suggest_stat') }}">
+      <div class="mb-2">
+        <textarea name="suggestion" class="form-control form-control-sm" rows="3"
+                  placeholder="e.g. Most strikes in a game, most consecutive weeks above 200 avg..."></textarea>
+      </div>
+      <button type="submit" class="btn btn-sm btn-outline-secondary">Submit idea</button>
+    </form>
+  </div>
+</div>
+
+</div>{# /tab-builder #}
 
 </div>{# /tab-content #}
 {% endif %}

@@ -3,7 +3,8 @@ Records route: all-time leaderboards and season comparison table.
 """
 
 from collections import defaultdict
-from flask import Blueprint, render_template, request
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 from models import (db, Season, Week, Bowler, MatchupEntry, TournamentEntry, TeamPoints, Roster, Team, ClubChampionshipResult)
 from calculations import get_bowler_stats, get_team_standings
 from extensions import cache
@@ -41,8 +42,14 @@ def _compute_bowler_season_summaries(seasons, tournament_weeks):
     """
     For each (bowler, season) that has regular-week entries (min 6 games),
     compute scratch and handicap stats.
-    Returns list of dicts with bowler, season, avg, games, high game/series S+H.
+    Returns list of dicts with bowler, season, team, avg, games, high game/series S+H.
     """
+    # Pre-load rosters and teams to avoid per-bowler queries
+    season_ids = [s.id for s in seasons]
+    all_rosters = Roster.query.filter(Roster.season_id.in_(season_ids)).all()
+    roster_map = {(r.bowler_id, r.season_id): r for r in all_rosters}
+    team_map = {t.id: t for t in Team.query.all()}
+
     summaries = []
     for season in seasons:
         twks = tournament_weeks[season.id]
@@ -58,9 +65,12 @@ def _compute_bowler_season_summaries(seasons, tournament_weeks):
             if stats['cumulative_games'] < 6:
                 continue
             bowler = db.session.get(Bowler, bid)
+            roster_row = roster_map.get((bid, season.id))
+            team = team_map.get(roster_row.team_id) if roster_row else None
             summaries.append({
                 'bowler':              bowler,
                 'season':              season,
+                'team':                team,
                 'avg':                 stats['running_avg'],
                 'games':               stats['cumulative_games'],
                 'high_game_scratch':   stats['ytd_high_game_scratch'],
@@ -236,6 +246,80 @@ def _tournament_winners_by_season(seasons):
     return rows
 
 
+def _fun_stats(summaries):
+    """Novelty stats not covered by the standard leaderboards."""
+    min_qualified = 30
+
+    # Worst season average (min 30 games)
+    qualified = [r for r in summaries if r['games'] >= min_qualified]
+    worst_avg = sorted(qualified, key=lambda r: r['avg'])[:20]
+
+    # Most games bowled in a single season
+    most_season_games = sorted(summaries, key=lambda r: -r['games'])[:20]
+
+    # Most career games across all seasons
+    career = defaultdict(lambda: {'bowler': None, 'total': 0, 'seasons': 0})
+    for r in summaries:
+        bid = r['bowler'].id
+        career[bid]['bowler'] = r['bowler']
+        career[bid]['total'] += r['games']
+        career[bid]['seasons'] += 1
+    most_career_games = sorted(career.values(), key=lambda x: -x['total'])[:20]
+
+    # Most 200+ scratch games (career) — query individual game columns
+    counts = defaultdict(int)
+    for row in db.session.query(
+        MatchupEntry.bowler_id,
+        MatchupEntry.game1, MatchupEntry.game2, MatchupEntry.game3,
+    ).filter(MatchupEntry.is_blind == False).all():
+        bid = row[0]
+        for g in row[1:]:
+            if g and g >= 200:
+                counts[bid] += 1
+    most_200 = []
+    for bid, cnt in counts.items():
+        bowler = db.session.get(Bowler, bid)
+        if bowler:
+            most_200.append({'bowler': bowler, 'count': cnt})
+    most_200.sort(key=lambda x: -x['count'])
+    most_200 = most_200[:20]
+
+    return {
+        'worst_avg':         worst_avg,
+        'most_season_games': most_season_games,
+        'most_career_games': most_career_games,
+        'most_200':          most_200,
+        'min_qualified':     min_qualified,
+    }
+
+
+_BUILDER_METRICS = {
+    'avg':        ('avg',                'Season Average'),
+    'games':      ('games',              'Games Bowled'),
+    'hg_scratch': ('high_game_scratch',  'High Game (Scratch)'),
+    'hg_hcp':     ('high_game_hcp',      'High Game (Hcp)'),
+    'hs_scratch': ('high_series_scratch','High Series (Scratch)'),
+    'hs_hcp':     ('high_series_hcp',    'High Series (Hcp)'),
+}
+
+
+def _stat_builder(summaries, all_seasons, metric_key, season_id, team_name,
+                  min_games, sort_asc):
+    """Filter summaries and return a ranked list for the stat builder."""
+    rows = summaries
+
+    if season_id:
+        rows = [r for r in rows if r['season'].id == season_id]
+    if team_name:
+        rows = [r for r in rows if r['team'] and r['team'].name == team_name]
+    if min_games:
+        rows = [r for r in rows if r['games'] >= min_games]
+
+    field, label = _BUILDER_METRICS.get(metric_key, ('avg', 'Season Average'))
+    rows = sorted(rows, key=lambda r: r[field], reverse=not sort_asc)[:50]
+    return rows, label
+
+
 _VENUE_LABELS = {
     'mountain_lakes_club': 'Mountain Lakes Club',
     'boonton_lanes':       'Boonton Lanes',
@@ -248,16 +332,26 @@ def records():
     seasons, tournament_weeks = _get_season_data()
     venue_filter = request.args.get('venue', 'all')
 
+    # Stat builder params
+    builder_metric   = request.args.get('bm', 'avg')
+    builder_season   = request.args.get('bs', '')
+    builder_team     = request.args.get('bt', '')
+    builder_mingames = int(request.args.get('bmg', 0) or 0)
+    builder_asc      = request.args.get('basc', '') == '1'
+    builder_season_id = int(builder_season) if builder_season.isdigit() else None
+
+    empty_ctx = dict(
+        seasons=[], venue_filter=venue_filter, venue_labels=_VENUE_LABELS,
+        all_time_hg_s=[], all_time_hs_s=[], all_time_hg_h=[], all_time_hs_h=[],
+        all_time_avg=[], top_season_avgs=[], most_improved=[], season_comparison=[],
+        tournament_winners=[], tournament_labels={},
+        fun_stats={}, builder_results=[], builder_label='',
+        builder_metric=builder_metric, builder_season=builder_season,
+        builder_team=builder_team, builder_mingames=builder_mingames,
+        builder_asc=builder_asc, all_team_names=[],
+    )
     if not seasons:
-        return render_template('reports/records.html',
-                               seasons=[],
-                               venue_filter=venue_filter,
-                               venue_labels=_VENUE_LABELS,
-                               all_time_hg_s=[], all_time_hs_s=[],
-                               all_time_hg_h=[], all_time_hs_h=[],
-                               all_time_avg=[], top_season_avgs=[],
-                               most_improved=[], season_comparison=[],
-                               tournament_winners=[], tournament_labels={})
+        return render_template('reports/records.html', **empty_ctx)
 
     summaries = _compute_bowler_season_summaries(seasons, tournament_weeks)
 
@@ -283,6 +377,20 @@ def records():
     active = Season.query.filter_by(is_active=True).first()
     tournament_labels = (active or seasons[-1]).tournament_labels if seasons else {}
 
+    fun = _fun_stats(filtered)
+
+    # All distinct team names for the builder team filter
+    all_team_names = sorted({r['team'].name for r in summaries if r['team']})
+
+    # Stat builder results — only compute when builder params are present
+    builder_results, builder_label = [], ''
+    if request.args.get('bm'):
+        builder_results, builder_label = _stat_builder(
+            filtered, filtered_seasons,
+            builder_metric, builder_season_id, builder_team,
+            builder_mingames, builder_asc,
+        )
+
     return render_template('reports/records.html',
                            seasons=seasons,
                            venue_filter=venue_filter,
@@ -296,7 +404,34 @@ def records():
                            most_improved=most_improved,
                            season_comparison=season_comp,
                            tournament_winners=tournament_winners,
-                           tournament_labels=tournament_labels)
+                           tournament_labels=tournament_labels,
+                           fun_stats=fun,
+                           builder_results=builder_results,
+                           builder_label=builder_label,
+                           builder_metric=builder_metric,
+                           builder_season=builder_season,
+                           builder_team=builder_team,
+                           builder_mingames=builder_mingames,
+                           builder_asc=builder_asc,
+                           all_team_names=all_team_names)
+
+
+@records_bp.route('/stats/suggest', methods=['POST'])
+@login_required
+def suggest_stat():
+    """Log a bowler's stat suggestion to a file for admin review."""
+    import os, datetime
+    suggestion = request.form.get('suggestion', '').strip()
+    if suggestion:
+        log_path = os.path.expanduser('~/bowling-data/stat_suggestions.txt')
+        name = ''
+        if current_user.is_authenticated:
+            name = f'{current_user.first_name} {current_user.last_name}'.strip()
+        with open(log_path, 'a') as f:
+            ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+            f.write(f'[{ts}] {name}: {suggestion}\n')
+    flash('Thanks! Your stat idea has been logged.', 'success')
+    return redirect(url_for('records.records') + '#tab-builder')
 
 
 @records_bp.route('/bowler_dir')

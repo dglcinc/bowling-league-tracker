@@ -61,52 +61,73 @@
   {% set is_entered = w.is_entered %}
   {% set is_upcoming = not w.is_entered and not w.is_cancelled %}
 
-  <div style="display:flex;align-items:center;padding:11px 16px;
-              border-bottom:1px solid #f0f0f0;
+  <div style="padding:11px 16px;border-bottom:1px solid #f0f0f0;
               {% if loop.first and is_upcoming %}background:#f0f4ff;{% endif %}">
 
-    {# Date column #}
-    <div style="width:72px;flex-shrink:0">
-      {% if row.date %}
-      <div style="font-size:.85rem;font-weight:{% if is_upcoming %}700{% else %}400{% endif %};
-                  color:{% if is_entered %}#adb5bd{% elif is_upcoming %}#1b3a6b{% else %}#495057{% endif %}">
-        {{ row.date.strftime('%b %-d') }}
-      </div>
-      {% else %}
-      <div style="font-size:.8rem;color:#adb5bd">—</div>
-      {% endif %}
-    </div>
-
-    {# Event label #}
-    <div style="flex:1">
-      <div style="font-size:.95rem;
-                  font-weight:{% if badge != 'regular' or is_upcoming %}600{% else %}400{% endif %};
-                  color:{% if is_entered %}#adb5bd
-                        {% elif badge == 'championship' %}#8b0000
-                        {% elif badge == 'tournament' %}#5a1a8a
-                        {% elif badge == 'position' %}#1a5a3a
-                        {% elif badge == 'cancelled' %}#adb5bd
-                        {% elif is_upcoming %}#1b3a6b
-                        {% else %}#212529{% endif %}">
-        {{ label }}
-        {% if w.is_cancelled %}<span style="font-size:.75rem;color:#dc3545"> — cancelled</span>{% endif %}
-      </div>
-      {% if badge in ('championship', 'tournament', 'position') and not is_entered %}
-      <div style="font-size:.72rem;color:#6c757d;margin-top:1px">
-        {% if badge == 'championship' %}Club Championship
-        {% elif badge == 'tournament' %}Individual Tournament
-        {% elif badge == 'position' %}Position Night
+    <div style="display:flex;align-items:center">
+      {# Date column #}
+      <div style="width:72px;flex-shrink:0">
+        {% if row.date %}
+        <div style="font-size:.85rem;font-weight:{% if is_upcoming %}700{% else %}400{% endif %};
+                    color:{% if is_entered %}#adb5bd{% elif is_upcoming %}#1b3a6b{% else %}#495057{% endif %}">
+          {{ row.date.strftime('%b %-d') }}
+        </div>
+        {% else %}
+        <div style="font-size:.8rem;color:#adb5bd">—</div>
         {% endif %}
       </div>
-      {% endif %}
+
+      {# Event label #}
+      <div style="flex:1">
+        <div style="font-size:.95rem;
+                    font-weight:{% if badge != 'regular' or is_upcoming %}600{% else %}400{% endif %};
+                    color:{% if is_entered %}#adb5bd
+                          {% elif badge == 'championship' %}#8b0000
+                          {% elif badge == 'tournament' %}#5a1a8a
+                          {% elif badge == 'position' %}#1a5a3a
+                          {% elif badge == 'cancelled' %}#adb5bd
+                          {% elif is_upcoming %}#1b3a6b
+                          {% else %}#212529{% endif %}">
+          {{ label }}
+          {% if w.is_cancelled %}<span style="font-size:.75rem;color:#dc3545"> — cancelled</span>{% endif %}
+        </div>
+        {% if badge in ('championship', 'tournament', 'position') and not is_entered %}
+        <div style="font-size:.72rem;color:#6c757d;margin-top:1px">
+          {% if badge == 'championship' %}Club Championship
+          {% elif badge == 'tournament' %}Individual Tournament
+          {% elif badge == 'position' %}Position Night
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      {# Status indicator #}
+      <div style="font-size:.75rem;color:#adb5bd;margin-left:8px">
+        {% if w.is_entered %}✓
+        {% elif w.is_cancelled %}—
+        {% endif %}
+      </div>
     </div>
 
-    {# Status indicator #}
-    <div style="font-size:.75rem;color:#adb5bd;margin-left:8px">
-      {% if w.is_entered %}✓
-      {% elif w.is_cancelled %}—
+    {# Lane assignments — show for regular weeks, position nights, and club championship #}
+    {% if row.matchups and badge in ('regular', 'position', 'championship') and not w.is_cancelled %}
+    <div style="margin-top:7px;padding-left:72px">
+      {% for m in row.matchups %}
+      {% if m.team1 and m.team2 %}
+      <div style="display:flex;align-items:center;gap:8px;padding:3px 0;
+                  font-size:.82rem;color:{% if is_entered %}#adb5bd{% else %}#495057{% endif %}">
+        {% if m.lane_pair %}
+        <span style="background:{% if is_entered %}#e9ecef{% else %}#1b3a6b{% endif %};
+                     color:{% if is_entered %}#adb5bd{% else %}#fff{% endif %};
+                     border-radius:5px;padding:1px 7px;font-size:.75rem;font-weight:600;
+                     flex-shrink:0">{{ m.lane_pair }}</span>
+        {% endif %}
+        <span>{{ m.team1.name }} <span style="color:#adb5bd">vs</span> {{ m.team2.name }}</span>
+      </div>
       {% endif %}
+      {% endfor %}
     </div>
+    {% endif %}
 
   </div>
   {% endif %}
