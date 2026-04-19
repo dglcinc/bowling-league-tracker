@@ -389,7 +389,7 @@ def records():
     all_time_avg  = _apply_at_filter(all_time_avg)
     most_improved = _most_improved(filtered)
     season_comp   = _season_comparison(filtered_seasons, filtered)
-    top_season_avgs = sorted(filtered, key=lambda r: -r['avg'])[:25]
+    top_season_avgs = _apply_at_filter(sorted(filtered, key=lambda r: -r['avg']))
     tournament_winners = _tournament_winners_by_season(filtered_seasons)
 
     # Tournament display names: use the active season's labels, fall back to most recent

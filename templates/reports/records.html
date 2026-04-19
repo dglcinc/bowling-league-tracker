@@ -185,8 +185,8 @@
     </div>
   </div>
 
-  {# ── Best Season Averages ── #}
-  <h6>Best Single-Season Averages (min 6 games)</h6>
+  {# ── Best/Lowest Season Averages ── #}
+  <h6>{% if at_filter == 'bottom' %}Lowest{% else %}Best{% endif %} Single-Season Averages (min 6 games)</h6>
   <div class="table-scroll">
   <table class="table table-sm table-bordered table-striped mb-0">
     <thead class="table-dark sortable-head">
