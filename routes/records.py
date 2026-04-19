@@ -196,12 +196,16 @@ def _season_comparison(seasons, summaries):
             'bowler_count':      len(season_rows),
             'hg_scratch':        best_hg_s['high_game_scratch'],
             'hg_scratch_bowler': best_hg_s['bowler'],
+            'hg_scratch_week':   best_hg_s['high_game_scratch_week'],
             'hs_scratch':        best_hs_s['high_series_scratch'],
             'hs_scratch_bowler': best_hs_s['bowler'],
+            'hs_scratch_week':   best_hs_s['high_series_scratch_week'],
             'hg_hcp':            best_hg_h['high_game_hcp'],
             'hg_hcp_bowler':     best_hg_h['bowler'],
+            'hg_hcp_week':       best_hg_h['high_game_hcp_week'],
             'hs_hcp':            best_hs_h['high_series_hcp'],
             'hs_hcp_bowler':     best_hs_h['bowler'],
+            'hs_hcp_week':       best_hs_h['high_series_hcp_week'],
             'champion_team':     champion_team,
         })
     return rows
