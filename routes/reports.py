@@ -162,36 +162,35 @@ def week_prizes(season_id, week_num):
     player_count = sum(1 for e in all_entries if not e.is_blind)
     blind_games  = sum(e.game_count for e in all_entries if e.is_blind)
 
-    # Prizes and high-average table only apply to regular (non-tournament) weeks
-    prizes = None
+    # Weekly prize boxes only apply to regular (non-tournament) weeks
+    prizes = get_weekly_prizes(season_id, week_num) if not week.tournament_type else None
+
+    # Leaders and high-average stats shown for all weeks
     leaders = []
-    avg_rows = []
-    if not week.tournament_type:
-        prizes = get_weekly_prizes(season_id, week_num)
-        roster_entries = (Roster.query
-                          .filter_by(season_id=season_id, active=True)
-                          .join(Bowler).order_by(Bowler.last_name).all())
-        for r in roster_entries:
-            stats = get_bowler_stats(r.bowler_id, season_id, week_num)
-            if stats['cumulative_games'] == 0:
-                continue
-            leaders.append({
-                'bowler': r.bowler, 'team': r.team,
-                'average':             stats['running_avg'],
-                'games':               stats['cumulative_games'],
-                'handicap':            stats['display_handicap'],
-                'high_game_scratch':   stats['ytd_high_game_scratch'],
-                'high_game_hcp':       stats['ytd_high_game_hcp'],
-                'high_series_scratch': stats['ytd_high_series_scratch'],
-                'high_series_hcp':     stats['ytd_high_series_hcp'],
-            })
-        avg_rows = sorted(
-            [l for l in leaders if l['games'] >= min_games],
-            key=lambda x: (-x['average'], x['bowler'].last_name)
-        )
-        if top10:
-            top10_avgs = set(sorted({r['average'] for r in avg_rows}, reverse=True)[:10])
-            avg_rows = [r for r in avg_rows if r['average'] in top10_avgs]
+    roster_entries = (Roster.query
+                      .filter_by(season_id=season_id, active=True)
+                      .join(Bowler).order_by(Bowler.last_name).all())
+    for r in roster_entries:
+        stats = get_bowler_stats(r.bowler_id, season_id, week_num)
+        if stats['cumulative_games'] == 0:
+            continue
+        leaders.append({
+            'bowler': r.bowler, 'team': r.team,
+            'average':             stats['running_avg'],
+            'games':               stats['cumulative_games'],
+            'handicap':            stats['display_handicap'],
+            'high_game_scratch':   stats['ytd_high_game_scratch'],
+            'high_game_hcp':       stats['ytd_high_game_hcp'],
+            'high_series_scratch': stats['ytd_high_series_scratch'],
+            'high_series_hcp':     stats['ytd_high_series_hcp'],
+        })
+    avg_rows = sorted(
+        [l for l in leaders if l['games'] >= min_games],
+        key=lambda x: (-x['average'], x['bowler'].last_name)
+    )
+    if top10:
+        top10_avgs = set(sorted({r['average'] for r in avg_rows}, reverse=True)[:10])
+        avg_rows = [r for r in avg_rows if r['average'] in top10_avgs]
 
     full_year = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
     fh_list = get_team_standings(season_id, half=1, through_week=week_num)
