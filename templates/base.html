@@ -351,9 +351,20 @@ if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw
     return path.replace(/\/seasons\/\d+/, '/seasons/' + newId);
   }
 
+  // True when navigated here from the Records page (score click-through).
+  // In that case we're browsing a historical season for reference only —
+  // don't overwrite the user's stored active-season preference.
+  var arrivedFromRecords = /[?&]back=records/.test(window.location.search);
+
+  // True on pages that intentionally span all seasons (Records, Bowler Dir).
+  // Don't apply stored season preference to nav links on these pages.
+  var isCrossSeasonPage = {{ 'true' if request.endpoint in ('records.records', 'records.bowler_dir') else 'false' }};
+
   // On season-scoped pages: persist the current season to localStorage so
   // non-season-scoped pages can pick up the user's last viewed season.
-  if (onSeasonScopedPage && serverSeasonId) {
+  // Skip when arriving from the Records page — the user is exploring history,
+  // not switching their working season.
+  if (onSeasonScopedPage && serverSeasonId && !arrivedFromRecords) {
     var activeItem = document.querySelector('.season-selector-item.active');
     var activeName = activeItem
       ? (activeItem.dataset.seasonName || activeItem.textContent.trim().replace(/\s*[\u25CF\u25CF\u2022]\s*$/, ''))
@@ -361,8 +372,10 @@ if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw
     if (activeName) storeSelection(serverSeasonId, serverWeek, activeName);
   }
 
-  // On non-season-scoped pages: apply stored season preference to nav links
-  if (!onSeasonScopedPage && serverSeasonId) {
+  // On non-season-scoped pages: apply stored season preference to nav links,
+  // unless this is a cross-season page (Records, Bowler Dir) which should
+  // always show the active season in the nav.
+  if (!onSeasonScopedPage && serverSeasonId && !isCrossSeasonPage) {
     var stored = getStored();
     if (stored && stored.id !== serverSeasonId) {
       updateNavLinks(stored.id, stored.wk);
