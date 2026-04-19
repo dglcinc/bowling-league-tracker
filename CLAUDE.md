@@ -9,11 +9,11 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 **Important:** Never put player names, team names (which are player surnames), or any other personal information in the repository, code, comments, or documentation.
 
-## Repo / Branch State (as of 2026-04-17)
+## Repo / Branch State (as of 2026-04-19)
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
-- No open PRs — PRs #37–#92 all merged to main
+- No open PRs — PRs #37–#102 all merged to main
 
 ## League Structure
 
@@ -133,13 +133,14 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 - `wkly_high_avg` — same columns as wkly_alpha, sorted by average with rank
 - `standings` — summary tables + week-by-week scoring grid (A/B pts per team, cumulative)
 - `high_games` — average leaders + top-10 HG/HS scratch & hcp; `?min_games=N` filter
-- `bowler_detail` — full season week-by-week for one bowler; includes venue badge per season
+- `bowler_detail` — full season week-by-week for one bowler; includes venue badge per season; week rows have `id="week-N"` anchors for score link deep-linking; breadcrumb shows "Records" when `?back=records` is in URL
 - `week_prizes` — per-week prize winners (4 categories with ties), team standings, YTD leaders; first-half/second-half/season points winners highlighted yellow
 - `print_batch` — combined print page: Group 1 = 4× wkly alpha; Group 2 = alpha + YTD + high avg + high games
 - `team_points` — season points totals table
 
 **`records_bp`** (`/records`, `/bowler_dir`)
-- `records` — all-time leaderboards, season comparison, tournament winners by year, most improved; venue filter (`?venue=all/mountain_lakes_club/boonton_lanes`); tab state persisted via URL hash
+- `records` — all-time leaderboards, season comparison, tournament winners by year, most improved; venue filter (`?venue=all/mountain_lakes_club/boonton_lanes`); tab state persisted via URL hash; `?at=top|bottom|all` filter on All-Time tab; Fun Stats tab (lowest avg, most games, most 200+, lowest individual games); Stat Builder tab; `/stats/suggest` POST logs stat ideas
+- Score cells throughout are invisible links (`text-decoration-none text-body`) — clicking any score navigates to `bowler_detail` for that season, scrolled to the specific week via `#week-N` anchor. `get_bowler_stats()` now returns `ytd_high_*_week` fields. Pages arrived via score links pass `?back=records`; bowler_detail breadcrumb swaps "Bowler Directory" for "Records" when `back=records` is present.
 - `bowler_dir` — alphabetical list of all bowlers with career highlights and season badges
 
 **`admin_bp`** (`/admin/...`)
@@ -201,7 +202,7 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 - Viewer permissions stored in `viewer_permissions` table (endpoint → viewer_accessible bool); managed via Admin → Settings
 - Post-season `ScheduleEntry` rows can have `team1_id = NULL` / `team2_id = NULL` (club championship uses all 4 teams via position night, no fixed pairing). `score_position_night` skips null-team entries; `position_entry` falls back to all season teams when scheds[0].team1/.team2 are None.
 - **Club championship finalists rule**: `tournament_placement` route checks if first-half and second-half points leaders are the same team. If so, that team plays the second-place second-half team (not an automatic win). Otherwise the two half-winners are the finalists.
-- **Season selector JS** (base.html): admin routes use `/seasons/<id>` (plural, no trailing slash); entry routes use `/season/<id>/` (singular, with slash). `replaceSeasonInPath()` handles both patterns. `onSeasonScopedPage` detects both.
+- **Season selector JS** (base.html): admin routes use `/seasons/<id>` (plural, no trailing slash); entry routes use `/season/<id>` (singular, NO trailing slash — week_list is `/entry/season/<id>` with no slash). `replaceSeasonInPath()` uses `(\/|$)` to handle both trailing-slash and end-of-path cases. `onSeasonScopedPage` uses same pattern. Records/BowlerDir pages set `isCrossSeasonPage=true` (via Jinja endpoint check) to suppress stored-season restore. Pages arrived at via `?back=records` set `arrivedFromRecords=true` to skip localStorage update (prevents browsing historical records from corrupting the working season).
 - **Sortable columns**: `sortable-head` class on `<thead>`, `data-sort="num"|"text"` on `<th>`, optional `data-sort-val` on `<td>` when display differs from sort value (e.g. medal emoji, "3, 3, 3" games string, score+name cell). Applied to: Weekly Alpha, YTD Alpha, Bowler Directory, Records (All-Time + By Season + Most Improved), Bowler Detail (all 3 tables).
 - Records By Season tab: two-row merged header was flattened to single row (required for column-index sort to match td positions). Column labels abbreviated to HG Scr / HG Hcp / HS Scr / HS Hcp.
 
