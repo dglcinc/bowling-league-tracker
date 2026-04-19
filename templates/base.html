@@ -128,6 +128,11 @@
           <button onclick="window.print()" class="btn btn-sm btn-outline-light my-1 me-1">Print</button>
         </li>
 
+        {# ── Mobile view — direct link so it's easy to find ── #}
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('mobile.prefer_mobile') }}" title="Switch to mobile view">📱</a>
+        </li>
+
         {# ── Account dropdown ── #}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Account</a>

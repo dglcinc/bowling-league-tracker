@@ -11,8 +11,8 @@ from flask import Blueprint, jsonify, make_response, redirect, render_template, 
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
-from models import MatchupEntry, PushSubscription, Roster, ScheduleEntry, Season, Team, TeamPoints, TournamentEntry, Week, db
-from calculations import get_team_standings
+from models import Bowler, MatchupEntry, PushSubscription, Roster, ScheduleEntry, Season, Team, TeamPoints, TournamentEntry, Week, db
+from calculations import calculate_handicap, get_team_standings
 
 mobile_bp = Blueprint('mobile', __name__)
 
@@ -193,6 +193,26 @@ def home():
         for e in regular_entries:
             games_played += len(e.games_night1)
 
+        # Roster with handicaps — all active bowlers grouped by team for the home screen
+        roster_by_team = []
+        next_week_num = upcoming_week.week_num if upcoming_week else season.num_weeks + 1
+        for team in Team.query.filter_by(season_id=season.id).order_by(Team.number).all():
+            rosters = (Roster.query
+                       .filter_by(season_id=season.id, team_id=team.id, active=True)
+                       .join(Bowler, Bowler.id == Roster.bowler_id)
+                       .order_by(Bowler.last_name, Bowler.first_name)
+                       .all())
+            bowler_rows = []
+            for r in rosters:
+                hcp = calculate_handicap(r.bowler_id, season.id, next_week_num)
+                bowler_rows.append({
+                    'first_name': r.bowler.first_name,
+                    'last_name': r.bowler.last_name,
+                    'nickname': r.bowler.nickname,
+                    'handicap': hcp,
+                })
+            roster_by_team.append({'team': team, 'bowlers': bowler_rows})
+
         if last_week:
             tt = last_week.tournament_type
             if tt == 'club_championship':
@@ -257,7 +277,8 @@ def home():
                            last_week_opp_pts=last_week_opp_pts,
                            last_week_opp=last_week_opp,
                            last_week_champ=last_week_champ,
-                           last_week_top3=last_week_top3)
+                           last_week_top3=last_week_top3,
+                           roster_by_team=roster_by_team)
 
 
 # ---------------------------------------------------------------------------
@@ -450,6 +471,15 @@ def schedule():
                  .order_by(Week.week_num)
                  .all())
 
+        # Pre-load all schedule entries so we can show matchups per week
+        all_sched = (ScheduleEntry.query
+                     .filter_by(season_id=season.id)
+                     .order_by(ScheduleEntry.week_num, ScheduleEntry.matchup_num)
+                     .all())
+        matchups_by_week = {}
+        for entry in all_sched:
+            matchups_by_week.setdefault(entry.week_num, []).append(entry)
+
         dated_weeks = [w for w in weeks if w.date]
 
         if dated_weeks:
@@ -460,21 +490,29 @@ def schedule():
             current = first_date
             while current <= last_date:
                 if current in date_to_week:
+                    wk = date_to_week[current]
                     schedule_rows.append({
                         'date': current,
-                        'week': date_to_week[current],
+                        'week': wk,
                         'is_break': False,
+                        'matchups': matchups_by_week.get(wk.week_num, []),
                     })
                 else:
                     schedule_rows.append({
                         'date': current,
                         'week': None,
                         'is_break': True,
+                        'matchups': [],
                     })
                 current += timedelta(weeks=1)
         else:
             # No dates set yet — show weeks without dates
             for w in weeks:
-                schedule_rows.append({'date': None, 'week': w, 'is_break': False})
+                schedule_rows.append({
+                    'date': None,
+                    'week': w,
+                    'is_break': False,
+                    'matchups': matchups_by_week.get(w.week_num, []),
+                })
 
     return render_template('mobile/schedule.html', season=season, schedule_rows=schedule_rows)
