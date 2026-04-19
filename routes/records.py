@@ -268,12 +268,15 @@ def _fun_stats(summaries):
 
     # Most 200+ scratch games (career) — query individual game columns
     counts = defaultdict(int)
-    for row in db.session.query(
+    all_game_rows = db.session.query(
         MatchupEntry.bowler_id,
+        MatchupEntry.season_id,
+        MatchupEntry.week_num,
         MatchupEntry.game1, MatchupEntry.game2, MatchupEntry.game3,
-    ).filter(MatchupEntry.is_blind == False).all():
+    ).filter(MatchupEntry.is_blind == False).all()
+    for row in all_game_rows:
         bid = row[0]
-        for g in row[1:]:
+        for g in row[3:]:
             if g and g >= 200:
                 counts[bid] += 1
     most_200 = []
@@ -284,11 +287,33 @@ def _fun_stats(summaries):
     most_200.sort(key=lambda x: -x['count'])
     most_200 = most_200[:20]
 
+    # Lowest individual scratch games ever rolled (non-blind, score > 0)
+    season_map = {s.id: s for s in db.session.query(Season).all()}
+    individual_games = []
+    for row in all_game_rows:
+        bid, sid, wnum = row[0], row[1], row[2]
+        for g in row[3:]:
+            if g and g > 0:
+                individual_games.append((g, bid, sid, wnum))
+    individual_games.sort(key=lambda x: x[0])
+    lowest_games = []
+    for score, bid, sid, wnum in individual_games[:20]:
+        bowler = db.session.get(Bowler, bid)
+        season = season_map.get(sid)
+        if bowler and season:
+            lowest_games.append({
+                'bowler': bowler,
+                'score':  score,
+                'season': season,
+                'week_num': wnum,
+            })
+
     return {
         'worst_avg':         worst_avg,
         'most_season_games': most_season_games,
         'most_career_games': most_career_games,
         'most_200':          most_200,
+        'lowest_games':      lowest_games,
         'min_qualified':     min_qualified,
     }
 
