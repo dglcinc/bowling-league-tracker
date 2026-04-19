@@ -338,14 +338,15 @@ if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw
     });
   }
 
-  // Matches entry routes (/season/123/) and admin routes (/seasons/123)
-  var onSeasonScopedPage = /\/season\/\d+\//.test(window.location.pathname) ||
+  // Matches entry routes (/season/123 or /season/123/...) and admin routes (/seasons/123)
+  var onSeasonScopedPage = /\/season\/\d+(\/|$)/.test(window.location.pathname) ||
                            /\/seasons\/\d+/.test(window.location.pathname);
 
-  // Rewrite a season ID in either URL pattern
+  // Rewrite a season ID in either URL pattern.
+  // Handles both /season/123/more and /season/123 (no trailing slash, e.g. week_list).
   function replaceSeasonInPath(path, newId) {
-    // Entry routes: /season/123/...
-    var r = path.replace(/\/season\/\d+\//, '/season/' + newId + '/');
+    // Entry routes: /season/123/... or /season/123 at end of path
+    var r = path.replace(/(\/season\/)\d+(\/|$)/, '$1' + newId + '$2');
     if (r !== path) return r;
     // Admin routes: /seasons/123 or /seasons/123/sub/path
     return path.replace(/\/seasons\/\d+/, '/seasons/' + newId);
