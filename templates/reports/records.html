@@ -108,8 +108,8 @@
           {% for row in all_time_hg_s %}
           <tr>
             <td>{{ loop.index }}</td>
-            <td><a href="{{ url_for('reports.bowler_detail', season_id=row.hg_scratch_season.id, bowler_id=row.bowler.id) }}" class="text-decoration-none text-body">{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</a></td>
-            <td><strong>{{ row.hg_scratch }}</strong></td>
+            <td><a href="{{ url_for('reports.bowler_detail', season_id=row.hg_scratch_season.id, bowler_id=row.bowler.id, back='records') }}{% if row.hg_scratch_week %}#week-{{ row.hg_scratch_week }}{% endif %}" class="text-decoration-none text-body">{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</a></td>
+            <td><a href="{{ url_for('reports.bowler_detail', season_id=row.hg_scratch_season.id, bowler_id=row.bowler.id, back='records') }}{% if row.hg_scratch_week %}#week-{{ row.hg_scratch_week }}{% endif %}" class="text-decoration-none text-body"><strong>{{ row.hg_scratch }}</strong></a></td>
             <td>{{ row.hg_scratch_season.name }}</td>
           </tr>
           {% else %}
@@ -128,8 +128,8 @@
           {% for row in all_time_hg_h %}
           <tr>
             <td>{{ loop.index }}</td>
-            <td><a href="{{ url_for('reports.bowler_detail', season_id=row.hg_hcp_season.id, bowler_id=row.bowler.id) }}" class="text-decoration-none text-body">{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</a></td>
-            <td><strong>{{ row.hg_hcp }}</strong></td>
+            <td><a href="{{ url_for('reports.bowler_detail', season_id=row.hg_hcp_season.id, bowler_id=row.bowler.id, back='records') }}{% if row.hg_hcp_week %}#week-{{ row.hg_hcp_week }}{% endif %}" class="text-decoration-none text-body">{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</a></td>
+            <td><a href="{{ url_for('reports.bowler_detail', season_id=row.hg_hcp_season.id, bowler_id=row.bowler.id, back='records') }}{% if row.hg_hcp_week %}#week-{{ row.hg_hcp_week }}{% endif %}" class="text-decoration-none text-body"><strong>{{ row.hg_hcp }}</strong></a></td>
             <td>{{ row.hg_hcp_season.name }}</td>
           </tr>
           {% else %}
@@ -152,8 +152,8 @@
           {% for row in all_time_hs_s %}
           <tr>
             <td>{{ loop.index }}</td>
-            <td><a href="{{ url_for('reports.bowler_detail', season_id=row.hs_scratch_season.id, bowler_id=row.bowler.id) }}" class="text-decoration-none text-body">{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</a></td>
-            <td><strong>{{ row.hs_scratch }}</strong></td>
+            <td><a href="{{ url_for('reports.bowler_detail', season_id=row.hs_scratch_season.id, bowler_id=row.bowler.id, back='records') }}{% if row.hs_scratch_week %}#week-{{ row.hs_scratch_week }}{% endif %}" class="text-decoration-none text-body">{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</a></td>
+            <td><a href="{{ url_for('reports.bowler_detail', season_id=row.hs_scratch_season.id, bowler_id=row.bowler.id, back='records') }}{% if row.hs_scratch_week %}#week-{{ row.hs_scratch_week }}{% endif %}" class="text-decoration-none text-body"><strong>{{ row.hs_scratch }}</strong></a></td>
             <td>{{ row.hs_scratch_season.name }}</td>
           </tr>
           {% else %}
@@ -172,8 +172,8 @@
           {% for row in all_time_hs_h %}
           <tr>
             <td>{{ loop.index }}</td>
-            <td><a href="{{ url_for('reports.bowler_detail', season_id=row.hs_hcp_season.id, bowler_id=row.bowler.id) }}" class="text-decoration-none text-body">{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</a></td>
-            <td><strong>{{ row.hs_hcp }}</strong></td>
+            <td><a href="{{ url_for('reports.bowler_detail', season_id=row.hs_hcp_season.id, bowler_id=row.bowler.id, back='records') }}{% if row.hs_hcp_week %}#week-{{ row.hs_hcp_week }}{% endif %}" class="text-decoration-none text-body">{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</a></td>
+            <td><a href="{{ url_for('reports.bowler_detail', season_id=row.hs_hcp_season.id, bowler_id=row.bowler.id, back='records') }}{% if row.hs_hcp_week %}#week-{{ row.hs_hcp_week }}{% endif %}" class="text-decoration-none text-body"><strong>{{ row.hs_hcp }}</strong></a></td>
             <td>{{ row.hs_hcp_season.name }}</td>
           </tr>
           {% else %}
@@ -196,8 +196,8 @@
       {% for row in top_season_avgs %}
       <tr>
         <td>{{ loop.index }}</td>
-        <td><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.bowler.id) }}" class="text-decoration-none text-body">{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</a></td>
-        <td><strong>{{ row.avg }}</strong></td>
+        <td><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.bowler.id, back='records') }}" class="text-decoration-none text-body">{{ row.bowler.last_name }}{% if row.bowler.first_name %}, {{ row.bowler.first_name }}{% endif %}</a></td>
+        <td><a href="{{ url_for('reports.bowler_detail', season_id=row.season.id, bowler_id=row.bowler.id, back='records') }}" class="text-decoration-none text-body"><strong>{{ row.avg }}</strong></a></td>
         <td>{{ row.games }}</td>
         <td>{{ row.season.name }}</td>
       </tr>

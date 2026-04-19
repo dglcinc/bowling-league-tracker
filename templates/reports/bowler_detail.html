@@ -4,7 +4,11 @@
 {% block content %}
 <nav aria-label="breadcrumb" class="no-print mb-2">
   <ol class="breadcrumb mb-0">
+    {% if request.args.get('back') == 'records' %}
+    <li class="breadcrumb-item"><a href="{{ url_for('records.records') }}#tab-alltime">Records</a></li>
+    {% else %}
     <li class="breadcrumb-item"><a href="{{ url_for('records.bowler_dir') }}">Bowler Directory</a></li>
+    {% endif %}
     <li class="breadcrumb-item active">{{ bowler.display_name }}</li>
   </ol>
 </nav>
@@ -117,7 +121,7 @@
   </thead>
   <tbody>
     {% for wk in stats.weekly_stats %}
-    <tr>
+    <tr id="week-{{ wk.week_num }}">
       <td>{{ wk.week_num }}</td>
       <td data-sort-val="{{ wk.week_games }}">{{ wk.games | join(', ') }}</td>
       <td>{{ wk.week_pins }}</td>
