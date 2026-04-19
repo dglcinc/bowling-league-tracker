@@ -109,6 +109,10 @@ def get_bowler_stats(bowler_id, season_id, through_week=None):
     ytd_high_game_hcp = 0
     ytd_high_series_scratch = 0
     ytd_high_series_hcp = 0
+    ytd_high_game_scratch_week = None
+    ytd_high_game_hcp_week = None
+    ytd_high_series_scratch_week = None
+    ytd_high_series_hcp_week = None
     red_pins_total = 0
 
     weekly_stats = []
@@ -157,11 +161,19 @@ def get_bowler_stats(bowler_id, season_id, through_week=None):
         else:
             wk_high_series_hcp = 0
 
-        # Update YTD highs
-        ytd_high_game_scratch = max(ytd_high_game_scratch, wk_high_scratch)
-        ytd_high_game_hcp = max(ytd_high_game_hcp, wk_high_hcp_game)
-        ytd_high_series_scratch = max(ytd_high_series_scratch, wk_high_series_scratch)
-        ytd_high_series_hcp = max(ytd_high_series_hcp, wk_high_series_hcp)
+        # Update YTD highs (track which week each best occurred)
+        if wk_high_scratch > ytd_high_game_scratch:
+            ytd_high_game_scratch = wk_high_scratch
+            ytd_high_game_scratch_week = week_num
+        if wk_high_hcp_game > ytd_high_game_hcp:
+            ytd_high_game_hcp = wk_high_hcp_game
+            ytd_high_game_hcp_week = week_num
+        if wk_high_series_scratch > ytd_high_series_scratch:
+            ytd_high_series_scratch = wk_high_series_scratch
+            ytd_high_series_scratch_week = week_num
+        if wk_high_series_hcp > ytd_high_series_hcp:
+            ytd_high_series_hcp = wk_high_series_hcp
+            ytd_high_series_hcp_week = week_num
 
         weekly_stats.append({
             'week_num': week_num,
@@ -199,6 +211,10 @@ def get_bowler_stats(bowler_id, season_id, through_week=None):
         'ytd_high_game_hcp': ytd_high_game_hcp,
         'ytd_high_series_scratch': ytd_high_series_scratch,
         'ytd_high_series_hcp': ytd_high_series_hcp,
+        'ytd_high_game_scratch_week': ytd_high_game_scratch_week,
+        'ytd_high_game_hcp_week': ytd_high_game_hcp_week,
+        'ytd_high_series_scratch_week': ytd_high_series_scratch_week,
+        'ytd_high_series_hcp_week': ytd_high_series_hcp_week,
         'weekly_stats': weekly_stats,
         'weeks_bowled': len(weekly_stats),
         'iron_man_candidate': True,  # updated below

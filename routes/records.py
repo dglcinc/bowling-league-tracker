@@ -68,15 +68,19 @@ def _compute_bowler_season_summaries(seasons, tournament_weeks):
             roster_row = roster_map.get((bid, season.id))
             team = team_map.get(roster_row.team_id) if roster_row else None
             summaries.append({
-                'bowler':              bowler,
-                'season':              season,
-                'team':                team,
-                'avg':                 stats['running_avg'],
-                'games':               stats['cumulative_games'],
-                'high_game_scratch':   stats['ytd_high_game_scratch'],
-                'high_series_scratch': stats['ytd_high_series_scratch'],
-                'high_game_hcp':       stats['ytd_high_game_hcp'],
-                'high_series_hcp':     stats['ytd_high_series_hcp'],
+                'bowler':                   bowler,
+                'season':                   season,
+                'team':                     team,
+                'avg':                      stats['running_avg'],
+                'games':                    stats['cumulative_games'],
+                'high_game_scratch':        stats['ytd_high_game_scratch'],
+                'high_series_scratch':      stats['ytd_high_series_scratch'],
+                'high_game_hcp':            stats['ytd_high_game_hcp'],
+                'high_series_hcp':          stats['ytd_high_series_hcp'],
+                'high_game_scratch_week':   stats['ytd_high_game_scratch_week'],
+                'high_series_scratch_week': stats['ytd_high_series_scratch_week'],
+                'high_game_hcp_week':       stats['ytd_high_game_hcp_week'],
+                'high_series_hcp_week':     stats['ytd_high_series_hcp_week'],
             })
     return summaries
 
@@ -90,10 +94,10 @@ def _all_time_records(summaries):
         if bid not in bowler_best:
             bowler_best[bid] = {
                 'bowler': row['bowler'],
-                'hg_scratch': 0, 'hg_scratch_season': None,
-                'hs_scratch': 0, 'hs_scratch_season': None,
-                'hg_hcp':     0, 'hg_hcp_season':     None,
-                'hs_hcp':     0, 'hs_hcp_season':     None,
+                'hg_scratch': 0, 'hg_scratch_season': None, 'hg_scratch_week': None,
+                'hs_scratch': 0, 'hs_scratch_season': None, 'hs_scratch_week': None,
+                'hg_hcp':     0, 'hg_hcp_season':     None, 'hg_hcp_week':     None,
+                'hs_hcp':     0, 'hs_hcp_season':     None, 'hs_hcp_week':     None,
                 'best_avg':   0, 'best_avg_season':   None,
                 'best_avg_games': 0,
             }
@@ -101,15 +105,19 @@ def _all_time_records(summaries):
         if row['high_game_scratch'] > b['hg_scratch']:
             b['hg_scratch'] = row['high_game_scratch']
             b['hg_scratch_season'] = row['season']
+            b['hg_scratch_week'] = row['high_game_scratch_week']
         if row['high_series_scratch'] > b['hs_scratch']:
             b['hs_scratch'] = row['high_series_scratch']
             b['hs_scratch_season'] = row['season']
+            b['hs_scratch_week'] = row['high_series_scratch_week']
         if row['high_game_hcp'] > b['hg_hcp']:
             b['hg_hcp'] = row['high_game_hcp']
             b['hg_hcp_season'] = row['season']
+            b['hg_hcp_week'] = row['high_game_hcp_week']
         if row['high_series_hcp'] > b['hs_hcp']:
             b['hs_hcp'] = row['high_series_hcp']
             b['hs_hcp_season'] = row['season']
+            b['hs_hcp_week'] = row['high_series_hcp_week']
         if row['avg'] > b['best_avg']:
             b['best_avg'] = row['avg']
             b['best_avg_season'] = row['season']
