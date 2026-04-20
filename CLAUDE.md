@@ -13,7 +13,7 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
-- No open PRs — PRs #37–#102 all merged to main
+- No open PRs — PRs #37–#107 all merged to main; hotfix (running_avg key) pushed directly to main
 
 ## League Structure
 
@@ -46,7 +46,7 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 Four tournament weeks are appended after every regular season. The order is the default; can be reordered via Admin → Week Dates without structural changes.
 
 - **Club Championship** (`tournament_type='club_championship'`, `is_position_night=True`): team competition scored as a position night; uses normal matchup entry; auto-assigns lane assignments from standings
-- **Harry E. Russell Championship** (`indiv_scratch`): individual scratch, 5 games; shows all bowlers (active + inactive) + write-in option for non-league participants
+- **Harry E. Russell Championship** (`indiv_scratch`): individual scratch, 5 games; shows all bowlers (active + inactive) + write-in option for non-league participants; past champions (place=1 in any prior indiv_scratch week) who aren't currently rostered appear in a "Past Champions" optgroup; entry page and home page "Who's Eligible" card both show a qualifiers list (top-10 avg, ≥30 games) formatted as "F. LastName (Nickname)"
 - **Hcp Tournament 1** (`indiv_hcp_1`): individual handicap, 3 games; active bowlers + write-in (named "Buzz Bedford Championship" pre-2023, "Shep Belyea Open" 2023+)
 - **Hcp Tournament 2** (`indiv_hcp_2`): individual handicap, 3 games; active bowlers + write-in (named "Rose Bowl" pre-2023, "Chad Harris Memorial Bowl" 2023+)
 
@@ -169,7 +169,7 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 ### Snapshots
 Written automatically after each week is fully entered. Stored as JSON at OneDrive path next to the DB.
 
-## Current State (as of 2026-04-13)
+## Current State (as of 2026-04-20)
 
 ### Seasons in DB
 - **2004-2005 through 2016-2017** (historical, venue=mountain_lakes_club): imported via `seed_historical_seasons.py`; seasons id=10–22; regular scores + tournament 1st/2nd/3rd place entries with `place` field set
@@ -202,6 +202,12 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 - Viewer permissions stored in `viewer_permissions` table (endpoint → viewer_accessible bool); managed via Admin → Settings
 - Post-season `ScheduleEntry` rows can have `team1_id = NULL` / `team2_id = NULL` (club championship uses all 4 teams via position night, no fixed pairing). `score_position_night` skips null-team entries; `position_entry` falls back to all season teams when scheds[0].team1/.team2 are None.
 - **Club championship finalists rule**: `tournament_placement` route checks if first-half and second-half points leaders are the same team. If so, that team plays the second-place second-half team (not an automatic win). Otherwise the two half-winners are the finalists.
+- **`league_settings` table**: single row (id=1). Contains `prizes_min_games` (INTEGER DEFAULT 9) and `prizes_top10` (BOOLEAN DEFAULT 0). Always update with explicit `db.session.execute(text('UPDATE league_settings SET prizes_min_games=:mg, prizes_top10=:t10 WHERE id=1'), {...})` — SQLAlchemy ORM attribute assignment + commit is unreliable for this table (doesn't mark object dirty).
+- **`get_bowler_stats()` key names**: average is `running_avg`, not `current_average`. Games count is `cumulative_games`.
+- **Tournament entry dropdown JS**: new rows are created by cloning `firstSelect.innerHTML`, so `<optgroup>` elements added in the Jinja template automatically carry through to dynamically-added rows.
+- **Email send flow** (`admin/email_compose`): two-step POST — first POST resolves recipients and renders a preview modal; second POST with `send_confirmed=1` actually sends. `bcc_override` textarea in the modal allows editing the BCC list before sending.
+- **Prizes page / print batch**: prize calculation skipped entirely for tournament weeks (`tournament_type` not None); YTD leaders and high averages are still shown for all weeks including tournament weeks.
+- **Gunicorn error log**: tracebacks go to `/tmp/bowling-app.err`, not `/tmp/bowling-app.log` (which is stdout/access).
 - **Season selector JS** (base.html): admin routes use `/seasons/<id>` (plural, no trailing slash); entry routes use `/season/<id>` (singular, NO trailing slash — week_list is `/entry/season/<id>` with no slash). `replaceSeasonInPath()` uses `(\/|$)` to handle both trailing-slash and end-of-path cases. `onSeasonScopedPage` uses same pattern. Records/BowlerDir pages set `isCrossSeasonPage=true` (via Jinja endpoint check) to suppress stored-season restore. Pages arrived at via `?back=records` set `arrivedFromRecords=true` to skip localStorage update (prevents browsing historical records from corrupting the working season).
 - **Sortable columns**: `sortable-head` class on `<thead>`, `data-sort="num"|"text"` on `<th>`, optional `data-sort-val` on `<td>` when display differs from sort value (e.g. medal emoji, "3, 3, 3" games string, score+name cell). Applied to: Weekly Alpha, YTD Alpha, Bowler Directory, Records (All-Time + By Season + Most Improved), Bowler Detail (all 3 tables).
 - Records By Season tab: two-row merged header was flattened to single row (required for column-index sort to match td positions). Column labels abbreviated to HG Scr / HG Hcp / HS Scr / HS Hcp.
