@@ -46,7 +46,7 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 Four tournament weeks are appended after every regular season. The order is the default; can be reordered via Admin → Week Dates without structural changes.
 
 - **Club Championship** (`tournament_type='club_championship'`, `is_position_night=True`): team competition scored as a position night; uses normal matchup entry; auto-assigns lane assignments from standings
-- **Harry E. Russell Championship** (`indiv_scratch`): individual scratch, 5 games; shows all bowlers (active + inactive) + write-in option for non-league participants; past champions (place=1 in any prior indiv_scratch week) who aren't currently rostered appear in a "Past Champions" optgroup; entry page and home page "Who's Eligible" card both show a qualifiers list (top-10 avg, ≥30 games) formatted as "F. LastName (Nickname)"
+- **Harry E. Russell Championship** (`indiv_scratch`): individual scratch, 5 games; entry dropdown shows top-10 qualifiers (≥30 regular-season games, active rostered, top avg) in the main list + write-in; all-time winners (place=1) who are NOT current qualifiers appear in a "Past Champions" optgroup (covers both rostered-but-below-30-games and un-rostered past winners); entry page starts with 10 rows; desktop and mobile home pages both show qualifiers list when Russell is upcoming. Shared helpers: `get_hr_qualifiers()` and `get_hr_past_champions()` in `calculations.py`.
 - **Hcp Tournament 1** (`indiv_hcp_1`): individual handicap, 3 games; active bowlers + write-in (named "Buzz Bedford Championship" pre-2023, "Shep Belyea Open" 2023+)
 - **Hcp Tournament 2** (`indiv_hcp_2`): individual handicap, 3 games; active bowlers + write-in (named "Rose Bowl" pre-2023, "Chad Harris Memorial Bowl" 2023+)
 
