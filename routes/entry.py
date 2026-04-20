@@ -7,7 +7,8 @@ from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
                     TeamPoints, Roster, Bowler, TournamentEntry, Team)
 from calculations import (score_matchup, score_position_night, calculate_handicap,
                           get_weekly_prizes, get_team_standings, get_matchup_breakdown,
-                          get_position_night_breakdown, get_bowler_stats)
+                          get_position_night_breakdown, get_bowler_stats,
+                          get_hr_qualifiers, get_hr_past_champions)
 from extensions import cache
 from snapshots import save_snapshot
 from config import Config
@@ -631,13 +632,10 @@ def tournament_entry(season_id, week_num):
     tt = week.tournament_type
     label = season.tournament_labels.get(tt, tt)
 
-    # indiv_scratch: all bowlers (active + inactive); handicap tournaments: active only
+    # indiv_scratch: qualifiers only in main list, past champions in optgroup
+    # handicap tournaments: all active bowlers
     if tt == 'indiv_scratch':
-        all_bowlers = (Bowler.query
-                       .join(Roster, Roster.bowler_id == Bowler.id)
-                       .filter(Roster.season_id == season_id)
-                       .order_by(Bowler.last_name)
-                       .all())
+        all_bowlers = []  # populated below after qualifiers computed
     else:
         all_bowlers = (Bowler.query
                        .join(Roster, Roster.bowler_id == Bowler.id)
@@ -722,44 +720,8 @@ def tournament_entry(season_id, week_num):
     past_champions = []
     hr_qualifiers = []
     if tt == 'indiv_scratch':
-        all_bowler_ids = {b.id for b in all_bowlers}
-
-        # Past Harry Russell champions (place=1 in any prior indiv_scratch week)
-        champ_entries = (TournamentEntry.query
-                         .join(Week, (Week.season_id == TournamentEntry.season_id) &
-                               (Week.week_num == TournamentEntry.week_num))
-                         .filter(Week.tournament_type == 'indiv_scratch',
-                                 TournamentEntry.place == 1,
-                                 TournamentEntry.bowler_id.isnot(None))
-                         .all())
-        seen_champ_ids = set()
-        for ce in champ_entries:
-            if ce.bowler_id not in all_bowler_ids and ce.bowler_id not in seen_champ_ids:
-                b = Bowler.query.get(ce.bowler_id)
-                if b:
-                    past_champions.append(b)
-                    seen_champ_ids.add(ce.bowler_id)
-
-        # Qualifiers: top-10 averages with ≥30 regular-season games
-        last_regular = (Week.query
-                        .filter_by(season_id=season_id)
-                        .filter(Week.tournament_type.is_(None))
-                        .order_by(Week.week_num.desc())
-                        .first())
-        through = last_regular.week_num if last_regular else week_num - 1
-        qual_list = []
-        for b in all_bowlers:
-            stats = get_bowler_stats(b.id, season_id, through)
-            if stats['cumulative_games'] >= 30:
-                qual_list.append((stats['running_avg'], b))
-        qual_list.sort(key=lambda x: -x[0])
-        if qual_list:
-            top10_avgs = set(sorted({avg for avg, _ in qual_list}, reverse=True)[:10])
-            qual_list = [(avg, b) for avg, b in qual_list if avg in top10_avgs]
-        for avg, b in qual_list:
-            first_init = b.first_name[0] + '.' if b.first_name else ''
-            nick = f' ({b.nickname})' if b.nickname else ''
-            hr_qualifiers.append(f'{first_init} {b.last_name}{nick}'.strip())
+        all_bowlers, qualifier_ids, hr_qualifiers = get_hr_qualifiers(season_id, week_num)
+        past_champions = get_hr_past_champions(exclude_bowler_ids=qualifier_ids)
 
     return render_template('entry/tournament_entry.html',
                            season=season, week=week, label=label,

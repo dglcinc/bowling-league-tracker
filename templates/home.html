@@ -156,6 +156,11 @@
             You have {{ games_played }} game{{ 's' if games_played != 1 }}.
           </div>
           {% endif %}
+          {% if hr_qualifiers %}
+          <div class="mt-2">
+            <strong>Qualifiers:</strong> {{ hr_qualifiers | join(', ') }}
+          </div>
+          {% endif %}
         </div>
 
         {% elif event_type == 'indiv_hcp_1' %}

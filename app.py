@@ -390,7 +390,7 @@ def create_app():
         from flask_login import current_user
         from models import (Season, Week, ScheduleEntry, MatchupEntry,
                             TeamPoints, Roster, TournamentEntry, Team)
-        from calculations import get_team_standings
+        from calculations import get_team_standings, get_hr_qualifiers
 
         season = Season.query.filter_by(is_active=True).first()
         if not season:
@@ -604,6 +604,10 @@ def create_app():
             if week_series:
                 hs_scratch = max(week_series.values())
 
+        hr_qualifiers = []
+        if upcoming_week and upcoming_week.tournament_type == 'indiv_scratch':
+            _, _, hr_qualifiers = get_hr_qualifiers(season.id, upcoming_week.week_num)
+
         return render_template('home.html',
                                season=season,
                                upcoming_week=upcoming_week,
@@ -611,6 +615,7 @@ def create_app():
                                my_team=my_team,
                                my_matchup=my_matchup,
                                games_played=games_played,
+                               hr_qualifiers=hr_qualifiers,
                                last_week=last_week,
                                last_week_type=last_week_type,
                                last_week_pts=last_week_pts,
