@@ -788,3 +788,84 @@ def get_weekly_prizes(season_id, week_num):
         'hs_hcp':     winners('hs_hcp'),
     }
 
+
+# ---------------------------------------------------------------------------
+# Harry Russell helpers (shared between home page, mobile home, tournament entry)
+# ---------------------------------------------------------------------------
+
+def get_hr_qualifiers(season_id, week_num):
+    """
+    Top-10 avg qualifiers for the Harry Russell: active rostered bowlers with
+    ≥30 regular-season games, ranked by running average.
+
+    Returns (qualifier_bowlers, qualifier_ids, qualifier_strings) where:
+      - qualifier_bowlers: list of Bowler objects in avg-desc order
+      - qualifier_ids: set of bowler IDs (for fast membership test)
+      - qualifier_strings: list of formatted "F. LastName (Nick)" strings
+    """
+    from models import Bowler, Roster, Week
+
+    last_regular = (Week.query
+                    .filter_by(season_id=season_id)
+                    .filter(Week.tournament_type.is_(None))
+                    .order_by(Week.week_num.desc())
+                    .first())
+    through = last_regular.week_num if last_regular else week_num - 1
+
+    active_bowlers = (Bowler.query
+                      .join(Roster, Roster.bowler_id == Bowler.id)
+                      .filter(Roster.season_id == season_id, Roster.active == True)
+                      .order_by(Bowler.last_name)
+                      .all())
+
+    qual_list = []
+    for b in active_bowlers:
+        stats = get_bowler_stats(b.id, season_id, through)
+        if stats['cumulative_games'] >= 30:
+            qual_list.append((stats['running_avg'], b))
+    qual_list.sort(key=lambda x: -x[0])
+
+    if qual_list:
+        top10_avgs = set(sorted({avg for avg, _ in qual_list}, reverse=True)[:10])
+        qual_list = [(avg, b) for avg, b in qual_list if avg in top10_avgs]
+
+    qualifier_bowlers = [b for _, b in qual_list]
+    qualifier_ids = {b.id for b in qualifier_bowlers}
+    qualifier_strings = []
+    for _, b in qual_list:
+        first_init = b.first_name[0] + '.' if b.first_name else ''
+        nick = f' ({b.nickname})' if b.nickname else ''
+        qualifier_strings.append(f'{first_init} {b.last_name}{nick}'.strip())
+
+    return qualifier_bowlers, qualifier_ids, qualifier_strings
+
+
+def get_hr_past_champions(exclude_bowler_ids=None):
+    """
+    All-time Harry Russell winners (place=1) not in exclude_bowler_ids.
+    Returns a list of Bowler objects, deduplicated, sorted by last name.
+    """
+    from models import Bowler, TournamentEntry, Week
+
+    exclude = exclude_bowler_ids or set()
+    champ_entries = (TournamentEntry.query
+                     .join(Week, (Week.season_id == TournamentEntry.season_id) &
+                           (Week.week_num == TournamentEntry.week_num))
+                     .filter(Week.tournament_type == 'indiv_scratch',
+                             TournamentEntry.place == 1,
+                             TournamentEntry.bowler_id.isnot(None))
+                     .all())
+
+    seen = set()
+    champions = []
+    for ce in champ_entries:
+        if ce.bowler_id in exclude or ce.bowler_id in seen:
+            continue
+        b = Bowler.query.get(ce.bowler_id)
+        if b:
+            champions.append(b)
+            seen.add(ce.bowler_id)
+
+    champions.sort(key=lambda b: b.last_name)
+    return champions
+

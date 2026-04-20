@@ -126,6 +126,7 @@
 </div>
 {% endif %}
 
+{% if not week.tournament_type or week.tournament_type == 'club_championship' %}
 {% if week.is_position_night %}
 {# Position night: 2 pairing cards; Club Championship: 1 pairing card (matchups 1&2 only) #}
 <div class="row">
@@ -353,6 +354,7 @@
   {% endfor %}
 </div>
 {% endif %}
+{% endif %}{# end: not individual tournament #}
 
 {% if weekly_team_pts and weekly_team_pts | selectattr('points', 'gt', 0) | list %}
 <hr>
