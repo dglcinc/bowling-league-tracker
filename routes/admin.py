@@ -154,11 +154,8 @@ def season_detail(season_id):
 
     # Avg leaders for High Averages email option — use latest entered week
     import json as _json
-    from calculations import get_bowler_stats
-    latest_week = (Week.query
-                   .filter_by(season_id=season_id, is_entered=True)
-                   .order_by(Week.week_num.desc())
-                   .first())
+    from calculations import get_bowler_stats, get_latest_entered_week
+    latest_week = get_latest_entered_week(season_id)
     avg_leaders_json = '[]'
     if latest_week:
         active_roster = Roster.query.filter_by(season_id=season_id, active=True).join(Bowler).all()
@@ -262,13 +259,10 @@ def send_email(season_id):
         else:
             bowlers = []
     elif recipient_mode == 'high_avg':
-        from calculations import get_bowler_stats
+        from calculations import get_bowler_stats, get_latest_entered_week
         min_games = int(request.form.get('ha_min_games', 9) or 9)
         top10     = request.form.get('ha_top10') == '1'
-        latest_week = (Week.query
-                       .filter_by(season_id=season_id, is_entered=True)
-                       .order_by(Week.week_num.desc())
-                       .first())
+        latest_week = get_latest_entered_week(season_id)
         bowlers = []
         if latest_week:
             active_roster = (Roster.query
@@ -1460,49 +1454,23 @@ def _generate_prizes_pdf(season_id, week_num, min_games=9, top10=False):
     """Render the prizes/standings page to PDF bytes via WeasyPrint."""
     from weasyprint import HTML
     from flask import current_app, render_template as rt
-    from calculations import (get_weekly_prizes, get_bowler_stats, get_team_standings,
-                               calculate_handicap)
-    from models import MatchupEntry, Roster, Bowler
+    from calculations import (get_weekly_prizes, get_team_standings,
+                               entry_total_wood, get_bowler_entries_bulk, build_leaders_list)
+    from models import MatchupEntry
 
     season = db.session.get(Season, season_id)
     week = Week.query.filter_by(season_id=season_id, week_num=week_num).first()
     prizes = get_weekly_prizes(season_id, week_num)
 
     all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
-    total_wood = sum(
-        e.total_pins + (
-            (season.blind_handicap if e.is_blind else calculate_handicap(e.bowler_id, season_id, week_num))
-            * e.game_count
-        )
-        for e in all_entries
-    )
+    bowler_ids = {e.bowler_id for e in all_entries if not e.is_blind and e.bowler_id}
+    ebowler = get_bowler_entries_bulk(bowler_ids, season_id)
+    total_wood = sum(entry_total_wood(e, season, season_id, week_num, ebowler) for e in all_entries)
     player_count = sum(1 for e in all_entries if not e.is_blind)
     blind_games  = sum(e.game_count for e in all_entries if e.is_blind)
 
-    roster_entries = (Roster.query
-                      .filter_by(season_id=season_id, active=True)
-                      .join(Bowler).order_by(Bowler.last_name).all())
-    leaders = []
-    for r in roster_entries:
-        stats = get_bowler_stats(r.bowler_id, season_id, week_num)
-        if stats['cumulative_games'] == 0:
-            continue
-        leaders.append({
-            'bowler': r.bowler, 'team': r.team,
-            'average':             stats['running_avg'],
-            'games':               stats['cumulative_games'],
-            'handicap':            stats['display_handicap'],
-            'high_game_scratch':   stats['ytd_high_game_scratch'],
-            'high_game_hcp':       stats['ytd_high_game_hcp'],
-            'high_series_scratch': stats['ytd_high_series_scratch'],
-            'high_series_hcp':     stats['ytd_high_series_hcp'],
-        })
+    leaders, avg_rows = build_leaders_list(season_id, week_num, min_games=min_games, top10=top10)
 
-    avg_rows = sorted([l for l in leaders if l['games'] >= min_games],
-                      key=lambda x: (-x['average'], x['bowler'].last_name))
-    if top10:
-        top10_avgs = set(sorted({r['average'] for r in avg_rows}, reverse=True)[:10])
-        avg_rows = [r for r in avg_rows if r['average'] in top10_avgs]
     full_year       = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
     fh_list         = get_team_standings(season_id, half=1, through_week=week_num)
     sh_list         = get_team_standings(season_id, half=2, through_week=week_num)

@@ -12,7 +12,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from models import Bowler, MatchupEntry, PushSubscription, Roster, ScheduleEntry, Season, Team, TeamPoints, TournamentEntry, Week, db
-from calculations import calculate_handicap, get_team_standings, get_bowler_stats, get_hr_qualifiers
+from calculations import calculate_handicap, get_team_standings, get_bowler_stats, get_hr_qualifiers, get_latest_entered_week
 
 mobile_bp = Blueprint('mobile', __name__)
 
@@ -161,10 +161,7 @@ def home():
 
     if season:
         # Last entered week (any type)
-        last_week = (Week.query
-                     .filter_by(season_id=season.id, is_entered=True)
-                     .order_by(Week.week_num.desc())
-                     .first())
+        last_week = get_latest_entered_week(season.id)
 
         # Next unentered, uncancelled week of ANY type
         upcoming_week = (Week.query

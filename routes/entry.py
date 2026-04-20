@@ -8,7 +8,9 @@ from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
 from calculations import (score_matchup, score_position_night, calculate_handicap,
                           get_weekly_prizes, get_team_standings, get_matchup_breakdown,
                           get_position_night_breakdown, get_bowler_stats,
-                          get_hr_qualifiers, get_hr_past_champions)
+                          get_hr_qualifiers, get_hr_past_champions,
+                          entry_handicap, entry_total_wood, get_bowler_entries_bulk,
+                          auto_assign_position_night)
 from extensions import cache
 from snapshots import save_snapshot
 from config import Config
@@ -119,16 +121,12 @@ def week_entry(season_id, week_num):
     recon = None
     if week.is_entered:
         all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+        bowler_ids = {e.bowler_id for e in all_entries if not e.is_blind and e.bowler_id}
+        ebowler = get_bowler_entries_bulk(bowler_ids, season_id)
         player_count = sum(1 for e in all_entries if not e.is_blind)
         blind_games  = sum(e.game_count for e in all_entries if e.is_blind)
-        total_wood   = sum(
-            e.total_pins + (
-                (season.blind_handicap if e.is_blind
-                 else calculate_handicap(e.bowler_id, season_id, week_num))
-                * e.game_count
-            )
-            for e in all_entries
-        )
+        total_wood   = sum(entry_total_wood(e, season, season_id, week_num, ebowler)
+                           for e in all_entries)
         prizes = get_weekly_prizes(season_id, week_num) if not week.tournament_type else None
         recon = {'player_count': player_count, 'blind_games': blind_games,
                  'total_wood': total_wood, 'prizes': prizes}
@@ -249,53 +247,6 @@ def generate_test_entries(season_id, week_num):
     return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
 
-def _auto_assign_position_night(season_id, position_week_num):
-    """
-    Update ScheduleEntry for a position night based on standings through the prior week.
-    Regular position night: top-2 on matchups 1&2, bottom-2 on matchups 3&4.
-    Club Championship: top-2 on all 4 matchups (only those 2 teams bowl).
-    """
-    from models import Week
-    pos_week = Week.query.filter_by(season_id=season_id, week_num=position_week_num).first()
-    is_club_championship = (pos_week and pos_week.tournament_type == 'club_championship')
-
-    standings = get_team_standings(season_id, through_week=position_week_num - 1)
-    if len(standings) < 2:
-        return
-    top_a, top_b = standings[0]['team'], standings[1]['team']
-
-    if is_club_championship:
-        # Only the top 2 teams bowl, on all 4 lane pairs
-        assignments = {
-            1: (top_a.id, top_b.id),
-            2: (top_a.id, top_b.id),
-            3: (top_a.id, top_b.id),
-            4: (top_a.id, top_b.id),
-        }
-    else:
-        if len(standings) < 4:
-            return
-        bot_a, bot_b = standings[2]['team'], standings[3]['team']
-        assignments = {
-            1: (top_a.id, top_b.id),
-            2: (top_a.id, top_b.id),
-            3: (bot_a.id, bot_b.id),
-            4: (bot_a.id, bot_b.id),
-        }
-    for matchup_num, (t1_id, t2_id) in assignments.items():
-        sched = ScheduleEntry.query.filter_by(
-            season_id=season_id, week_num=position_week_num,
-            matchup_num=matchup_num
-        ).first()
-        if sched:
-            sched.team1_id = t1_id
-            sched.team2_id = t2_id
-        else:
-            db.session.add(ScheduleEntry(
-                season_id=season_id, week_num=position_week_num,
-                matchup_num=matchup_num, team1_id=t1_id, team2_id=t2_id
-            ))
-
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/matchup/<int:matchup_num>',
                 methods=['GET', 'POST'])
@@ -359,11 +310,11 @@ def matchup_entry(season_id, week_num, matchup_num):
 
         # Calculate and save points
         if week.is_position_night:
-            # Delete ALL TeamPoints for the week before re-inserting — position night
-            # points are calculated from all matchups together, so saving any single
-            # matchup must replace the full set to avoid double-counting.
-            TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).delete()
+            # Calculate first, then atomically replace — avoids an empty-points window
+            # if score_position_night raises. Points are per-week for position nights
+            # (all matchups together), so any save replaces the full set.
             pts = score_position_night(season_id, week_num)
+            TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).delete()
             for team_id, points in pts.items():
                 tp = TeamPoints(
                     season_id=season_id, week_num=week_num,
@@ -392,7 +343,7 @@ def matchup_entry(season_id, week_num, matchup_num):
             is_position_night=True, is_entered=False
         ).first()
         if next_pos:
-            _auto_assign_position_night(season_id, week_num + 1)
+            auto_assign_position_night(season_id, week_num + 1)
             db.session.commit()
 
         # Mark week as entered if all matchups are done
@@ -407,7 +358,7 @@ def matchup_entry(season_id, week_num, matchup_num):
         if entered_matchups >= all_matchups:
             week.is_entered = True
             db.session.commit()
-            # Auto-save snapshot
+            cache.clear()
             try:
                 save_snapshot(season_id, week_num, Config.SNAPSHOT_DIR)
             except Exception as e:
@@ -594,14 +545,13 @@ def reconcile(season_id, week_num):
         season_id=season_id, week_num=week_num
     ).all()
 
-    # Build per-entry handicap and handicap wood
+    bowler_ids = {e.bowler_id for e in entries if not e.is_blind and e.bowler_id}
+    ebowler = get_bowler_entries_bulk(bowler_ids, season_id)
+
     entry_data = []
     for e in entries:
-        if e.is_blind:
-            hcp = season.blind_handicap
-        else:
-            hcp = calculate_handicap(e.bowler_id, season_id, week_num) if e.bowler_id else 0
-        hcp_wood = e.total_pins + hcp * e.game_count
+        hcp = entry_handicap(e, season, season_id, week_num, ebowler)
+        hcp_wood = entry_total_wood(e, season, season_id, week_num, ebowler)
         entry_data.append({'entry': e, 'hcp': hcp, 'hcp_wood': hcp_wood})
 
     player_count = sum(1 for e in entries if not e.is_blind)
@@ -704,6 +654,7 @@ def tournament_entry(season_id, week_num):
         db.session.commit()
         week.is_entered = True
         db.session.commit()
+        cache.clear()
         flash(f'{label} scores saved.', 'success')
         return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
