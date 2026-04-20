@@ -12,7 +12,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from models import Bowler, MatchupEntry, PushSubscription, Roster, ScheduleEntry, Season, Team, TeamPoints, TournamentEntry, Week, db
-from calculations import calculate_handicap, get_team_standings
+from calculations import calculate_handicap, get_team_standings, get_bowler_stats
 
 mobile_bp = Blueprint('mobile', __name__)
 
@@ -264,6 +264,34 @@ def home():
                                          else last_matchup.team1)
                         last_week_opp_pts = totals.get(last_week_opp.id) if last_week_opp else None
 
+    # Harry Russell qualifiers: top-10 avg bowlers with ≥30 regular-season games
+    hr_qualifiers = []
+    if season and upcoming_week and upcoming_week.tournament_type == 'indiv_scratch':
+        last_regular = (Week.query
+                        .filter_by(season_id=season.id)
+                        .filter(Week.tournament_type.is_(None))
+                        .order_by(Week.week_num.desc())
+                        .first())
+        through = last_regular.week_num if last_regular else upcoming_week.week_num - 1
+        rostered = (Roster.query
+                    .filter_by(season_id=season.id)
+                    .join(Bowler, Bowler.id == Roster.bowler_id)
+                    .order_by(Bowler.last_name)
+                    .all())
+        qual_list = []
+        for r in rostered:
+            stats = get_bowler_stats(r.bowler_id, season.id, through)
+            if stats['cumulative_games'] >= 30:
+                qual_list.append((stats['current_average'], r.bowler))
+        qual_list.sort(key=lambda x: -x[0])
+        if qual_list:
+            top10_avgs = set(sorted({avg for avg, _ in qual_list}, reverse=True)[:10])
+            qual_list = [(avg, b) for avg, b in qual_list if avg in top10_avgs]
+        for _, b in qual_list:
+            first_init = b.first_name[0] + '.' if b.first_name else ''
+            nick = f' ({b.nickname})' if b.nickname else ''
+            hr_qualifiers.append(f'{first_init} {b.last_name}{nick}'.strip())
+
     return render_template('mobile/home.html',
                            season=season,
                            my_team=my_team,
@@ -271,6 +299,7 @@ def home():
                            all_matchups=all_matchups,
                            my_matchup=my_matchup,
                            games_played=games_played,
+                           hr_qualifiers=hr_qualifiers,
                            last_week=last_week,
                            last_week_type=last_week_type,
                            last_week_pts=last_week_pts,

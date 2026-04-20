@@ -59,6 +59,11 @@
     Previous champions exempt from the game minimum ("Green Jacket Exemption").
     5 games, scratch scoring (no handicap).
   </div>
+  {% if hr_qualifiers %}
+  <div class="mt-2" style="font-size:.85rem;color:#495057">
+    <strong>Qualifiers:</strong> {{ hr_qualifiers | join(', ') }}
+  </div>
+  {% endif %}
   {% if games_played %}
   <div class="mt-2" style="font-size:.85rem;color:#1b3a6b;font-weight:600">
     You have {{ games_played }} game{{ 's' if games_played != 1 else '' }} this season.
