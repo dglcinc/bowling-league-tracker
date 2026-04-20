@@ -7,7 +7,8 @@ from models import Season, Week, Roster, Bowler, Team, MatchupEntry, TeamPoints,
 from calculations import (get_wkly_alpha, get_team_standings, get_bowler_stats,
                            get_iron_man_status, get_most_improved, get_weekly_prizes,
                            calculate_handicap, get_weekly_team_points, get_matchup_breakdown,
-                           get_career_stats)
+                           get_career_stats, entry_total_wood, get_bowler_entries_bulk,
+                           build_leaders_list, get_latest_entered_week)
 
 
 def _get_settings():
@@ -154,14 +155,9 @@ def week_prizes(season_id, week_num):
     top10 = bool(settings.prizes_top10)
 
     all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
-    total_wood = sum(
-        e.total_pins + (
-            (season.blind_handicap if e.is_blind
-             else calculate_handicap(e.bowler_id, season_id, week_num))
-            * e.game_count
-        )
-        for e in all_entries
-    )
+    bowler_ids = {e.bowler_id for e in all_entries if not e.is_blind and e.bowler_id}
+    ebowler = get_bowler_entries_bulk(bowler_ids, season_id)
+    total_wood = sum(entry_total_wood(e, season, season_id, week_num, ebowler) for e in all_entries)
     player_count = sum(1 for e in all_entries if not e.is_blind)
     blind_games  = sum(e.game_count for e in all_entries if e.is_blind)
 
@@ -169,31 +165,7 @@ def week_prizes(season_id, week_num):
     prizes = get_weekly_prizes(season_id, week_num) if not week.tournament_type else None
 
     # Leaders and high-average stats shown for all weeks
-    leaders = []
-    roster_entries = (Roster.query
-                      .filter_by(season_id=season_id, active=True)
-                      .join(Bowler).order_by(Bowler.last_name).all())
-    for r in roster_entries:
-        stats = get_bowler_stats(r.bowler_id, season_id, week_num)
-        if stats['cumulative_games'] == 0:
-            continue
-        leaders.append({
-            'bowler': r.bowler, 'team': r.team,
-            'average':             stats['running_avg'],
-            'games':               stats['cumulative_games'],
-            'handicap':            stats['display_handicap'],
-            'high_game_scratch':   stats['ytd_high_game_scratch'],
-            'high_game_hcp':       stats['ytd_high_game_hcp'],
-            'high_series_scratch': stats['ytd_high_series_scratch'],
-            'high_series_hcp':     stats['ytd_high_series_hcp'],
-        })
-    avg_rows = sorted(
-        [l for l in leaders if l['games'] >= min_games],
-        key=lambda x: (-x['average'], x['bowler'].last_name)
-    )
-    if top10:
-        top10_avgs = set(sorted({r['average'] for r in avg_rows}, reverse=True)[:10])
-        avg_rows = [r for r in avg_rows if r['average'] in top10_avgs]
+    leaders, avg_rows = build_leaders_list(season_id, week_num, min_games=min_games, top10=top10)
 
     full_year = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
     fh_list = get_team_standings(season_id, half=1, through_week=week_num)
@@ -312,10 +284,7 @@ def print_batch(season_id, week_num):
     ytd_rows = sorted(alpha_rows, key=lambda r: r['bowler'].last_name)
 
     # High games data
-    last_entered = (Week.query
-                    .filter_by(season_id=season_id, is_entered=True)
-                    .order_by(Week.week_num.desc())
-                    .first())
+    last_entered = get_latest_entered_week(season_id)
     hg_through = last_entered.week_num if last_entered else week_num
     settings = _get_settings()
     min_games = settings.prizes_min_games if settings.prizes_min_games is not None else 9
@@ -333,14 +302,9 @@ def print_batch(season_id, week_num):
     # Prizes & Standings data for Group 2 page 4 (regular weeks only)
     prizes = get_weekly_prizes(season_id, week_num) if not week.tournament_type else None
     all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
-    total_wood = sum(
-        e.total_pins + (
-            (season.blind_handicap if e.is_blind
-             else calculate_handicap(e.bowler_id, season_id, week_num))
-            * e.game_count
-        )
-        for e in all_entries
-    )
+    pb_bowler_ids = {e.bowler_id for e in all_entries if not e.is_blind and e.bowler_id}
+    pb_ebowler = get_bowler_entries_bulk(pb_bowler_ids, season_id)
+    total_wood = sum(entry_total_wood(e, season, season_id, week_num, pb_ebowler) for e in all_entries)
     player_count = sum(1 for e in all_entries if not e.is_blind)
     blind_games = sum(e.game_count for e in all_entries if e.is_blind)
     pb_full_year   = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)

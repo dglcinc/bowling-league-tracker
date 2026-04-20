@@ -31,6 +31,33 @@ def get_bowler_entries(bowler_id, season_id):
     return [e for e in entries if e.week_num not in tournament_weeks]
 
 
+def get_bowler_entries_bulk(bowler_ids, season_id):
+    """
+    Fetches entries for multiple bowlers in two queries instead of 2N.
+    Returns {bowler_id: [MatchupEntry...]} with tournament weeks excluded.
+    """
+    from models import Week
+    if not bowler_ids:
+        return {}
+    tournament_weeks = {
+        w.week_num for w in
+        Week.query.filter_by(season_id=season_id).filter(
+            Week.tournament_type.isnot(None)
+        ).all()
+    }
+    all_entries = (MatchupEntry.query
+                   .filter(MatchupEntry.bowler_id.in_(bowler_ids),
+                           MatchupEntry.season_id == season_id,
+                           MatchupEntry.is_blind == False)
+                   .order_by(MatchupEntry.week_num)
+                   .all())
+    result = {bid: [] for bid in bowler_ids}
+    for e in all_entries:
+        if e.week_num not in tournament_weeks:
+            result[e.bowler_id].append(e)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Handicap calculation
 # ---------------------------------------------------------------------------
@@ -83,6 +110,22 @@ def calculate_handicap(bowler_id, season_id, for_week, entries=None):
         # Established: use prior week's running average
         prior_avg = round(cumulative_pins / cumulative_games)
         return round((base - prior_avg) * factor)
+
+
+def entry_handicap(entry, season, season_id, week_num, entries_by_bowler=None):
+    """Returns the handicap to apply for a single MatchupEntry."""
+    if entry.is_blind:
+        return season.blind_handicap
+    if not entry.bowler_id:
+        return 0
+    prior_entries = entries_by_bowler.get(entry.bowler_id) if entries_by_bowler else None
+    return calculate_handicap(entry.bowler_id, season_id, week_num, prior_entries)
+
+
+def entry_total_wood(entry, season, season_id, week_num, entries_by_bowler=None):
+    """Returns total handicap wood (scratch pins + hcp × games) for a MatchupEntry."""
+    hcp = entry_handicap(entry, season, season_id, week_num, entries_by_bowler)
+    return entry.total_pins + hcp * entry.game_count
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +308,11 @@ def score_matchup(season_id, week_num, matchup_num):
     if not t2_has_bowlers:
         return {team1_id: 4, team2_id: 0, 'forfeit': team2_id}
 
+    # Pre-fetch all bowler entries to avoid N+1 handicap queries
+    all_bowler_ids = {e.bowler_id for e in t1_entries + t2_entries
+                      if not e.is_blind and e.bowler_id}
+    entries_by_bowler = get_bowler_entries_bulk(all_bowler_ids, season_id)
+
     # Build per-game handicap totals for each team
     def team_game_hcp_totals(entries, team_id):
         """Returns [game1_hcp_total, game2_hcp_total, game3_hcp_total]"""
@@ -274,7 +322,8 @@ def score_matchup(season_id, week_num, matchup_num):
                 hcp = season.blind_handicap
                 scratch_games = [season.blind_scratch] * min(entry.game_count or 3, 3)
             else:
-                hcp = calculate_handicap(entry.bowler_id, season_id, week_num)
+                hcp = calculate_handicap(entry.bowler_id, season_id, week_num,
+                                         entries_by_bowler.get(entry.bowler_id))
                 scratch_games = entry.games_night1 or []
 
             for i, score in enumerate(scratch_games[:3]):
@@ -386,12 +435,21 @@ def get_position_night_breakdown(season_id, week_num, pairing_num):
               .all())
     if not scheds:
         return None
-    entry_count = (MatchupEntry.query
-                   .filter_by(season_id=season_id, week_num=week_num)
-                   .filter(MatchupEntry.matchup_num.in_(matchup_nums))
-                   .count())
-    if not entry_count:
+
+    # Fetch all entries for these matchups in one query, then group by (matchup, team)
+    all_week_entries = MatchupEntry.query.filter(
+        MatchupEntry.season_id == season_id,
+        MatchupEntry.week_num == week_num,
+        MatchupEntry.matchup_num.in_(matchup_nums)
+    ).all()
+    if not all_week_entries:
         return None
+
+    bowler_ids = {e.bowler_id for e in all_week_entries if not e.is_blind and e.bowler_id}
+    entries_by_bowler = get_bowler_entries_bulk(bowler_ids, season_id)
+    entries_by_mnum_team = {}
+    for e in all_week_entries:
+        entries_by_mnum_team.setdefault((e.matchup_num, e.team_id), []).append(e)
 
     season = db.session.get(Season, season_id)
     team1 = scheds[0].team1
@@ -403,15 +461,13 @@ def get_position_night_breakdown(season_id, week_num, pairing_num):
     for sched in scheds:
         mnum = sched.matchup_num
         for team_id, agg in [(t1_id, agg_t1), (t2_id, agg_t2)]:
-            entries = MatchupEntry.query.filter_by(
-                season_id=season_id, week_num=week_num, matchup_num=mnum, team_id=team_id
-            ).all()
-            for entry in entries:
+            for entry in entries_by_mnum_team.get((mnum, team_id), []):
                 if entry.is_blind:
                     hcp = season.blind_handicap
                     games = [season.blind_scratch] * (entry.game_count or 3)
                 else:
-                    hcp = calculate_handicap(entry.bowler_id, season_id, week_num)
+                    hcp = calculate_handicap(entry.bowler_id, season_id, week_num,
+                                             entries_by_bowler.get(entry.bowler_id))
                     games = entry.games_night1 or []
                 for i, score in enumerate(games[:3]):
                     agg[i] += score + hcp
@@ -455,6 +511,16 @@ def score_position_night(season_id, week_num):
             pairings[key] = []
         pairings[key].append(sched.matchup_num)
 
+    # Pre-fetch all entries for the week and all bowler histories to avoid N+1 queries
+    week_entries_all = MatchupEntry.query.filter_by(
+        season_id=season_id, week_num=week_num
+    ).all()
+    bowler_ids = {e.bowler_id for e in week_entries_all if not e.is_blind and e.bowler_id}
+    entries_by_bowler = get_bowler_entries_bulk(bowler_ids, season_id)
+    entries_by_mnum_team = {}
+    for e in week_entries_all:
+        entries_by_mnum_team.setdefault((e.matchup_num, e.team_id), []).append(e)
+
     result = {}
     for (t1_id, t2_id), matchup_nums in pairings.items():
         # Aggregate game hcp totals across all matchups in this pairing
@@ -462,22 +528,17 @@ def score_position_night(season_id, week_num):
         agg_t2 = [0, 0, 0]
 
         for mnum in matchup_nums:
-            t1_entries = MatchupEntry.query.filter_by(
-                season_id=season_id, week_num=week_num,
-                matchup_num=mnum, team_id=t1_id
-            ).all()
-            t2_entries = MatchupEntry.query.filter_by(
-                season_id=season_id, week_num=week_num,
-                matchup_num=mnum, team_id=t2_id
-            ).all()
-
-            for entries, agg in [(t1_entries, agg_t1), (t2_entries, agg_t2)]:
+            for entries, agg in [
+                (entries_by_mnum_team.get((mnum, t1_id), []), agg_t1),
+                (entries_by_mnum_team.get((mnum, t2_id), []), agg_t2),
+            ]:
                 for entry in entries:
                     if entry.is_blind:
                         hcp = season.blind_handicap
                         games = [season.blind_scratch] * (entry.game_count or 3)
                     else:
-                        hcp = calculate_handicap(entry.bowler_id, season_id, week_num)
+                        hcp = calculate_handicap(entry.bowler_id, season_id, week_num,
+                                                 entries_by_bowler.get(entry.bowler_id))
                         games = entry.games_night1 or []
                     for i, score in enumerate(games[:3]):
                         agg[i] += score + hcp
@@ -533,6 +594,62 @@ def get_team_standings(season_id, half=None, through_week=None):
         standings[tp.team_id]['points'] += tp.points_earned
 
     return sorted(standings.values(), key=lambda x: x['points'], reverse=True)
+
+
+def get_latest_entered_week(season_id, exclude_cancelled=False):
+    """Returns the most recently entered Week for a season, or None."""
+    from models import Week
+    q = Week.query.filter_by(season_id=season_id, is_entered=True)
+    if exclude_cancelled:
+        q = q.filter_by(is_cancelled=False)
+    return q.order_by(Week.week_num.desc()).first()
+
+
+def auto_assign_position_night(season_id, position_week_num):
+    """
+    Update ScheduleEntry for a position night based on standings through the prior week.
+    Regular position night: top-2 on matchups 1&2, bottom-2 on matchups 3&4.
+    Club Championship: top-2 on all 4 matchups (only those 2 teams bowl).
+    """
+    from models import Week
+    pos_week = Week.query.filter_by(season_id=season_id, week_num=position_week_num).first()
+    is_club_championship = (pos_week and pos_week.tournament_type == 'club_championship')
+
+    standings = get_team_standings(season_id, through_week=position_week_num - 1)
+    if len(standings) < 2:
+        return
+    top_a, top_b = standings[0]['team'], standings[1]['team']
+
+    if is_club_championship:
+        assignments = {
+            1: (top_a.id, top_b.id),
+            2: (top_a.id, top_b.id),
+            3: (top_a.id, top_b.id),
+            4: (top_a.id, top_b.id),
+        }
+    else:
+        if len(standings) < 4:
+            return
+        bot_a, bot_b = standings[2]['team'], standings[3]['team']
+        assignments = {
+            1: (top_a.id, top_b.id),
+            2: (top_a.id, top_b.id),
+            3: (bot_a.id, bot_b.id),
+            4: (bot_a.id, bot_b.id),
+        }
+    for matchup_num, (t1_id, t2_id) in assignments.items():
+        sched = ScheduleEntry.query.filter_by(
+            season_id=season_id, week_num=position_week_num,
+            matchup_num=matchup_num
+        ).first()
+        if sched:
+            sched.team1_id = t1_id
+            sched.team2_id = t2_id
+        else:
+            db.session.add(ScheduleEntry(
+                season_id=season_id, week_num=position_week_num,
+                matchup_num=matchup_num, team1_id=t1_id, team2_id=t2_id
+            ))
 
 
 # ---------------------------------------------------------------------------
@@ -677,6 +794,41 @@ def get_most_improved(season_id, through_week):
     return results
 
 
+def build_leaders_list(season_id, through_week, min_games=None, top10=False):
+    """
+    Builds the bowler leaders list used by week_prizes and print_batch.
+    Returns (leaders, avg_rows) where leaders is the full list and avg_rows
+    is filtered by min_games, sorted by avg desc, with optional top-10 tie filter.
+    """
+    from models import Roster, Bowler
+    roster_entries = (Roster.query
+                      .filter_by(season_id=season_id, active=True)
+                      .join(Bowler)
+                      .order_by(Bowler.last_name)
+                      .all())
+    leaders = []
+    for r in roster_entries:
+        stats = get_bowler_stats(r.bowler_id, season_id, through_week)
+        if stats['cumulative_games'] == 0:
+            continue
+        leaders.append({
+            'bowler': r.bowler, 'team': r.team,
+            'average':             stats['running_avg'],
+            'games':               stats['cumulative_games'],
+            'handicap':            stats['display_handicap'],
+            'high_game_scratch':   stats['ytd_high_game_scratch'],
+            'high_game_hcp':       stats['ytd_high_game_hcp'],
+            'high_series_scratch': stats['ytd_high_series_scratch'],
+            'high_series_hcp':     stats['ytd_high_series_hcp'],
+        })
+    avg_rows = [l for l in leaders if min_games is None or l['games'] >= min_games]
+    avg_rows.sort(key=lambda x: (-x['average'], x['bowler'].last_name))
+    if top10:
+        top10_avgs = set(sorted({r['average'] for r in avg_rows}, reverse=True)[:10])
+        avg_rows = [r for r in avg_rows if r['average'] in top10_avgs]
+    return leaders, avg_rows
+
+
 # ---------------------------------------------------------------------------
 # Weekly prizes
 # ---------------------------------------------------------------------------
@@ -754,11 +906,15 @@ def get_weekly_prizes(season_id, week_num):
         season_id=season_id, week_num=week_num, is_blind=False
     ).all()
 
+    bowler_ids = {e.bowler_id for e in entries if e.bowler_id}
+    entries_by_bowler = get_bowler_entries_bulk(bowler_ids, season_id)
+
     candidates = []
     for e in entries:
         if not e.bowler_id or not e.games_night1:
             continue
-        hcp = calculate_handicap(e.bowler_id, season_id, week_num)
+        hcp = calculate_handicap(e.bowler_id, season_id, week_num,
+                                 entries_by_bowler.get(e.bowler_id))
         n1 = e.games_night1
         hg_s = max(n1)
         hs_s = sum(n1)
@@ -826,6 +982,7 @@ def get_hr_qualifiers(season_id, week_num):
     qual_list.sort(key=lambda x: -x[0])
 
     if qual_list:
+        # All bowlers tied at the 10th-place average qualify (intentional tie rule)
         top10_avgs = set(sorted({avg for avg, _ in qual_list}, reverse=True)[:10])
         qual_list = [(avg, b) for avg, b in qual_list if avg in top10_avgs]
 

@@ -341,15 +341,13 @@ def create_app():
 
     @app.context_processor
     def inject_globals():
-        from models import Season, Week, LeagueSettings, WebAuthnCredential
+        from models import Season, LeagueSettings, WebAuthnCredential
+        from calculations import get_latest_entered_week
         from flask_login import current_user
         active = Season.query.filter_by(is_active=True).first()
         current_week = 0
         if active:
-            last = (Week.query
-                    .filter_by(season_id=active.id, is_entered=True)
-                    .order_by(Week.week_num.desc())
-                    .first())
+            last = get_latest_entered_week(active.id)
             current_week = last.week_num if last else 0
         settings = db.session.get(LeagueSettings, 1)
         has_passkey = False
@@ -360,10 +358,7 @@ def create_app():
         all_seasons = Season.query.order_by(Season.name.desc()).all()
         latest_entered = {}
         for s in all_seasons:
-            lw = (Week.query
-                  .filter_by(season_id=s.id, is_entered=True)
-                  .order_by(Week.week_num.desc())
-                  .first())
+            lw = get_latest_entered_week(s.id)
             latest_entered[s.id] = lw.week_num if lw else 0
         seasons_with_data = [s for s in all_seasons if latest_entered.get(s.id, 0) > 0]
 
@@ -443,10 +438,8 @@ def create_app():
         if _preview_wn and current_user.is_authenticated and current_user.is_editor:
             last_week = Week.query.filter_by(season_id=season.id, week_num=_preview_wn).first()
         else:
-            last_week = (Week.query
-                         .filter_by(season_id=season.id, is_entered=True)
-                         .order_by(Week.week_num.desc())
-                         .first())
+            from calculations import get_latest_entered_week as _glew
+            last_week = _glew(season.id)
 
         # Variables populated below depending on last week's event type
         last_week_type = None          # 'regular' | 'championship' | 'solo'
