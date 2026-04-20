@@ -32,6 +32,13 @@
   Tournament scores are not counted toward season averages.
 </p>
 
+{% if tournament_type == 'indiv_scratch' and hr_qualifiers %}
+<div class="alert alert-info py-2 mb-3">
+  <strong>Qualifiers</strong> (top-10 avg, 30+ games):
+  {{ hr_qualifiers | join(', ') }}
+</div>
+{% endif %}
+
 <form method="post" id="tourney-form">
 <table class="table table-sm table-bordered" id="tournament-table">
   <thead>
@@ -62,6 +69,17 @@
             {{ b.last_name }}{% if b.first_name %}, {{ b.first_name }}{% endif %}
           </option>
           {% endfor %}
+          {% if past_champions %}
+          <optgroup label="— Past Champions —">
+            {% for b in past_champions %}
+            <option value="{{ b.id }}"
+                    data-hcp="0"
+                    {% if entry and entry.bowler_id == b.id %}selected{% endif %}>
+              {{ b.last_name }}{% if b.first_name %}, {{ b.first_name }}{% endif %}
+            </option>
+            {% endfor %}
+          </optgroup>
+          {% endif %}
         </select>
         <input type="text" name="guest_name_{{ i }}" class="form-control form-control-sm mt-1 guest-name"
                placeholder="Guest name"
