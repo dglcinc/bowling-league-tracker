@@ -282,7 +282,7 @@ def home():
         for r in rostered:
             stats = get_bowler_stats(r.bowler_id, season.id, through)
             if stats['cumulative_games'] >= 30:
-                qual_list.append((stats['current_average'], r.bowler))
+                qual_list.append((stats['running_avg'], r.bowler))
         qual_list.sort(key=lambda x: -x[0])
         if qual_list:
             top10_avgs = set(sorted({avg for avg, _ in qual_list}, reverse=True)[:10])

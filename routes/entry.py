@@ -751,7 +751,7 @@ def tournament_entry(season_id, week_num):
         for b in all_bowlers:
             stats = get_bowler_stats(b.id, season_id, through)
             if stats['cumulative_games'] >= 30:
-                qual_list.append((stats['current_average'], b))
+                qual_list.append((stats['running_avg'], b))
         qual_list.sort(key=lambda x: -x[0])
         if qual_list:
             top10_avgs = set(sorted({avg for avg, _ in qual_list}, reverse=True)[:10])
