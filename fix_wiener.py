@@ -9,9 +9,10 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-from app import app
+from app import create_app
 from models import db, Season, Week, TournamentEntry, Bowler
 
+app = create_app()
 with app.app_context():
     season = Season.query.filter_by(name='2025-2026').first()
     if not season:
