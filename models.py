@@ -90,6 +90,12 @@ class Season(db.Model):
     name_indiv_hcp_1       = db.Column(db.String(128), default='Chad Harris Memorial Bowl')
     name_indiv_hcp_2       = db.Column(db.String(128), default='Shep Belyea Open')
 
+    # Configurable "Up Next" eligibility/rules descriptions shown on the home page.
+    desc_club_championship = db.Column(db.Text, default='')
+    desc_indiv_scratch     = db.Column(db.Text, default='Top-15 avg qualifiers · 30+ games required · Green Jacket Exemption applies.')
+    desc_indiv_hcp_1       = db.Column(db.Text, default='Any active bowler can bowl. 3 games with handicap.')
+    desc_indiv_hcp_2       = db.Column(db.Text, default='Bowlers 50+ years old with 30+ games this season. 3 games with handicap.')
+
     @property
     def tournament_labels(self):
         """Map tournament_type key → display name for this season."""

@@ -55,9 +55,7 @@
 <div class="m-card">
   <div class="m-card-title">Who's Eligible</div>
   <div style="font-size:.9rem;line-height:1.5;color:#495057">
-    Top 10 scratch bowlers with <strong>30+ games</strong> this season.
-    Previous champions exempt from the game minimum ("Green Jacket Exemption").
-    5 games, scratch scoring (no handicap).
+    {{ season.desc_indiv_scratch or 'Top-15 avg qualifiers · 30+ games required · Green Jacket Exemption applies.' }}
   </div>
   {% if hr_qualifiers %}
   <div class="mt-2" style="font-size:.85rem;color:#495057">
@@ -75,8 +73,7 @@
 <div class="m-card">
   <div class="m-card-title">Who's Eligible</div>
   <div style="font-size:.9rem;line-height:1.5;color:#495057">
-    All league bowlers with <strong>30+ games</strong> this season.
-    3 games with handicap. If more than 24 bowlers attend, the event may extend to a second night.
+    {{ season.desc_indiv_hcp_1 or 'Any active bowler can bowl. 3 games with handicap.' }}
   </div>
   {% if games_played %}
   <div class="mt-2" style="font-size:.85rem;
@@ -91,8 +88,7 @@
 <div class="m-card">
   <div class="m-card-title">Who's Eligible</div>
   <div style="font-size:.9rem;line-height:1.5;color:#495057">
-    Bowlers <strong>50 years or older</strong> with <strong>30+ games</strong> this season.
-    3 games with handicap.
+    {{ season.desc_indiv_hcp_2 or 'Bowlers 50+ years old with 30+ games this season. 3 games with handicap.' }}
   </div>
   {% if games_played %}
   <div class="mt-2" style="font-size:.85rem;

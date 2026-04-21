@@ -99,6 +99,11 @@ def _migrate_db(db):
         "ALTER TABLE seasons ADD COLUMN start_time VARCHAR(16) DEFAULT '8:00 PM'",
         # Optional home-page message (editor-settable, shown below last-week result)
         "ALTER TABLE seasons ADD COLUMN home_message TEXT",
+        # Configurable tournament eligibility descriptions for the home page Up Next card
+        "ALTER TABLE seasons ADD COLUMN desc_club_championship TEXT DEFAULT ''",
+        "ALTER TABLE seasons ADD COLUMN desc_indiv_scratch TEXT DEFAULT 'Top-15 avg qualifiers · 30+ games required · Green Jacket Exemption applies.'",
+        "ALTER TABLE seasons ADD COLUMN desc_indiv_hcp_1 TEXT DEFAULT 'Any active bowler can bowl. 3 games with handicap.'",
+        "ALTER TABLE seasons ADD COLUMN desc_indiv_hcp_2 TEXT DEFAULT 'Bowlers 50+ years old with 30+ games this season. 3 games with handicap.'",
         # OTP login — replaces magic links for day-to-day sign-in
         """CREATE TABLE IF NOT EXISTS login_otps (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
