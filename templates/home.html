@@ -150,7 +150,7 @@
 
         {% elif event_type == 'indiv_scratch' %}
         <div class="mt-3" style="font-size:.85rem;color:#495057">
-          Top 10 scratch bowlers · 30+ games required · Green Jacket Exemption applies.
+          {{ season.desc_indiv_scratch or 'Top-15 avg qualifiers · 30+ games required · Green Jacket Exemption applies.' }}
           {% if games_played %}
           <div class="mt-1" style="color:#1b3a6b;font-weight:600">
             You have {{ games_played }} game{{ 's' if games_played != 1 }}.
@@ -165,7 +165,7 @@
 
         {% elif event_type == 'indiv_hcp_1' %}
         <div class="mt-3" style="font-size:.85rem;color:#495057">
-          All bowlers with 30+ games this season. 3 games with handicap.
+          {{ season.desc_indiv_hcp_1 or 'Any active bowler can bowl. 3 games with handicap.' }}
           {% if games_played %}
           <div class="mt-1 fw-semibold"
                style="color:{% if games_played >= 30 %}#198754{% else %}#dc3545{% endif %}">
@@ -177,7 +177,7 @@
 
         {% elif event_type == 'indiv_hcp_2' %}
         <div class="mt-3" style="font-size:.85rem;color:#495057">
-          Bowlers 50+ years old with 30+ games this season. 3 games with handicap.
+          {{ season.desc_indiv_hcp_2 or 'Bowlers 50+ years old with 30+ games this season. 3 games with handicap.' }}
           {% if games_played %}
           <div class="mt-1 fw-semibold"
                style="color:{% if games_played >= 30 %}#198754{% else %}#dc3545{% endif %}">

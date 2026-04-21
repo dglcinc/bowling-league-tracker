@@ -686,6 +686,10 @@ def edit_weeks(season_id):
         season.name_indiv_scratch     = request.form.get('name_indiv_scratch', '').strip()     or season.name_indiv_scratch
         season.name_indiv_hcp_1       = request.form.get('name_indiv_hcp_1', '').strip()       or season.name_indiv_hcp_1
         season.name_indiv_hcp_2       = request.form.get('name_indiv_hcp_2', '').strip()       or season.name_indiv_hcp_2
+        season.desc_club_championship = request.form.get('desc_club_championship', '').strip()
+        season.desc_indiv_scratch     = request.form.get('desc_indiv_scratch', '').strip()
+        season.desc_indiv_hcp_1       = request.form.get('desc_indiv_hcp_1', '').strip()
+        season.desc_indiv_hcp_2       = request.form.get('desc_indiv_hcp_2', '').strip()
         venue = request.form.get('venue', '').strip()
         if venue in ('mountain_lakes_club', 'boonton_lanes'):
             season.venue = venue

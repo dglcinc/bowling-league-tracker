@@ -951,7 +951,7 @@ def get_weekly_prizes(season_id, week_num):
 
 def get_hr_qualifiers(season_id, week_num):
     """
-    Top-10 avg qualifiers for the Harry Russell: active rostered bowlers with
+    Top-15 avg qualifiers for the Harry Russell: active rostered bowlers with
     ≥30 regular-season games, ranked by running average.
 
     Returns (qualifier_bowlers, qualifier_ids, qualifier_strings) where:
@@ -982,8 +982,8 @@ def get_hr_qualifiers(season_id, week_num):
     qual_list.sort(key=lambda x: -x[0])
 
     if qual_list:
-        # All bowlers tied at the 10th-place average qualify (intentional tie rule)
-        top10_avgs = set(sorted({avg for avg, _ in qual_list}, reverse=True)[:10])
+        # All bowlers tied at the 15th-place average qualify (intentional tie rule)
+        top10_avgs = set(sorted({avg for avg, _ in qual_list}, reverse=True)[:15])
         qual_list = [(avg, b) for avg, b in qual_list if avg in top10_avgs]
 
     qualifier_bowlers = [b for _, b in qual_list]

@@ -133,12 +133,26 @@ def week_entry(season_id, week_num):
 
     # Tournament score summary for individual post-season events
     tournament_entries = []
+    tournament_rankings = []
     if week.tournament_type and week.tournament_type != 'club_championship':  # noqa: individual types
         tournament_entries = (TournamentEntry.query
                               .filter_by(season_id=season_id, week_num=week_num)
                               .join(Bowler, TournamentEntry.bowler_id == Bowler.id, isouter=True)
                               .order_by(Bowler.last_name)
                               .all())
+        # Build ranked list sorted by score descending
+        use_hcp = (week.tournament_type != 'indiv_scratch')
+        scored = [(e.total_with_hcp if use_hcp else e.total_scratch, e) for e in tournament_entries
+                  if e.games]
+        scored.sort(key=lambda x: -x[0])
+        rank = 1
+        for i, (score, e) in enumerate(scored):
+            if i > 0 and score == scored[i - 1][0]:
+                r = tournament_rankings[-1]['rank']
+            else:
+                r = rank
+            tournament_rankings.append({'entry': e, 'score': score, 'rank': r})
+            rank += 1
 
     return render_template('entry/week_entry.html',
                            season=season, week=week,
@@ -152,7 +166,8 @@ def week_entry(season_id, week_num):
                            prev_week_num=prev_week_num,
                            next_week_num=next_week_num,
                            tournament_labels=season.tournament_labels,
-                           tournament_entries=tournament_entries)
+                           tournament_entries=tournament_entries,
+                           tournament_rankings=tournament_rankings)
 
 
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/clear-tournament-entries', methods=['POST'])

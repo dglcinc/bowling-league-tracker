@@ -7,31 +7,39 @@
 
 <form method="post">
 <div class="card mb-3">
-  <div class="card-header">Tournament Display Names</div>
+  <div class="card-header">Tournament Display Names &amp; Descriptions</div>
   <div class="card-body">
-    <p class="text-muted small mb-3">These names appear in reports, headers, and prize pages. Changes apply to this season only.</p>
-    <div class="row g-2">
+    <p class="text-muted small mb-3">Names appear in reports, headers, and prize pages. Descriptions appear on the home page "Up Next" card. Changes apply to this season only.</p>
+    <div class="row g-3">
       <div class="col-md-6">
-        <label class="form-label small fw-semibold">Club Championship (team event)</label>
+        <label class="form-label small fw-semibold">Club Championship (team event) — Name</label>
         <input type="text" name="name_club_championship" class="form-control form-control-sm"
                value="{{ season.name_club_championship }}">
+        <label class="form-label small fw-semibold mt-2">Description</label>
+        <textarea name="desc_club_championship" class="form-control form-control-sm" rows="2">{{ season.desc_club_championship or '' }}</textarea>
       </div>
       <div class="col-md-6">
-        <label class="form-label small fw-semibold">Individual Scratch Championship (5 games)</label>
+        <label class="form-label small fw-semibold">Individual Scratch Championship (5 games) — Name</label>
         <input type="text" name="name_indiv_scratch" class="form-control form-control-sm"
                value="{{ season.name_indiv_scratch }}">
+        <label class="form-label small fw-semibold mt-2">Description</label>
+        <textarea name="desc_indiv_scratch" class="form-control form-control-sm" rows="2">{{ season.desc_indiv_scratch or '' }}</textarea>
       </div>
       <div class="col-md-6">
-        <label class="form-label small fw-semibold">Individual Handicap Tournament 1 (3 games)</label>
+        <label class="form-label small fw-semibold">Individual Handicap Tournament 1 (3 games) — Name</label>
         <input type="text" name="name_indiv_hcp_1" class="form-control form-control-sm"
                value="{{ season.name_indiv_hcp_1 }}">
+        <label class="form-label small fw-semibold mt-2">Description</label>
+        <textarea name="desc_indiv_hcp_1" class="form-control form-control-sm" rows="2">{{ season.desc_indiv_hcp_1 or '' }}</textarea>
       </div>
       <div class="col-md-6">
-        <label class="form-label small fw-semibold">Individual Handicap Tournament 2 (3 games)</label>
+        <label class="form-label small fw-semibold">Individual Handicap Tournament 2 (3 games) — Name</label>
         <input type="text" name="name_indiv_hcp_2" class="form-control form-control-sm"
                value="{{ season.name_indiv_hcp_2 }}">
+        <label class="form-label small fw-semibold mt-2">Description</label>
+        <textarea name="desc_indiv_hcp_2" class="form-control form-control-sm" rows="2">{{ season.desc_indiv_hcp_2 or '' }}</textarea>
       </div>
-      <div class="col-md-6 mt-2">
+      <div class="col-md-6">
         <label class="form-label small fw-semibold">Venue</label>
         <select name="venue" class="form-select form-select-sm">
           <option value="boonton_lanes" {{ 'selected' if season.venue == 'boonton_lanes' else '' }}>Boonton Lanes</option>
