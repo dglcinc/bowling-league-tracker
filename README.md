@@ -36,10 +36,12 @@ Four tournament weeks are automatically appended to each season after the regula
 
 | Tournament | Format | Notes |
 |-----------|--------|-------|
-| Club Team Championship | Team competition, position-night scoring | Uses standard matchup entry |
-| Harry E. Russell Championship | Individual, 5-game scratch | All bowlers (active + inactive) + write-in option for non-league participants |
-| Chad Harris Memorial Bowl | Individual, 3-game handicap | Active bowlers only |
-| Shep Belyea Open | Individual, 3-game handicap | Active bowlers only |
+| Club Team Championship (`club_championship`) | Team competition, position-night scoring | Uses standard matchup entry; lane assignments auto-assigned from standings |
+| Individual Scratch Championship (`indiv_scratch`) | Individual, 5-game scratch | Top-10 average qualifiers (≥30 games) in main dropdown; all-time past champions in a separate optgroup; write-in option for non-league participants |
+| Individual Handicap 1 (`indiv_hcp_1`) | Individual, 3-game handicap | Active bowlers + write-in |
+| Individual Handicap 2 (`indiv_hcp_2`) | Individual, 3-game handicap | Active bowlers + write-in |
+
+Tournament display names are configurable per season in Admin → Week Dates and stored as JSON in the `Season` row, so the same tournament types can carry different names across seasons without code changes.
 
 The individual tournament entry form shows live rankings that update as scores are typed.
 
@@ -73,7 +75,9 @@ Full payout calculator with printable output for the end-of-season banquet.
 | Team Standings | `/reports/season/<id>/standings` | Summary tables (overall, first half, second half) plus week-by-week scoring grid |
 | High Games & Averages | `/reports/season/<id>/high-games` | Average leaders and top-10 lists for HG/HS scratch and handicap; filterable by minimum games |
 | Per-Week Prizes | `/reports/season/<id>/week/<week>/prizes` | Four prize categories with tie handling; team standings; YTD leaders |
-| Bowler Detail | `/reports/season/<id>/bowler/<id>` | Individual bowler week-by-week breakdown |
+| Bowler Detail | `/reports/season/<id>/bowler/<id>` | Individual bowler week-by-week breakdown; clicking any score navigates to the detail page for that week |
+| All-Time Records | `/records` | All-time leaderboards, season comparison table, tournament winners by year, Most Improved, Fun Stats, and a Stat Builder. Venue filter available. Sortable columns throughout. |
+| Bowler Directory | `/bowler_dir` | All bowlers with career highlights and season badges |
 | Payout Overview | `/payout/season/<id>` | YTD prize counts, weekly prize history, Most Improved |
 | Payout Summary | `/payout/season/<id>/summary` | Full end-of-season payout calculation with currency breakdown |
 | Award Pages | `/payout/season/<id>/award/all` | Printable award certificates for all recipients |
@@ -102,6 +106,10 @@ A single page (`/reports/season/<id>/print-batch/<week>`) assembles all weekly p
 ### PWA / Mobile App
 The app ships a web app manifest and service worker so it can be installed as a Progressive Web App on iOS, Android, and desktop Chrome. The home screen icon is a 🎳 emoji rendered at full resolution.
 
+The `/m/` mobile route set provides a phone-optimised home page showing: upcoming lane assignments, last week's results (score, opponent points, standings delta), current standings, and individual bowler stats. It detects mobile user agents and redirects automatically.
+
+**Push notifications** (Web Push / VAPID) are supported on the mobile home page. Bowlers can enable per-event preferences for three notification types: the evening before bowling night, the morning of bowling night, and when scores are posted. Notification sending is handled by `send_notifications.py`, run on a 10-minute launchd timer.
+
 ## Data Model
 
 ```
@@ -127,7 +135,7 @@ All statistics (averages, handicaps, high games, standings) are computed on the 
 
 **Season** — `bowling_format`: `'single'` (G1–G3, 8 lanes) or `'double'` (G1–G6, 4 lanes).
 
-**Week** — `tournament_type`: null for regular weeks; `'club_championship'`, `'harry_russell'`, `'chad_harris'`, or `'shep_belyea'` for post-season weeks.
+**Week** — `tournament_type`: null for regular weeks; `'club_championship'`, `'indiv_scratch'`, `'indiv_hcp_1'`, or `'indiv_hcp_2'` for post-season weeks. Display names are stored separately in `Season.tournament_labels` (JSON).
 
 **MatchupEntry** — one bowler's session for one matchup:
 - `game1`–`game3`: primary night scores
@@ -144,32 +152,39 @@ All statistics (averages, handicaps, high games, standings) are computed on the 
 ## Tech Stack
 
 - **Python 3** / **Flask** — web framework and routing (port 5001)
-- **SQLAlchemy** — ORM; SQLite database stored in OneDrive folder for automatic cloud backup
+- **SQLAlchemy** — ORM; SQLite database
 - **Flask-Login** — session management and user authentication
-- **Flask-Limiter** — rate limiting on auth endpoints
+- **Flask-Limiter** / **Flask-Caching** — rate limiting on auth endpoints; page-level caching for Records and Bowler Directory
 - **Jinja2** — templating
 - **Bootstrap 5** — responsive layout and print utilities
-- **MSAL + Microsoft Graph API** — email delivery (replaces SMTP; uses client credentials flow)
+- **MSAL + Microsoft Graph API** — email delivery via Microsoft 365; uses client credentials flow (no SMTP)
 - **python-webauthn** — passkey/WebAuthn registration and authentication
-- **WeasyPrint** — PDF generation (optional; requires system Pango library)
+- **py_vapid / pywebpush** — Web Push / VAPID for PWA push notifications
+- **WeasyPrint** — PDF generation for weekly prizes email attachment (optional; requires system Pango library)
 - **python-dotenv** — `.env` file support for local development
-- No JavaScript frameworks — vanilla JS for blind auto-fill, date cascade, live tournament rankings, and print group isolation
+- No JavaScript frameworks — vanilla JS for blind auto-fill, date cascade, live tournament rankings, sortable tables, and print group isolation
 
 ## Project Layout
 
 ```
 bowling-league-tracker/
-├── app.py                  # App factory, blueprint registration, DB migration
-├── config.py               # DB path (OneDrive-backed), snapshot dir
-├── extensions.py           # Shared Flask extensions (db, login_manager, limiter)
+├── app.py                  # App factory, blueprint registration, DB migration, home page
+├── config.py               # DB path, snapshot dir
+├── extensions.py           # Shared Flask extensions (db, login_manager, limiter, cache)
 ├── models.py               # SQLAlchemy models
 ├── calculations.py         # All stat computation (pure functions, no DB writes)
+│                           #   Shared helpers: entry_handicap, entry_total_wood,
+│                           #   get_bowler_entries_bulk, build_leaders_list,
+│                           #   get_latest_entered_week, auto_assign_position_night
 ├── snapshots.py            # Weekly JSON snapshot writer
+├── send_notifications.py   # Web Push sender (bowling_tomorrow / tonight / scores_posted)
 ├── routes/
-│   ├── admin.py            # Season, team, roster, week, schedule, XLS import, email
+│   ├── admin.py            # Season, team, roster, week, schedule, XLS import, email, PDF
 │   ├── auth.py             # Login, magic link, passkey (WebAuthn), logout
 │   ├── entry.py            # Score entry, matchup forms, tournament entry, points calculation
-│   ├── reports.py          # All report views
+│   ├── mobile.py           # Mobile/PWA home, standings, scores, push subscription
+│   ├── records.py          # All-time records, bowler directory, stat builder
+│   ├── reports.py          # Weekly/YTD reports, print batch, high games, prizes, standings
 │   └── payout.py           # Prize payout overview, config, summary, award pages
 ├── static/
 │   ├── manifest.json       # PWA manifest
@@ -180,9 +195,10 @@ bowling-league-tracker/
 │   ├── admin/              # Season/roster/schedule/settings admin pages
 │   ├── auth/               # Login and passkey management pages
 │   ├── entry/              # Score entry and tournament entry pages
+│   ├── mobile/             # Mobile PWA pages
+│   ├── records/            # All-time records and bowler directory
 │   ├── reports/            # Report and print pages
 │   └── payout/             # Payout config, summary, and award certificate pages
-├── docs/                   # Implementation plans and design notes
 └── seed_*.py               # One-time data import scripts (historical XLS import)
 ```
 
@@ -195,12 +211,14 @@ flask>=3.0.0
 flask-sqlalchemy>=3.1.0
 flask-login>=0.6.3
 flask-limiter>=3.5.0
-flask-mail>=0.10.0
+flask-caching>=2.1.0
 python-dotenv>=1.0.0
 openpyxl>=3.1.0
 weasyprint>=62.0
 msal>=1.29.0
 webauthn>=2.0.0
+py-vapid>=1.9.0
+pywebpush>=2.0.0
 ```
 
 Install:
@@ -222,6 +240,13 @@ GRAPH_SENDER_EMAIL=sender@yourdomain.com
 # Cloudflare Turnstile (optional bot protection on login page)
 TURNSTILE_SITE_KEY=your-site-key
 TURNSTILE_SECRET_KEY=your-secret-key
+
+# Web Push / VAPID (required for push notifications)
+# Generate once with: python -c "from py_vapid import Vapid; v=Vapid(); v.generate_keys(); print(v.public_key, v.private_key)"
+# Do NOT rotate after the first subscriber — existing subscriptions will break
+VAPID_PUBLIC_KEY=your-vapid-public-key
+VAPID_PRIVATE_PEM=your-vapid-private-key-pem
+VAPID_CLAIMS_EMAIL=mailto:admin@yourdomain.com
 
 # WeasyPrint on Apple Silicon (if using PDF generation)
 DYLD_LIBRARY_PATH=/opt/homebrew/lib
