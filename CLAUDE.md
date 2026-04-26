@@ -204,6 +204,7 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 - **Club championship finalists rule**: `tournament_placement` route checks if first-half and second-half points leaders are the same team. If so, that team plays the second-place second-half team (not an automatic win). Otherwise the two half-winners are the finalists.
 - **`league_settings` table**: single row (id=1). Contains `prizes_min_games` (INTEGER DEFAULT 9) and `prizes_top10` (BOOLEAN DEFAULT 0). Always update with explicit `db.session.execute(text('UPDATE league_settings SET prizes_min_games=:mg, prizes_top10=:t10 WHERE id=1'), {...})` — SQLAlchemy ORM attribute assignment + commit is unreliable for this table (doesn't mark object dirty).
 - **`get_bowler_stats()` key names**: average is `running_avg`, not `current_average`. Games count is `cumulative_games`.
+- **`login_manager.login_view = 'auth.login'`** is set in `extensions.py`. Without it, `@login_required` calls `abort(401)` instead of redirecting to the login page. If users report bare 401 pages on login flows, verify this is still set and `auth.login` still resolves.
 - **Shared helpers in `calculations.py`** (PR #110): `entry_handicap(entry, season, season_id, week_num, entries_by_bowler=None)` and `entry_total_wood(...)` centralise the blind/non-blind handicap expression. `get_bowler_entries_bulk(bowler_ids, season_id)` pre-fetches season entries for N bowlers in 2 queries (pass result as `entries_by_bowler` to avoid N+1). `build_leaders_list(season_id, through_week, min_games, top10)` returns `(leaders, avg_rows)`. `get_latest_entered_week(season_id, exclude_cancelled=False)` replaces the inline `Week.query.filter_by(is_entered=True)...first()` pattern. `auto_assign_position_night(season_id, week_num)` moved here from `entry.py`.
 - **Cache invalidation**: `cache.clear()` must be called after `week.is_entered = True` in every scoring POST (matchup_entry, position_entry, tournament_entry). All three paths do this as of PR #110.
 - **Tournament entry dropdown JS**: new rows are created by cloning `firstSelect.innerHTML`, so `<optgroup>` elements added in the Jinja template automatically carry through to dynamically-added rows.
@@ -232,6 +233,8 @@ Production is live at **https://mlb.dglc.com** on Mac Mini M4 (`utilityserver@10
 ## Git Workflow
 
 CLAUDE.md pushes directly to main. All other code and documentation changes use feature branches + PRs. See global CLAUDE.md for full workflow.
+
+Always run `git pull` and other git network operations with `dangerouslyDisableSandbox: true` — the sandbox blocks writes to `.git/FETCH_HEAD`.
 
 For `gh` CLI: token is embedded in the remote URL — prefix commands with:
 ```bash
