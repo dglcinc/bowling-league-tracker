@@ -259,13 +259,7 @@ Four early bowlers have no first name in any XLS file — these are unfixable fr
 - id=185 Casey, id=186 Dejackmo, id=201 Parker, id=214 Wagner
 
 ### Incomplete score imports — ✅ VERIFIED CORRECT (2026-04-26)
-All previously flagged cases were verified against individual bowler sheets in the final XLS files. In every case the DB matches the XLS exactly — those bowlers simply bowled fewer weeks those seasons. The earlier analysis compared against the "final handicap" tab (which contains the *prior* season's ending data, not the current season's), producing false positives. No re-import needed.
-
-- Zorlas (Paul) 2010-2011: 1 week in XLS and DB — correct
-- Gellert 2015-2016: week 6 only (2 games) in XLS and DB — correct
-- Maute (Dave) 2016-2017: 7 weeks in XLS and DB, scores match exactly — correct; prior hcp=69 is accurate
-- Tellie 2016-2017: week 3 only in XLS and DB — correct
-- Brian Lewis 2016-2017: 15 weeks (45 games), DB avg=129.1 matches XLS individual sheet; XLS hcp=64 matches DB — correct
+All previously flagged cases (Zorlas 2010-2011, Gellert 2015-2016, Maute 2016-2017, Tellie 2016-2017, Brian Lewis 2016-2017) were verified against individual bowler sheets. DB matches XLS exactly — those bowlers simply bowled fewer weeks. Caution: the XLS "final handicap" tab contains the *prior* season's data, not the current year's; comparisons against it produce false positives.
 
 ### Bowler merge procedure
 When merging duplicates: (1) find both Bowler rows by name, (2) re-point all FK refs (Roster.bowler_id, MatchupEntry.bowler_id, TournamentEntry.bowler_id, UserAccount.bowler_id, PushSubscription.bowler_id) to canonical record, (3) delete duplicate.
