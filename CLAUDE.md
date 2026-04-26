@@ -252,30 +252,33 @@ with app.app_context():
 ## Data Quality Issues
 
 ### Tietjen
-Bowler id=244 has `first_name="Ma"` — truncated during 2007-2008 import. Confirm correct name before fixing with `UPDATE bowlers SET first_name = '?' WHERE id = 244;`
+Bowler id=244 has `first_name="Ma"` — truncated in the original 2007-2008 spreadsheet (XLS also shows "Ma"). Cannot determine correct name from source data; needs manual lookup.
 
-### Incomplete score imports (prior_handicap unreliable in following season)
-- **Zorlas, 2010-2011**: 3 games in DB (should be ~36–48); DB prior_hcp=37, XLS says ~59
-- **Gellert, 2015-2016**: 2 games in DB; DB prior_hcp=86
-- **Maute, 2016-2017**: 21 games in DB (~half season); DB prior_hcp=69, XLS says hcp=50
-- **Tellie, 2016-2017**: 3 games in DB; DB prior_hcp=87, XLS says hcp=76
-- **Brian Lewis, 2016-2017**: 45 games in DB but avg 12.9 pins below XLS final avg — possible wrong-bowler entries
+### Missing first names (source data never included them)
+Four early bowlers have no first name in any XLS file — these are unfixable from existing spreadsheets:
+- id=185 Casey, id=186 Dejackmo, id=201 Parker, id=214 Wagner
 
-### Coluni
-Login tokens expired — send fresh invite from admin panel.
+### Incomplete score imports — ✅ VERIFIED CORRECT (2026-04-26)
+All previously flagged cases were verified against individual bowler sheets in the final XLS files. In every case the DB matches the XLS exactly — those bowlers simply bowled fewer weeks those seasons. The earlier analysis compared against the "final handicap" tab (which contains the *prior* season's ending data, not the current season's), producing false positives. No re-import needed.
+
+- Zorlas (Paul) 2010-2011: 1 week in XLS and DB — correct
+- Gellert 2015-2016: week 6 only (2 games) in XLS and DB — correct
+- Maute (Dave) 2016-2017: 7 weeks in XLS and DB, scores match exactly — correct; prior hcp=69 is accurate
+- Tellie 2016-2017: week 3 only in XLS and DB — correct
+- Brian Lewis 2016-2017: 15 weeks (45 games), DB avg=129.1 matches XLS individual sheet; XLS hcp=64 matches DB — correct
 
 ### Bowler merge procedure
 When merging duplicates: (1) find both Bowler rows by name, (2) re-point all FK refs (Roster.bowler_id, MatchupEntry.bowler_id, TournamentEntry.bowler_id, UserAccount.bowler_id, PushSubscription.bowler_id) to canonical record, (3) delete duplicate.
 
-Pending merges (confirm before acting):
-- Ramich/RamichJoel/RamichNeil — Ramich=Joel throughout; Neil only 2011-2013
-- Martorana/MartoranaM/MartoranaS — Martorana=Scott; MartoranaM has first='M' only
+No pending merges — all resolved as of 2026-04-26:
+- Ramich: Joel (id=105) and Neil (id=280) are separate legitimate bowlers, both with correct first names
+- Martorana: Scott (id=97) and Mike (id=295) are separate legitimate bowlers, both with correct first names
 
 ### Historical same-surname pairs (all merged as of 2026-04-10)
-- Lewis: David (id=34, team 1) and Brian (id=90, bowled 2017-2020 only)
+- Lewis: David (id=34, team 1) and Brian (id=90, bowled 2015-2020 only)
 - Faehner: Josh (id=16) and Kyle (id=17)
 - Drews: Jon (id=12) and Mike (id=13)
-- Ferrante: Dan (id=18) and Ryan (id=19) — Ferrante Daniel (id=172, 0 games) also exists; confirm if same as Dan before merging
+- Ferrante: Dan (id=18) and Ryan (id=19) — previously noted Ferrante Daniel id=172 no longer exists in DB
 
 ## Git Workflow
 
