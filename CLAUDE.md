@@ -274,8 +274,9 @@ No pending merges — all resolved as of 2026-04-26:
 - Ramich: Joel (id=105) and Neil (id=280) are separate legitimate bowlers, both with correct first names
 - Martorana: Scott (id=97) and Mike (id=295) are separate legitimate bowlers, both with correct first names
 
-### Historical same-surname pairs (all merged as of 2026-04-10)
-- Lewis: David (id=34, team 1) and Brian (id=90, bowled 2015-2020 only)
+### Historical same-surname pairs (confirmed separate bowlers, verified 2026-04-26)
+These are all distinct people with separate DB records and non-overlapping or distinguishable histories. No merging was done or should be done.
+- Lewis: David (id=34) and Brian (id=90, bowled 2015-2020 only)
 - Faehner: Josh (id=16) and Kyle (id=17)
 - Drews: Jon (id=12) and Mike (id=13)
 - Ferrante: Dan (id=18) and Ryan (id=19) — previously noted Ferrante Daniel id=172 no longer exists in DB
