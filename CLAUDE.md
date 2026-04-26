@@ -219,6 +219,11 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 
 Production is live at **https://mlb.dglc.com** on Mac Mini M4 (`utilityserver@10.0.0.84`). nginx + TLS on Pi (`pi@10.0.0.82`; config: `/etc/nginx/sites-available/mlb.dglc.com`). App: gunicorn via launchd (`com.dglc.bowling-app`), binds `0.0.0.0:5001`. DB: `~/bowling-data/league.db` (local — NOT OneDrive; SQLite + cloud sync = corruption risk). Restart: `pkill -f "gunicorn.*wsgi"` (launchd auto-restarts). Logs: `/tmp/bowling-app.log`. Full setup guide in `DEPLOYMENT.md` (gitignored).
 
+- SSH username is always `utilityserver` — never `david` or any other name.
+- Deploy from dev Mac (single command): `ssh macmini '~/bin/deploy-bowling.sh'`
+- Backup: `~/bin/backup-bowling.sh` → `~/bowling-data/backups/`, 3am daily via launchd; 30-day retention.
+- Route 53: `~/bin/update-r53.sh`, profile `dglc-admin`, zone `Z0225171IDMZU3O5FZM0`, every 10 min via launchd.
+
 Claude Code runs directly on the production server — do not SSH to `10.0.0.84`, run commands locally.
 
 To reload the launchd plist after editing it directly: `launchctl unload ~/Library/LaunchAgents/com.dglc.bowling-app.plist && launchctl load ~/Library/LaunchAgents/com.dglc.bowling-app.plist`. Needed when plist changes don't take effect on a simple gunicorn restart.
@@ -243,6 +248,34 @@ with app.app_context():
 
 ### Still to build
 - Season rollover wizard
+
+## Data Quality Issues
+
+### Tietjen
+Bowler id=244 has `first_name="Ma"` — truncated during 2007-2008 import. Confirm correct name before fixing with `UPDATE bowlers SET first_name = '?' WHERE id = 244;`
+
+### Incomplete score imports (prior_handicap unreliable in following season)
+- **Zorlas, 2010-2011**: 3 games in DB (should be ~36–48); DB prior_hcp=37, XLS says ~59
+- **Gellert, 2015-2016**: 2 games in DB; DB prior_hcp=86
+- **Maute, 2016-2017**: 21 games in DB (~half season); DB prior_hcp=69, XLS says hcp=50
+- **Tellie, 2016-2017**: 3 games in DB; DB prior_hcp=87, XLS says hcp=76
+- **Brian Lewis, 2016-2017**: 45 games in DB but avg 12.9 pins below XLS final avg — possible wrong-bowler entries
+
+### Coluni
+Login tokens expired — send fresh invite from admin panel.
+
+### Bowler merge procedure
+When merging duplicates: (1) find both Bowler rows by name, (2) re-point all FK refs (Roster.bowler_id, MatchupEntry.bowler_id, TournamentEntry.bowler_id, UserAccount.bowler_id, PushSubscription.bowler_id) to canonical record, (3) delete duplicate.
+
+Pending merges (confirm before acting):
+- Ramich/RamichJoel/RamichNeil — Ramich=Joel throughout; Neil only 2011-2013
+- Martorana/MartoranaM/MartoranaS — Martorana=Scott; MartoranaM has first='M' only
+
+### Historical same-surname pairs (all merged as of 2026-04-10)
+- Lewis: David (id=34, team 1) and Brian (id=90, bowled 2017-2020 only)
+- Faehner: Josh (id=16) and Kyle (id=17)
+- Drews: Jon (id=12) and Mike (id=13)
+- Ferrante: Dan (id=18) and Ryan (id=19) — Ferrante Daniel (id=172, 0 games) also exists; confirm if same as Dan before merging
 
 ## Git Workflow
 
