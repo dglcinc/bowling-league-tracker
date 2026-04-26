@@ -219,6 +219,20 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 
 Production is live at **https://mlb.dglc.com** on Mac Mini M4 (`utilityserver@10.0.0.84`). nginx + TLS on Pi (`pi@10.0.0.82`; config: `/etc/nginx/sites-available/mlb.dglc.com`). App: gunicorn via launchd (`com.dglc.bowling-app`), binds `0.0.0.0:5001`. DB: `~/bowling-data/league.db` (local — NOT OneDrive; SQLite + cloud sync = corruption risk). Restart: `pkill -f "gunicorn.*wsgi"` (launchd auto-restarts). Logs: `/tmp/bowling-app.log`. Full setup guide in `DEPLOYMENT.md` (gitignored).
 
+Claude Code runs directly on the production server — do not SSH to `10.0.0.84`, run commands locally.
+
+To reload the launchd plist after editing it directly: `launchctl unload ~/Library/LaunchAgents/com.dglc.bowling-app.plist && launchctl load ~/Library/LaunchAgents/com.dglc.bowling-app.plist`. Needed when plist changes don't take effect on a simple gunicorn restart.
+
+To send email outside the web UI (e.g. an ad-hoc bulk send), wrap the call in `app.test_request_context('/', base_url='https://mlb.dglc.com')` so `url_for(_external=True)` resolves:
+
+```python
+from app import create_app
+app = create_app()
+with app.app_context():
+    with app.test_request_context('/', base_url='https://mlb.dglc.com'):
+        # call send_otp_invite, send_otp, etc.
+```
+
 ### Push notifications
 - `PushSubscription` model + `push_subscriptions` table (endpoint, subscription JSON, platform, 3 preference booleans)
 - `/m/push/subscribe`, `/m/push/unsubscribe`, `/m/push/preferences`, `/m/push/vapid-public-key` routes
