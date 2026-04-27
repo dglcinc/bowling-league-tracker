@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd plist for the bowling app health check.
+  Install on utilityserver (Mac Mini M4):
+
+    cp ~/github/bowling-league-tracker/com.dglc.bowling-health.plist \
+       ~/Library/LaunchAgents/com.dglc.bowling-health.plist
+    launchctl load ~/Library/LaunchAgents/com.dglc.bowling-health.plist
+
+  Runs every 5 minutes. Emails david@dglc.com once on outage and again on recovery.
+  Logs to /tmp/bowling-health.log and /tmp/bowling-health.err.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.dglc.bowling-health</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/python3.11</string>
+    <string>/Users/utilityserver/github/bowling-league-tracker/check_health.py</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/utilityserver/github/bowling-league-tracker</string>
+
+  <key>StartInterval</key>
+  <integer>300</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/bowling-health.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/bowling-health.err</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>DYLD_LIBRARY_PATH</key>
+    <string>/opt/homebrew/lib</string>
+  </dict>
+</dict>
+</plist>
