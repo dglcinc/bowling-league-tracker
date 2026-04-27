@@ -9,11 +9,11 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 **Important:** Never put player names, team names (which are player surnames), or any other personal information in the repository, code, comments, or documentation.
 
-## Repo / Branch State (as of 2026-04-21)
+## Repo / Branch State (as of 2026-04-26)
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
-- No open PRs — PRs #37–#110 all merged to main
+- No open PRs — PRs #37–#112 all merged or closed to main
 
 ## League Structure
 
@@ -223,6 +223,8 @@ Production is live at **https://mlb.dglc.com** on Mac Mini M4 (`utilityserver@10
 - Deploy from dev Mac (single command): `ssh macmini '~/bin/deploy-bowling.sh'`
 - Backup: `~/bin/backup-bowling.sh` → `~/bowling-data/backups/`, 3am daily via launchd; 30-day retention.
 - Route 53: `~/bin/update-r53.sh`, profile `dglc-admin`, zone `Z0225171IDMZU3O5FZM0`, every 10 min via launchd.
+- Health check: `check_health.py` + `com.dglc.bowling-health` launchd timer (5-min interval). Pings `localhost:5001`; emails `david@dglc.com` via Graph API on first failure and again on recovery. Sentinel file `/tmp/bowling-health-down` prevents repeat alerts. Logs: `/tmp/bowling-health.log` / `/tmp/bowling-health.err`.
+- **wsgi.py**: gunicorn entrypoint (`from app import create_app; app = create_app()`). Must exist in repo root — plist uses `wsgi:app`. Was lost in a rebase on 2026-04-26 causing a production outage; now tracked in git.
 
 Claude Code runs directly on the production server — do not SSH to `10.0.0.84`, run commands locally.
 
