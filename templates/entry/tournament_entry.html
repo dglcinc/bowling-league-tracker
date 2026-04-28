@@ -56,7 +56,7 @@
     {% if tournament_type == 'indiv_scratch' %}
     {% set total_rows = [existing_count + 1, 10]|max %}
     {% else %}
-    {% set total_rows = [existing_count + 5, 10]|min %}
+    {% set total_rows = [existing_count + 5, 10]|max %}
     {% endif %}
     {% for i in range(total_rows) %}
     {% set entry = existing[i] if i < existing_count else none %}
@@ -146,7 +146,7 @@
 <script>
 const useHandicap = {{ 'true' if use_handicap else 'false' }};
 const numGames = {{ num_games }};
-let rowCount = {{ ([existing|length + 1, 10]|max) if tournament_type == 'indiv_scratch' else ([existing|length + 5, 10]|min) }};
+let rowCount = {{ ([existing|length + 1, 10]|max) if tournament_type == 'indiv_scratch' else ([existing|length + 5, 10]|max) }};
 
 const handicaps = {
   {% for b in all_bowlers %}{{ b.id }}: {{ bowler_handicaps.get(b.id, 0) }},{% endfor %}
@@ -277,7 +277,7 @@ function addRow() {
   `;
   tbody.appendChild(row);
   const sel = row.querySelector('.bowler-select');
-  sel.value = '';
+  sel.selectedIndex = 0;
   sel.addEventListener('change', onBowlerChange);
   row.querySelectorAll('.game-input, .hcp-input').forEach(inp => {
     inp.addEventListener('input', () => { updateRowTotal(row); buildRankings(); });
