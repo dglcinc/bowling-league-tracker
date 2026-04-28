@@ -14,6 +14,98 @@ from calculations import (get_wkly_alpha, get_team_standings, get_bowler_stats,
 def _get_settings():
     return db.session.get(LeagueSettings, 1) or LeagueSettings(id=1)
 
+
+def build_week_prizes_context(season_id, week_num, min_games, top10):
+    """Compute the full context dict for `reports/week_prizes.html`.
+
+    Shared by the on-screen view (`week_prizes` route) and the email PDF
+    generator (`admin._generate_prizes_pdf`) so the standings page sent
+    with the weekly email is byte-for-byte the same as the navbar page.
+    """
+    season = Season.query.get_or_404(season_id)
+    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
+
+    all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+    bowler_ids = {e.bowler_id for e in all_entries if not e.is_blind and e.bowler_id}
+    ebowler = get_bowler_entries_bulk(bowler_ids, season_id)
+    total_wood = sum(entry_total_wood(e, season, season_id, week_num, ebowler) for e in all_entries)
+    player_count = sum(1 for e in all_entries if not e.is_blind)
+    blind_games = sum(e.game_count for e in all_entries if e.is_blind)
+
+    # Weekly prize boxes only apply to regular (non-tournament) weeks.
+    prizes = get_weekly_prizes(season_id, week_num) if not week.tournament_type else None
+    leaders, avg_rows = build_leaders_list(season_id, week_num, min_games=min_games, top10=top10)
+
+    full_year = sorted(get_team_standings(season_id, through_week=week_num),
+                       key=lambda s: s['team'].number)
+    fh_list = get_team_standings(season_id, half=1, through_week=week_num)
+    sh_list = get_team_standings(season_id, half=2, through_week=week_num)
+    first_half_map = {s['team'].id: s['points'] for s in fh_list}
+    second_half_map = {s['team'].id: s['points'] for s in sh_list}
+    fh_max = max(first_half_map.values(), default=0)
+    sh_max = max(second_half_map.values(), default=0)
+    fy_max = max((s['points'] for s in full_year), default=0)
+
+    tt = week.tournament_type
+    tournament_results = None
+    payout = None
+    if tt == 'club_championship':
+        team_data = {}
+        for e in all_entries:
+            tid = e.team_id
+            if tid not in team_data:
+                team_data[tid] = {'team': e.team, 'g1': 0, 'g2': 0, 'g3': 0,
+                                  'total_scratch': 0, 'total_wood': 0}
+            hcp = (season.blind_handicap if e.is_blind
+                   else calculate_handicap(e.bowler_id, season_id, week_num))
+            g1, g2, g3 = e.game1 or 0, e.game2 or 0, e.game3 or 0
+            team_data[tid]['g1'] += g1
+            team_data[tid]['g2'] += g2
+            team_data[tid]['g3'] += g3
+            team_data[tid]['total_scratch'] += g1 + g2 + g3
+            team_data[tid]['total_wood'] += g1 + g2 + g3 + hcp * e.game_count
+        tournament_results = sorted(team_data.values(), key=lambda x: -x['total_wood'])
+        for i, r in enumerate(tournament_results):
+            r['placement'] = i + 1
+    elif tt in ('indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'):
+        t_entries = TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+        results = []
+        for e in t_entries:
+            games = [e.game1, e.game2, e.game3, e.game4, e.game5]
+            scratch = sum(g for g in games if g is not None)
+            tw = scratch if tt == 'indiv_scratch' else e.total_with_hcp
+            results.append({
+                'name':       e.bowler.last_name if e.bowler else e.guest_name,
+                'nickname':   e.bowler.nickname if e.bowler else '',
+                'bowler_id':  e.bowler_id,
+                'games':      games,
+                'scratch':    scratch,
+                'handicap':   e.handicap,
+                'total_wood': tw,
+            })
+        results.sort(key=lambda x: -x['total_wood'])
+        for i, r in enumerate(results):
+            r['placement'] = i + 1
+        tournament_results = results
+        payout = PayoutConfig.query.filter_by(season_id=season_id).first()
+
+    weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
+
+    return {
+        'season': season, 'week': week, 'weeks': weeks,
+        'prizes': prizes, 'leaders': leaders,
+        'standings': full_year,
+        'first_half_map': first_half_map, 'second_half_map': second_half_map,
+        'fh_max': fh_max, 'sh_max': sh_max, 'fy_max': fy_max,
+        'avg_rows': avg_rows,
+        'min_games': min_games, 'top10': top10,
+        'total_wood': total_wood, 'player_count': player_count, 'blind_games': blind_games,
+        'tournament_type': tt,
+        'tournament_results': tournament_results,
+        'payout': payout,
+    }
+
+
 reports_bp = Blueprint('reports', __name__)
 
 
@@ -135,9 +227,6 @@ def _build_high_games_leaders(season_id, through_week, min_games=0):
 
 @reports_bp.route('/season/<int:season_id>/week/<int:week_num>/prizes')
 def week_prizes(season_id, week_num):
-    season = Season.query.get_or_404(season_id)
-    week   = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
-
     settings = _get_settings()
 
     # If min_games/top10 params provided, save to DB and redirect to clean URL
@@ -153,92 +242,8 @@ def week_prizes(season_id, week_num):
 
     min_games = settings.prizes_min_games if settings.prizes_min_games is not None else 9
     top10 = bool(settings.prizes_top10)
-
-    all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
-    bowler_ids = {e.bowler_id for e in all_entries if not e.is_blind and e.bowler_id}
-    ebowler = get_bowler_entries_bulk(bowler_ids, season_id)
-    total_wood = sum(entry_total_wood(e, season, season_id, week_num, ebowler) for e in all_entries)
-    player_count = sum(1 for e in all_entries if not e.is_blind)
-    blind_games  = sum(e.game_count for e in all_entries if e.is_blind)
-
-    # Weekly prize boxes only apply to regular (non-tournament) weeks
-    prizes = get_weekly_prizes(season_id, week_num) if not week.tournament_type else None
-
-    # Leaders and high-average stats shown for all weeks
-    leaders, avg_rows = build_leaders_list(season_id, week_num, min_games=min_games, top10=top10)
-
-    full_year = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
-    fh_list = get_team_standings(season_id, half=1, through_week=week_num)
-    sh_list = get_team_standings(season_id, half=2, through_week=week_num)
-    first_half_map  = {s['team'].id: s['points'] for s in fh_list}
-    second_half_map = {s['team'].id: s['points'] for s in sh_list}
-    fh_max = max(first_half_map.values(),  default=0)
-    sh_max = max(second_half_map.values(), default=0)
-    fy_max = max((s['points'] for s in full_year), default=0)
-
-    # Tournament results (post-season weeks only)
-    tt = week.tournament_type
-    tournament_results = None
-    payout = None
-    if tt == 'club_championship':
-        team_data = {}
-        for e in all_entries:
-            tid = e.team_id
-            if tid not in team_data:
-                team_data[tid] = {'team': e.team, 'g1': 0, 'g2': 0, 'g3': 0,
-                                  'total_scratch': 0, 'total_wood': 0}
-            hcp = (season.blind_handicap if e.is_blind
-                   else calculate_handicap(e.bowler_id, season_id, week_num))
-            g1, g2, g3 = e.game1 or 0, e.game2 or 0, e.game3 or 0
-            team_data[tid]['g1'] += g1
-            team_data[tid]['g2'] += g2
-            team_data[tid]['g3'] += g3
-            team_data[tid]['total_scratch'] += g1 + g2 + g3
-            team_data[tid]['total_wood']    += g1 + g2 + g3 + hcp * e.game_count
-        tournament_results = sorted(team_data.values(), key=lambda x: -x['total_wood'])
-        for i, r in enumerate(tournament_results):
-            r['placement'] = i + 1
-    elif tt in ('indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'):
-        t_entries = TournamentEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
-        results = []
-        for e in t_entries:
-            games = [e.game1, e.game2, e.game3, e.game4, e.game5]
-            scratch = sum(g for g in games if g is not None)
-            total_wood = scratch if tt == 'indiv_scratch' else e.total_with_hcp
-            results.append({
-                'name':      e.bowler.last_name if e.bowler else e.guest_name,
-                'nickname':  e.bowler.nickname  if e.bowler else '',
-                'bowler_id': e.bowler_id,
-                'games':     games,
-                'scratch':   scratch,
-                'handicap':  e.handicap,
-                'total_wood': total_wood,
-            })
-        results.sort(key=lambda x: -x['total_wood'])
-        for i, r in enumerate(results):
-            r['placement'] = i + 1
-        tournament_results = results
-        payout = PayoutConfig.query.filter_by(season_id=season_id).first()
-
-    weeks = Week.query.filter_by(season_id=season_id).order_by(Week.week_num).all()
-
-    return render_template('reports/week_prizes.html',
-                           season=season, week=week, weeks=weeks,
-                           prizes=prizes,
-                           leaders=leaders,
-                           standings=full_year,
-                           first_half_map=first_half_map,
-                           second_half_map=second_half_map,
-                           fh_max=fh_max, sh_max=sh_max, fy_max=fy_max,
-                           avg_rows=avg_rows,
-                           min_games=min_games,
-                           top10=top10,
-                           total_wood=total_wood,
-                           player_count=player_count,
-                           blind_games=blind_games,
-                           tournament_type=tt,
-                           tournament_results=tournament_results,
-                           payout=payout)
+    ctx = build_week_prizes_context(season_id, week_num, min_games=min_games, top10=top10)
+    return render_template('reports/week_prizes.html', **ctx)
 
 
 @reports_bp.route('/season/<int:season_id>/points')
