@@ -455,10 +455,6 @@ def edit_bowler(bowler_id):
                                         **({'season_id': season_id} if season_id else {})))
         bowler.is_editor = new_is_editor
 
-        if roster:
-            roster.team_id = int(request.form['team_id'])
-            roster.prior_handicap = int(request.form.get('prior_handicap') or 0)
-            roster.joined_week = int(request.form.get('joined_week') or 1)
         db.session.commit()
         flash('Bowler updated.', 'success')
         if season_id:
