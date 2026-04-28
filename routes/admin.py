@@ -1213,11 +1213,13 @@ def email_compose(season_id, week_num):
         bcc_scope = request.form.get('bcc_scope', 'all')
         attach_pdf = request.form.get('attach_pdf') == '1'
         to_emails_raw = request.form.get('to_emails', '').strip()
+        cc_emails_raw = request.form.get('cc_emails', '').strip()
         send_confirmed = request.form.get('send_confirmed') == '1'
         test_only = request.form.get('test_only') == '1'
 
-        # Build TO list
+        # Build TO + CC lists
         to_list = [e.strip() for e in to_emails_raw.split(',') if e.strip()]
+        cc_list = [e.strip() for e in cc_emails_raw.split(',') if e.strip()]
 
         # PDF filter settings — always save to DB for persistence
         from sqlalchemy import text as _text
@@ -1251,6 +1253,7 @@ def email_compose(season_id, week_num):
         if test_only:
             send_to = [current_app.config.get('GRAPH_SENDER_EMAIL', '')]
             send_to = [e for e in send_to if e]
+            send_cc = []
             send_bcc = []
             send_subject = f'[TEST] {subject}'
         else:
@@ -1261,11 +1264,15 @@ def email_compose(season_id, week_num):
             if thomson and thomson.email and thomson.email not in bcc_list:
                 bcc_list.append(thomson.email)
             send_to = to_list
+            send_cc = cc_list
             send_bcc = bcc_list
             send_subject = subject
 
         if send_confirmed or test_only:
-            # If the preview modal had an editable BCC textarea, use those addresses
+            # Preview modal allows editing CC and BCC before final send
+            cc_override_raw = request.form.get('cc_override', '').strip()
+            if cc_override_raw and not test_only:
+                send_cc = [e.strip() for e in cc_override_raw.splitlines() if e.strip()]
             bcc_override_raw = request.form.get('bcc_override', '').strip()
             if bcc_override_raw and not test_only:
                 send_bcc = [e.strip() for e in bcc_override_raw.splitlines() if e.strip()]
@@ -1287,6 +1294,7 @@ def email_compose(season_id, week_num):
                     subject=send_subject,
                     html_body=html_body,
                     to_list=send_to,
+                    cc_list=send_cc,
                     bcc_list=send_bcc,
                     pdf_attachment=pdf_bytes,
                     pdf_filename=f'Week{week_num}_Standings.pdf',
@@ -1294,7 +1302,8 @@ def email_compose(season_id, week_num):
                 if test_only:
                     flash(f'Test email sent to {send_to[0] if send_to else "you"}.', 'success')
                 else:
-                    flash(f'Email sent to {len(send_to)} captain(s) with {len(send_bcc)} BCC recipients.', 'success')
+                    cc_note = f', {len(send_cc)} CC' if send_cc else ''
+                    flash(f'Email sent to {len(send_to)} captain(s){cc_note} with {len(send_bcc)} BCC recipients.', 'success')
                 return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
             except Exception as e:
                 flash(f'Email send failed: {e}', 'danger')
@@ -1304,6 +1313,7 @@ def email_compose(season_id, week_num):
                 'subject':      subject,
                 'body_text':    body_text,
                 'to_list':      send_to,
+                'cc_list':      send_cc,
                 'bcc_list':     send_bcc,
                 'bcc_scope':    bcc_scope,
                 'attach_pdf':   attach_pdf,
@@ -1347,6 +1357,7 @@ def _get_msal_app(tenant_id, client_id, client_secret):
 
 
 def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
+                    cc_list=None,
                     pdf_attachment=None, pdf_filename=None):
     """Send email via Microsoft Graph API using client-credentials OAuth2."""
     import base64
@@ -1377,12 +1388,14 @@ def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
 
     # Build message payload
     to_recipients  = [{'emailAddress': {'address': e}} for e in to_list]
+    cc_recipients  = [{'emailAddress': {'address': e}} for e in (cc_list or [])]
     bcc_recipients = [{'emailAddress': {'address': e}} for e in bcc_list]
 
     message = {
         'subject': subject,
         'body': {'contentType': 'HTML', 'content': html_body},
         'toRecipients': to_recipients,
+        'ccRecipients': cc_recipients,
         'bccRecipients': bcc_recipients,
     }
 
