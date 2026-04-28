@@ -617,6 +617,7 @@ def tournament_entry(season_id, week_num):
             season_id=season_id, week_num=week_num
         ).delete()
 
+        any_scores = False
         for key in request.form:
             if not key.startswith('bowler_'):
                 continue
@@ -629,9 +630,8 @@ def tournament_entry(season_id, week_num):
             for g in range(1, num_games + 1):
                 val = request.form.get(f'game{g}_{row_id}', '').strip()
                 games.append(int(val) if val.isdigit() else None)
-
-            if all(g is None for g in games):
-                continue
+            if any(g is not None for g in games):
+                any_scores = True
 
             hcp = 0
             if use_handicap:
@@ -667,10 +667,13 @@ def tournament_entry(season_id, week_num):
             db.session.add(te)
 
         db.session.commit()
-        week.is_entered = True
-        db.session.commit()
-        cache.clear()
-        flash(f'{label} scores saved.', 'success')
+        if any_scores:
+            week.is_entered = True
+            db.session.commit()
+            cache.clear()
+            flash(f'{label} scores saved.', 'success')
+        else:
+            flash(f'{label} bowlers saved (no scores yet).', 'success')
         return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
 
     # GET — load existing entries
