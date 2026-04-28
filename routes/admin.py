@@ -1274,7 +1274,7 @@ def email_compose(season_id, week_num):
             html_body = _build_email_html(body_text, above_avg, season, week)
 
             pdf_bytes = None
-            if attach_pdf and not week.tournament_type:
+            if attach_pdf:
                 try:
                     pdf_bytes = _generate_prizes_pdf(season_id, week_num,
                                                      min_games=pdf_min_games, top10=pdf_top10)
