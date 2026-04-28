@@ -404,7 +404,8 @@
           <div id="selectedPreview" class="mb-2 text-muted small" style="display:none"></div>
           <div class="mb-3">
             <label for="emailSubject" class="form-label fw-semibold">Subject</label>
-            <input type="text" class="form-control" id="emailSubject" name="subject" required>
+            <input type="text" class="form-control" id="emailSubject" name="subject" required
+                   value="{{ league_settings.league_name if league_settings else '' }}">
           </div>
           <div class="mb-3">
             <label for="emailBody" class="form-label fw-semibold">Message</label>

@@ -93,6 +93,14 @@
       </div>
 
       <div class="mb-3">
+        <label class="form-label fw-bold">CC</label>
+        <input type="text" name="cc_emails" class="form-control font-monospace"
+               value=""
+               placeholder="(optional) cc1@example.com, cc2@example.com">
+        <div class="form-text">Comma-separated. Anyone you want visibly copied (officers, treasurer, etc.).</div>
+      </div>
+
+      <div class="mb-3">
         <label class="form-label fw-bold">BCC — Players</label>
         <select name="bcc_scope" id="bccScope" class="form-select form-select-sm w-auto">
           <option value="all">All active players ({{ all_roster|length }})</option>
@@ -221,7 +229,6 @@
       </div>
       <form method="post">
         <input type="hidden" name="send_confirmed" value="1">
-        <input type="hidden" name="body_text" value="{{ email_preview.body_text | e }}">
         <input type="hidden" name="attach_pdf" value="{{ '1' if email_preview.attach_pdf else '0' }}">
         <input type="hidden" name="pdf_min_games" value="{{ email_preview.pdf_min_games }}">
         {% if email_preview.pdf_top10 %}<input type="hidden" name="pdf_top10" value="1">{% endif %}
@@ -233,15 +240,30 @@
                    value="{{ email_preview.subject | e }}">
           </div>
           <div class="mb-3">
-            <label class="form-label fw-bold">TO — Captains</label>
+            <label class="form-label fw-bold">TO — Captains ({{ email_preview.to_list | length }})</label>
             <input type="text" name="to_emails" class="form-control font-monospace"
                    value="{{ email_preview.to_emails_raw | e }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">CC ({{ email_preview.cc_list | length }})</label>
+            <textarea name="cc_override" class="form-control font-monospace" rows="2"
+                      style="font-size:0.8rem"
+                      placeholder="(none)">{{ email_preview.cc_list | join('\n') }}</textarea>
+            <div class="form-text">One address per line.</div>
           </div>
           <div class="mb-3">
             <label class="form-label fw-bold">BCC — {{ email_preview.bcc_list | length }} recipients</label>
             <textarea name="bcc_override" class="form-control font-monospace" rows="4"
                       style="font-size:0.8rem">{{ email_preview.bcc_list | join('\n') }}</textarea>
             <div class="form-text">One address per line. Edit to add or remove recipients.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Body</label>
+            <textarea name="body_text" class="form-control" rows="10">{{ email_preview.body_text | e }}</textarea>
+            <div class="form-text">
+              The auto-generated prize, notable-bowling, and standings sections are appended
+              automatically below this text.
+            </div>
           </div>
         </div>
         <div class="modal-footer">
