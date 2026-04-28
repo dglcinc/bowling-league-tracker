@@ -1451,45 +1451,18 @@ def _build_email_html(body_text, above_avg, season, week):
 
 
 def _generate_prizes_pdf(season_id, week_num, min_games=9, top10=False):
-    """Render the prizes/standings page to PDF bytes via WeasyPrint."""
+    """Render the prizes/standings page to PDF bytes via WeasyPrint.
+
+    Uses the same `reports/week_prizes.html` template the navbar serves
+    so the emailed PDF and the on-screen page can never drift apart.
+    The template's @media print rules drive the print layout.
+    """
     from weasyprint import HTML
-    from flask import current_app, render_template as rt
-    from calculations import (get_weekly_prizes, get_team_standings,
-                               entry_total_wood, get_bowler_entries_bulk, build_leaders_list)
-    from models import MatchupEntry
+    from flask import render_template as rt
+    from routes.reports import build_week_prizes_context
 
-    season = db.session.get(Season, season_id)
-    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first()
-    prizes = get_weekly_prizes(season_id, week_num)
-
-    all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
-    bowler_ids = {e.bowler_id for e in all_entries if not e.is_blind and e.bowler_id}
-    ebowler = get_bowler_entries_bulk(bowler_ids, season_id)
-    total_wood = sum(entry_total_wood(e, season, season_id, week_num, ebowler) for e in all_entries)
-    player_count = sum(1 for e in all_entries if not e.is_blind)
-    blind_games  = sum(e.game_count for e in all_entries if e.is_blind)
-
-    leaders, avg_rows = build_leaders_list(season_id, week_num, min_games=min_games, top10=top10)
-
-    full_year       = sorted(get_team_standings(season_id, through_week=week_num), key=lambda s: s['team'].number)
-    fh_list         = get_team_standings(season_id, half=1, through_week=week_num)
-    sh_list         = get_team_standings(season_id, half=2, through_week=week_num)
-    first_half_map  = {s['team'].id: s['points'] for s in fh_list}
-    second_half_map = {s['team'].id: s['points'] for s in sh_list}
-    fh_max = max(first_half_map.values(),  default=0)
-    sh_max = max(second_half_map.values(), default=0)
-    fy_max = max((s['points'] for s in full_year), default=0)
-
-    html_str = rt('reports/week_prizes_pdf.html',
-                  season=season, week=week,
-                  prizes=prizes, leaders=leaders,
-                  standings=full_year,
-                  first_half_map=first_half_map, second_half_map=second_half_map,
-                  fh_max=fh_max, sh_max=sh_max, fy_max=fy_max,
-                  avg_rows=avg_rows, min_games=min_games, top10=top10,
-                  total_wood=total_wood, player_count=player_count,
-                  blind_games=blind_games)
-
+    ctx = build_week_prizes_context(season_id, week_num, min_games=min_games, top10=top10)
+    html_str = rt('reports/week_prizes.html', **ctx)
     return HTML(string=html_str).write_pdf()
 
 
