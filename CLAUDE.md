@@ -9,11 +9,11 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 **Important:** Never put player names, team names (which are player surnames), or any other personal information in the repository, code, comments, or documentation.
 
-## Repo / Branch State (as of 2026-04-26)
+## Repo / Branch State (as of 2026-04-27)
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
-- No open PRs — PRs #37–#112 all merged or closed to main
+- No open PRs — PRs #37–#114 all merged or closed to main
 
 ## League Structure
 
@@ -207,7 +207,8 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 - **`login_manager.login_view = 'auth.login'`** is set in `extensions.py`. Without it, `@login_required` calls `abort(401)` instead of redirecting to the login page. If users report bare 401 pages on login flows, verify this is still set and `auth.login` still resolves.
 - **Shared helpers in `calculations.py`** (PR #110): `entry_handicap(entry, season, season_id, week_num, entries_by_bowler=None)` and `entry_total_wood(...)` centralise the blind/non-blind handicap expression. `get_bowler_entries_bulk(bowler_ids, season_id)` pre-fetches season entries for N bowlers in 2 queries (pass result as `entries_by_bowler` to avoid N+1). `build_leaders_list(season_id, through_week, min_games, top10)` returns `(leaders, avg_rows)`. `get_latest_entered_week(season_id, exclude_cancelled=False)` replaces the inline `Week.query.filter_by(is_entered=True)...first()` pattern. `auto_assign_position_night(season_id, week_num)` moved here from `entry.py`.
 - **Cache invalidation**: `cache.clear()` must be called after `week.is_entered = True` in every scoring POST (matchup_entry, position_entry, tournament_entry). All three paths do this as of PR #110.
-- **Tournament entry dropdown JS**: new rows are created by cloning `firstSelect.innerHTML`, so `<optgroup>` elements added in the Jinja template automatically carry through to dynamically-added rows.
+- **Tournament entry dropdown JS**: new rows are created by cloning `firstSelect.innerHTML`, so `<optgroup>` elements added in the Jinja template automatically carry through to dynamically-added rows. New row's bowler-select is reset with `sel.selectedIndex = 0` (PR #114) — don't switch back to `sel.value = ''`, that's brittle when the cloned innerHTML carries a `selected` attribute.
+- **Tournament entry row buffer + draft saves** (PR #114): all three `tournament_entry` types (`indiv_scratch`, `indiv_hcp_1`, `indiv_hcp_2`) render `max(existing+5, 10)` rows so there's always headroom to add bowlers. POST handler persists rows that have a bowler/guest_name even when no scores are entered (names-only "draft" save). `week.is_entered` is only set when at least one score is present — names-only saves leave the week in draft state so the "scores posted" push notification doesn't fire prematurely.
 - **Email send flow** (`admin/email_compose`): two-step POST — first POST resolves recipients and renders a preview modal; second POST with `send_confirmed=1` actually sends. `bcc_override` textarea in the modal allows editing the BCC list before sending.
 - **Prizes page / print batch**: prize calculation skipped entirely for tournament weeks (`tournament_type` not None); YTD leaders and high averages are still shown for all weeks including tournament weeks.
 - **Gunicorn error log**: tracebacks go to `/tmp/bowling-app.err`, not `/tmp/bowling-app.log` (which is stdout/access).
