@@ -128,17 +128,15 @@
           <button onclick="window.print()" class="btn btn-sm btn-outline-light my-1 me-1">Print</button>
         </li>
 
-        {# ── Mobile view — direct link so it's easy to find ── #}
+        {# ── Mobile view — top-level link so users don't have to open Account ── #}
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('mobile.prefer_mobile') }}" title="Switch to mobile view">📱</a>
+          <a class="nav-link" href="{{ url_for('mobile.prefer_mobile') }}" title="Switch to mobile view">📱 Mobile view</a>
         </li>
 
         {# ── Account dropdown ── #}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Account</a>
           <ul class="dropdown-menu dropdown-menu-end">
-            <li><a class="dropdown-item" href="{{ url_for('mobile.prefer_mobile') }}">📱 Mobile view</a></li>
-            <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="{{ url_for('auth.passkeys') }}">Passkeys</a></li>
             <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">Sign out</a></li>
           </ul>

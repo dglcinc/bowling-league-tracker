@@ -28,8 +28,20 @@
       top: 0;
       z-index: 100;
     }
+    .m-header-row { display: flex; align-items: flex-start; gap: 12px; }
+    .m-header-titles { flex: 1; min-width: 0; }
     .m-header h1 { font-size: 1.1rem; margin: 0; font-weight: 600; }
     .m-header .m-subtitle { font-size: 0.8rem; opacity: 0.75; }
+    .m-header-toggle {
+      color: #fff;
+      text-decoration: none;
+      font-size: 0.8rem;
+      opacity: 0.85;
+      white-space: nowrap;
+      padding: 2px 0;
+      flex-shrink: 0;
+    }
+    .m-header-toggle:hover, .m-header-toggle:active { color: #fff; opacity: 1; }
 
     /* Content area */
     .m-content { padding: 16px; }
@@ -147,8 +159,15 @@
 <body>
 
 <div class="m-header">
-  <h1>{% block header_title %}🎳 MLC Bowling{% endblock %}</h1>
-  {% block header_sub %}<div class="m-subtitle">{{ season.name if season else '' }}</div>{% endblock %}
+  <div class="m-header-row">
+    <div class="m-header-titles">
+      <h1>{% block header_title %}🎳 MLC Bowling{% endblock %}</h1>
+      {% block header_sub %}<div class="m-subtitle">{{ season.name if season else '' }}</div>{% endblock %}
+    </div>
+    <a class="m-header-toggle"
+       href="{{ url_for('mobile.prefer_desktop', next=url_for('index')) }}"
+       title="Switch to desktop view">🖥️ Desktop</a>
+  </div>
 </div>
 
 <div class="m-content">
