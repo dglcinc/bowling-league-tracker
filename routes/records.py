@@ -258,7 +258,128 @@ def _tournament_winners_by_season(seasons):
     return rows
 
 
-def _fun_stats(summaries):
+def _resolve_placement_row(key, counts):
+    """Turn a per-key counter into a display row (skips deleted bowlers)."""
+    kind, val = key
+    total = counts['ones'] + counts['twos'] + counts['threes']
+    if kind == 'bowler':
+        bowler = db.session.get(Bowler, val)
+        if not bowler:
+            return None
+        return {
+            'bowler':   bowler,
+            'is_guest': False,
+            'name':     None,
+            'ones':     counts['ones'],
+            'twos':     counts['twos'],
+            'threes':   counts['threes'],
+            'total':    total,
+        }
+    return {
+        'bowler':   None,
+        'is_guest': True,
+        'name':     val,
+        'ones':     counts['ones'],
+        'twos':     counts['twos'],
+        'threes':   counts['threes'],
+        'total':    total,
+    }
+
+
+def _tournament_placements(seasons):
+    """
+    Count top-3 tournament placements per bowler across the given seasons.
+    Returns {'per_type': {tt: [rows]}, 'overall': [rows]}.
+
+    Individual tournaments (indiv_scratch, indiv_hcp_1, indiv_hcp_2) credit the
+    bowler (or guest_name) on each TournamentEntry whose place is 1/2/3.
+    Club championship credits every rostered bowler on a placing team.
+    """
+    season_ids = [s.id for s in seasons]
+    empty = {'per_type': {tt: [] for tt in (
+        'club_championship', 'indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2')},
+        'overall': []}
+    if not season_ids:
+        return empty
+
+    tourn_weeks = (Week.query
+                   .filter(Week.season_id.in_(season_ids))
+                   .filter(Week.tournament_type.isnot(None))
+                   .all())
+    weeks_by_season_type = defaultdict(dict)
+    for w in tourn_weeks:
+        weeks_by_season_type[w.season_id][w.tournament_type] = w.week_num
+
+    per_type_counts = {tt: defaultdict(lambda: {'ones': 0, 'twos': 0, 'threes': 0})
+                       for tt in ('club_championship', 'indiv_scratch',
+                                  'indiv_hcp_1', 'indiv_hcp_2')}
+
+    def _bump(bucket, key, place):
+        if place == 1:
+            bucket[key]['ones'] += 1
+        elif place == 2:
+            bucket[key]['twos'] += 1
+        elif place == 3:
+            bucket[key]['threes'] += 1
+
+    # Individual tournaments
+    for tt in ('indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2'):
+        for sid in season_ids:
+            wnum = weeks_by_season_type.get(sid, {}).get(tt)
+            if wnum is None:
+                continue
+            entries = (TournamentEntry.query
+                       .filter_by(season_id=sid, week_num=wnum)
+                       .filter(TournamentEntry.place.in_([1, 2, 3]))
+                       .all())
+            for e in entries:
+                if e.bowler_id:
+                    key = ('bowler', e.bowler_id)
+                elif e.guest_name:
+                    key = ('guest', e.guest_name.strip())
+                else:
+                    continue
+                _bump(per_type_counts[tt], key, e.place)
+
+    # Club championship: credit roster of placing teams
+    club_results = (ClubChampionshipResult.query
+                    .filter(ClubChampionshipResult.season_id.in_(season_ids))
+                    .filter(ClubChampionshipResult.place.in_([1, 2, 3]))
+                    .all())
+    if club_results:
+        team_ids = {r.team_id for r in club_results}
+        rosters = Roster.query.filter(Roster.team_id.in_(team_ids)).all()
+        roster_by_team = defaultdict(list)
+        for r in rosters:
+            roster_by_team[(r.team_id, r.season_id)].append(r.bowler_id)
+        for cr in club_results:
+            for bid in roster_by_team.get((cr.team_id, cr.season_id), []):
+                _bump(per_type_counts['club_championship'], ('bowler', bid), cr.place)
+
+    overall_counts = defaultdict(lambda: {'ones': 0, 'twos': 0, 'threes': 0})
+    per_type = {}
+    for tt, counts in per_type_counts.items():
+        rows = []
+        for key, c in counts.items():
+            row = _resolve_placement_row(key, c)
+            if row:
+                rows.append(row)
+            overall_counts[key]['ones']   += c['ones']
+            overall_counts[key]['twos']   += c['twos']
+            overall_counts[key]['threes'] += c['threes']
+        rows.sort(key=lambda r: (-r['total'], -r['ones'], -r['twos']))
+        per_type[tt] = rows[:10]
+
+    overall = []
+    for key, c in overall_counts.items():
+        row = _resolve_placement_row(key, c)
+        if row:
+            overall.append(row)
+    overall.sort(key=lambda r: (-r['total'], -r['ones'], -r['twos']))
+    return {'per_type': per_type, 'overall': overall[:20]}
+
+
+def _fun_stats(summaries, seasons):
     """Novelty stats not covered by the standard leaderboards."""
     min_qualified = 30
 
@@ -320,6 +441,8 @@ def _fun_stats(summaries):
                 'week_num': wnum,
             })
 
+    placements = _tournament_placements(seasons)
+
     return {
         'worst_avg':         worst_avg,
         'most_season_games': most_season_games,
@@ -327,6 +450,8 @@ def _fun_stats(summaries):
         'most_200':          most_200,
         'lowest_games':      lowest_games,
         'min_qualified':     min_qualified,
+        'tourn_per_type':    placements['per_type'],
+        'tourn_overall':     placements['overall'],
     }
 
 
@@ -433,7 +558,7 @@ def records():
     active = Season.query.filter_by(is_active=True).first()
     tournament_labels = (active or seasons[-1]).tournament_labels if seasons else {}
 
-    fun = _fun_stats(filtered)
+    fun = _fun_stats(filtered, filtered_seasons)
 
     # All distinct team names for the builder team filter
     all_team_names = sorted({r['team'].name for r in summaries if r['team']})
