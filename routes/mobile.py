@@ -338,23 +338,60 @@ def week_scores(week_num):
         return redirect(url_for('mobile.scores'))
 
     week = Week.query.filter_by(season_id=season.id, week_num=week_num).first_or_404()
-    entries = (MatchupEntry.query
-               .filter_by(season_id=season.id, week_num=week_num)
-               .filter(MatchupEntry.is_blind == False)
-               .filter(MatchupEntry.bowler_id != None)
-               .order_by(MatchupEntry.team_id, MatchupEntry.matchup_num)
-               .all())
 
-    # Group by team
-    teams_dict = {}
-    for e in entries:
-        if e.team_id not in teams_dict:
-            teams_dict[e.team_id] = {'team': e.team, 'entries': []}
-        teams_dict[e.team_id]['entries'].append(e)
-    team_groups = sorted(teams_dict.values(), key=lambda x: x['team'].number)
+    # Individual tournaments use TournamentEntry; club_championship and regular
+    # weeks use MatchupEntry (club_championship is scored as a position night).
+    is_indiv_tournament = week.tournament_type in ('indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2')
+
+    tournament_rows = None
+    tournament_label = None
+    is_scratch_tournament = False
+    team_groups = []
+
+    if is_indiv_tournament:
+        is_scratch_tournament = (week.tournament_type == 'indiv_scratch')
+        tournament_label = (season.tournament_labels or {}).get(week.tournament_type, 'Tournament')
+        t_entries = (TournamentEntry.query
+                     .filter_by(season_id=season.id, week_num=week_num)
+                     .all())
+        rows = []
+        for e in t_entries:
+            games = [g for g in (e.game1, e.game2, e.game3, e.game4, e.game5) if g is not None]
+            scratch = sum(games)
+            hcp = e.handicap or 0
+            total_with_hcp = scratch + hcp * len(games)
+            rows.append({
+                'name': e.bowler.display_name if e.bowler else (e.guest_name or '(unknown)'),
+                'games': games,
+                'handicap': hcp,
+                'scratch': scratch,
+                'total_with_hcp': total_with_hcp,
+            })
+        sort_key = (lambda r: -r['scratch']) if is_scratch_tournament else (lambda r: -r['total_with_hcp'])
+        rows.sort(key=sort_key)
+        tournament_rows = rows
+    else:
+        entries = (MatchupEntry.query
+                   .filter_by(season_id=season.id, week_num=week_num)
+                   .filter(MatchupEntry.is_blind == False)
+                   .filter(MatchupEntry.bowler_id != None)
+                   .order_by(MatchupEntry.team_id, MatchupEntry.matchup_num)
+                   .all())
+
+        # Group by team
+        teams_dict = {}
+        for e in entries:
+            if e.team_id not in teams_dict:
+                teams_dict[e.team_id] = {'team': e.team, 'entries': []}
+            teams_dict[e.team_id]['entries'].append(e)
+        team_groups = sorted(teams_dict.values(), key=lambda x: x['team'].number)
 
     return render_template('mobile/week_scores.html',
-                           season=season, week=week, team_groups=team_groups)
+                           season=season, week=week,
+                           team_groups=team_groups,
+                           tournament_rows=tournament_rows,
+                           tournament_label=tournament_label,
+                           is_scratch_tournament=is_scratch_tournament)
 
 
 # ---------------------------------------------------------------------------
