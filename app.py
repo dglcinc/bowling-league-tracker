@@ -59,6 +59,8 @@ _VIEWER_DEFAULTS = [
     ('records.bowler_dir',    'Bowler Directory',    True),
     ('entry.week_list',       'Scores (week list)',  True),
     ('entry.week_entry',      'Scores (week view)',  True),
+    ('chat.index',            'Ask (LLM stats)',     True),
+    ('chat.ask',              'Ask (LLM stats)',     True),
 ]
 
 
@@ -260,6 +262,7 @@ def create_app():
     from routes.payout import payout_bp
     from routes.records import records_bp
     from routes.mobile import mobile_bp
+    from routes.chat import chat_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(admin_bp, url_prefix='/admin')
@@ -268,6 +271,7 @@ def create_app():
     app.register_blueprint(payout_bp, url_prefix='/payout')
     app.register_blueprint(records_bp, url_prefix='/reports')
     app.register_blueprint(mobile_bp, url_prefix='/m')
+    app.register_blueprint(chat_bp, url_prefix='/chat')
 
     # Mobile redirect — runs before auth check so mobile users land on /m/ by default.
     # Skipped for: static files, auth routes, mobile routes themselves, prefer_desktop cookie.
