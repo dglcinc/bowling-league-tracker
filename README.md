@@ -76,7 +76,7 @@ Full payout calculator with printable output for the end-of-season banquet.
 | High Games & Averages | `/reports/season/<id>/high-games` | Average leaders and top-10 lists for HG/HS scratch and handicap; filterable by minimum games |
 | Per-Week Prizes | `/reports/season/<id>/week/<week>/prizes` | Four prize categories with tie handling; team standings; YTD leaders |
 | Bowler Detail | `/reports/season/<id>/bowler/<id>` | Individual bowler week-by-week breakdown; clicking any score navigates to the detail page for that week |
-| All-Time Records | `/records` | All-time leaderboards, season comparison table, tournament winners by year, Most Improved, Fun Stats, and a Stat Builder. Venue filter available. Sortable columns throughout. |
+| All-Time Records | `/records` | All-time leaderboards, season comparison table, tournament winners by year, Most Improved, Fun Stats, and an Ask (LLM) tab. Venue filter available. Sortable columns throughout. |
 | Bowler Directory | `/bowler_dir` | All bowlers with career highlights and season badges |
 | Payout Overview | `/payout/season/<id>` | YTD prize counts, weekly prize history, Most Improved |
 | Payout Summary | `/payout/season/<id>/summary` | Full end-of-season payout calculation with currency breakdown |
