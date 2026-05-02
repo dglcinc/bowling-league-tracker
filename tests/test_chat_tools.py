@@ -31,15 +31,14 @@ class ChatToolsTest(unittest.TestCase):
         cls.ctx = cls.app.app_context()
         cls.ctx.push()
 
-        # Pick a season with entered data to exercise season-scoped tools.
-        seasons = chat_tools.list_seasons()
-        if not seasons:
-            raise unittest.SkipTest("No seasons with entered data — DB is empty.")
-
-        # Prefer 2025-2026 if present, else the most recent entered season.
-        match = next((s for s in seasons if s['name'] == '2025-2026'), None)
-        cls.season_id = (match or seasons[-1])['id']
-        cls.season_name = (match or seasons[-1])['name']
+        # Pick a season to exercise season-scoped tools. Prefer 2025-2026
+        # if present, else the most recent season by start_date.
+        season = (Season.query.filter_by(name='2025-2026').first()
+                  or Season.query.order_by(Season.start_date.desc()).first())
+        if season is None:
+            raise unittest.SkipTest("No seasons in DB.")
+        cls.season_id = season.id
+        cls.season_name = season.name
 
         # Find a bowler with career data in this season — Lewis if rostered, else
         # the first roster entry's bowler.
@@ -78,27 +77,10 @@ class ChatToolsTest(unittest.TestCase):
             chat_tools.dispatch('nope', {})
 
     def test_dispatch_routes_by_name(self):
-        result = chat_tools.dispatch('list_seasons', {})
-        self.assertTrue(len(result) > 0)
+        result = chat_tools.dispatch('query_db', {'sql': 'SELECT 1 AS one'})
+        self.assertEqual(result['rows'], [{'one': 1}])
 
     # ---- per-tool smoke tests ----
-
-    def test_list_seasons(self):
-        rows = chat_tools.list_seasons()
-        self.assertGreater(len(rows), 0)
-        for r in rows:
-            self.assertIn('id', r)
-            self.assertIn('name', r)
-            self.assertIn('venue', r)
-
-    def test_list_bowlers_substring(self):
-        rows = chat_tools.list_bowlers(last_name_substring='e')
-        self.assertGreater(len(rows), 0)
-        self.assertTrue(all('e' in (r['last_name'] or '').lower() for r in rows))
-
-    def test_list_bowlers_by_season(self):
-        rows = chat_tools.list_bowlers(season_id=self.season_id)
-        self.assertGreater(len(rows), 0)
 
     def test_bowler_career_stats(self):
         rows = chat_tools.bowler_career_stats(self.bowler_id)
@@ -178,12 +160,6 @@ class ChatToolsTest(unittest.TestCase):
         from models import Bowler
         if Bowler.query.count() > 200:
             self.assertTrue(out['truncated'])
-
-    def test_team_standings(self):
-        rows = chat_tools.team_standings(self.season_id)
-        self.assertGreater(len(rows), 0)
-        self.assertIn('points', rows[0])
-        self.assertIn('team', rows[0])
 
     def test_weekly_prizes(self):
         # Find the first week with entries in the test season.
