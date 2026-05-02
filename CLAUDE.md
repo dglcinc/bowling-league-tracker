@@ -140,7 +140,7 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 - `team_points` — season points totals table
 
 **`records_bp`** (`/records`, `/bowler_dir`)
-- `records` — all-time leaderboards, season comparison, tournament winners by year, most improved; venue filter (`?venue=all/mountain_lakes_club/boonton_lanes`); tab state persisted via URL hash; `?at=top|bottom|all` filter on All-Time tab; Fun Stats tab (lowest avg, most games, most 200+, lowest individual games); Stat Builder tab; `/stats/suggest` POST logs stat ideas
+- `records` — all-time leaderboards, season comparison, tournament winners by year, most improved; venue filter (`?venue=all/mountain_lakes_club/boonton_lanes`); tab state persisted via URL hash; `?at=top|bottom|all` filter on All-Time tab; Fun Stats tab (lowest avg, most games, most 200+, lowest individual games); Ask tab (LLM stats assistant)
 - Score cells throughout are invisible links (`text-decoration-none text-body`) — clicking any score navigates to `bowler_detail` for that season, scrolled to the specific week via `#week-N` anchor. `get_bowler_stats()` now returns `ytd_high_*_week` fields. Pages arrived via score links pass `?back=records`; bowler_detail breadcrumb swaps "Bowler Directory" for "Records" when `back=records` is present.
 - `bowler_dir` — alphabetical list of all bowlers with career highlights and season badges
 

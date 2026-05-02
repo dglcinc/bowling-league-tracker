@@ -3,8 +3,7 @@ Records route: all-time leaderboards and season comparison table.
 """
 
 from collections import defaultdict
-from flask import Blueprint, flash, redirect, render_template, request, url_for
-from flask_login import current_user, login_required
+from flask import Blueprint, render_template, request
 from models import (db, Season, Week, Bowler, MatchupEntry, TournamentEntry, TeamPoints, Roster, Team, ClubChampionshipResult)
 from calculations import get_bowler_stats, get_team_standings
 from extensions import cache
@@ -455,33 +454,6 @@ def _fun_stats(summaries, seasons):
     }
 
 
-_BUILDER_METRICS = {
-    'avg':        ('avg',                'Season Average'),
-    'games':      ('games',              'Games Bowled'),
-    'hg_scratch': ('high_game_scratch',  'High Game (Scratch)'),
-    'hg_hcp':     ('high_game_hcp',      'High Game (Hcp)'),
-    'hs_scratch': ('high_series_scratch','High Series (Scratch)'),
-    'hs_hcp':     ('high_series_hcp',    'High Series (Hcp)'),
-}
-
-
-def _stat_builder(summaries, all_seasons, metric_key, season_id, team_name,
-                  min_games, sort_asc):
-    """Filter summaries and return a ranked list for the stat builder."""
-    rows = summaries
-
-    if season_id:
-        rows = [r for r in rows if r['season'].id == season_id]
-    if team_name:
-        rows = [r for r in rows if r['team'] and r['team'].name == team_name]
-    if min_games:
-        rows = [r for r in rows if r['games'] >= min_games]
-
-    field, label = _BUILDER_METRICS.get(metric_key, ('avg', 'Season Average'))
-    rows = sorted(rows, key=lambda r: r[field], reverse=not sort_asc)[:50]
-    return rows, label
-
-
 _VENUE_LABELS = {
     'mountain_lakes_club': 'Mountain Lakes Club',
     'boonton_lanes':       'Boonton Lanes',
@@ -499,24 +471,13 @@ def records():
     if at_filter not in ('top', 'bottom', 'all'):
         at_filter = 'top'
 
-    # Stat builder params
-    builder_metric   = request.args.get('bm', 'avg')
-    builder_season   = request.args.get('bs', '')
-    builder_team     = request.args.get('bt', '')
-    builder_mingames = int(request.args.get('bmg', 0) or 0)
-    builder_asc      = request.args.get('basc', '') == '1'
-    builder_season_id = int(builder_season) if builder_season.isdigit() else None
-
     empty_ctx = dict(
         seasons=[], venue_filter=venue_filter, venue_labels=_VENUE_LABELS,
         at_filter=at_filter,
         all_time_hg_s=[], all_time_hs_s=[], all_time_hg_h=[], all_time_hs_h=[],
         all_time_avg=[], top_season_avgs=[], most_improved=[], season_comparison=[],
         tournament_winners=[], tournament_labels={},
-        fun_stats={}, builder_results=[], builder_label='',
-        builder_metric=builder_metric, builder_season=builder_season,
-        builder_team=builder_team, builder_mingames=builder_mingames,
-        builder_asc=builder_asc, all_team_names=[],
+        fun_stats={},
     )
     if not seasons:
         return render_template('reports/records.html', **empty_ctx)
@@ -560,18 +521,6 @@ def records():
 
     fun = _fun_stats(filtered, filtered_seasons)
 
-    # All distinct team names for the builder team filter
-    all_team_names = sorted({r['team'].name for r in summaries if r['team']})
-
-    # Stat builder results — only compute when builder params are present
-    builder_results, builder_label = [], ''
-    if request.args.get('bm'):
-        builder_results, builder_label = _stat_builder(
-            filtered, filtered_seasons,
-            builder_metric, builder_season_id, builder_team,
-            builder_mingames, builder_asc,
-        )
-
     return render_template('reports/records.html',
                            seasons=seasons,
                            venue_filter=venue_filter,
@@ -587,33 +536,7 @@ def records():
                            season_comparison=season_comp,
                            tournament_winners=tournament_winners,
                            tournament_labels=tournament_labels,
-                           fun_stats=fun,
-                           builder_results=builder_results,
-                           builder_label=builder_label,
-                           builder_metric=builder_metric,
-                           builder_season=builder_season,
-                           builder_team=builder_team,
-                           builder_mingames=builder_mingames,
-                           builder_asc=builder_asc,
-                           all_team_names=all_team_names)
-
-
-@records_bp.route('/stats/suggest', methods=['POST'])
-@login_required
-def suggest_stat():
-    """Log a bowler's stat suggestion to a file for admin review."""
-    import os, datetime
-    suggestion = request.form.get('suggestion', '').strip()
-    if suggestion:
-        log_path = os.path.expanduser('~/bowling-data/stat_suggestions.txt')
-        name = ''
-        if current_user.is_authenticated:
-            name = f'{current_user.first_name} {current_user.last_name}'.strip()
-        with open(log_path, 'a') as f:
-            ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
-            f.write(f'[{ts}] {name}: {suggestion}\n')
-    flash('Thanks! Your stat idea has been logged.', 'success')
-    return redirect(url_for('records.records') + '#tab-builder')
+                           fun_stats=fun)
 
 
 @records_bp.route('/bowler_dir')
