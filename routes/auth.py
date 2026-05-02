@@ -442,6 +442,7 @@ def webauthn_register_complete():
 
 
 @auth_bp.route('/webauthn/authenticate/begin', methods=['POST'])
+@limiter.limit('20 per minute')
 def webauthn_authenticate_begin():
     from webauthn import generate_authentication_options, options_to_json
     from webauthn.helpers.structs import (

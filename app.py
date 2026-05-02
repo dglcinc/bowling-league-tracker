@@ -290,6 +290,10 @@ def create_app():
         if ep is None or ep == 'static':
             return
 
+        # Health probe is public — no auth, no DB, no log row
+        if ep == 'healthz':
+            return
+
         # Auth routes and root index are always public or universally accessible
         if ep.startswith('auth.'):
             return
@@ -328,7 +332,7 @@ def create_app():
     def log_request(response):
         try:
             ep = request.endpoint
-            if ep and ep != 'static' and ep != 'admin.activity':
+            if ep and ep not in ('static', 'admin.activity', 'healthz'):
                 from flask_login import current_user
                 bid = current_user.id if current_user.is_authenticated else None
                 ua  = (request.user_agent.string or '')[:256]
@@ -383,6 +387,10 @@ def create_app():
             'latest_entered': latest_entered,
             'seasons_with_data': seasons_with_data,
         }
+
+    @app.route('/healthz')
+    def healthz():
+        return 'ok', 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
     @app.route('/')
     def index():
