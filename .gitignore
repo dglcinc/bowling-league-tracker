@@ -9,3 +9,6 @@ snapshots/
 .DS_Store
 DEPLOYMENT.md
 .claude/
+PLAN.md
+ralph.sh
+ralph-finish.sh
