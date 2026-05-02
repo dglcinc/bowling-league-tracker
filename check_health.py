@@ -23,7 +23,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv()
 
-HEALTH_URL = 'http://localhost:5001/'
+HEALTH_URL = 'http://localhost:5001/healthz'
 SENTINEL   = '/tmp/bowling-health-down'
 TIMEOUT    = 10  # seconds
 RECIPIENT  = 'david@dglc.com'
