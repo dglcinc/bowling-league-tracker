@@ -11,3 +11,4 @@ msal>=1.29.0
 webauthn>=2.0.0
 pywebpush>=2.0.0
 requests>=2.31.0
+anthropic>=0.50.0
