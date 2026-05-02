@@ -109,10 +109,17 @@
       e.preventDefault();
       if (holding) return;
       holding = true;
-      baseText = input.value;
+      // Press-to-talk replaces whatever was in the box, so the released
+      // utterance becomes the question that gets submitted.
+      input.value = '';
+      baseText = '';
       micBtn.classList.remove('btn-outline-secondary');
       micBtn.classList.add('btn-danger');
       startRecognition();
+    }
+
+    function submitIfNonEmpty() {
+      if (input.value.trim()) form.requestSubmit();
     }
 
     function pressUp(e) {
@@ -127,9 +134,11 @@
       var pending = recognition;
       recognition = null;
       setTimeout(function () {
-        if (pending) {
-          try { pending.stop(); } catch (_) {}
-        }
+        if (!pending) { submitIfNonEmpty(); return; }
+        // Submit once the engine has emitted its final transcript, not
+        // before — onend fires after the last onresult.
+        pending.onend = submitIfNonEmpty;
+        try { pending.stop(); } catch (_) { submitIfNonEmpty(); }
       }, 350);
     }
 
