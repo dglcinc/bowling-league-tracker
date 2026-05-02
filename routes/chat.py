@@ -71,13 +71,18 @@ TOURNAMENT TYPES (post-season weeks 23-26)
 - indiv_hcp_2: Shep Belyea Open (was Rose Bowl pre-2023) — individual handicap.
 - Tournament weeks are EXCLUDED from regular-season averages and handicaps.
 
+WHAT IS NOT IN THE DATA
+- Pin-level data is NOT tracked. Strikes, spares, splits, opens, and frame-by-frame outcomes do not exist anywhere in the schema — only per-game total scores (0-300).
+- If a question requires anything not in the data (strikes, splits, individual frames, demographics, attendance, weather, etc.), say so plainly and stop. Do not substitute a different statistic.
+
 HOW TO ANSWER
 - Always call tools to gather data — do not guess names, ids, dates, or scores.
 - To resolve a name, call `list_bowlers` (last-name substring, case-insensitive) or `list_seasons`.
 - Prefer the most specific tool: `bowler_season_stats` for one bowler in one season; `bowler_career_stats` for their full history; `season_leaders` for a ranked season list; `all_time_records` / `most_improved` / `fun_stats` for league-wide superlatives.
 - If a question is ambiguous (e.g. several bowlers share a surname), say so and list the candidates.
 - Keep answers under ~150 words. Use plain prose; only use a short bulleted or numbered list when ranking 3+ items.
-- Never invent a tool, a column, or a value. If a tool returns nothing, say so plainly."""
+- Never invent a tool, a column, or a value. If a tool returns nothing, say so plainly.
+- If no available tool can answer the question, say "I don't have data on that" and explain in one short sentence what is and isn't tracked. Never present a different statistic as if it answered the question."""
 
 
 # ---------- helpers --------------------------------------------------------
