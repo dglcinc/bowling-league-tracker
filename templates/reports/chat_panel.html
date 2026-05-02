@@ -26,6 +26,15 @@
 
 <div id="askAnswer" class="mb-3" style="white-space: pre-wrap;"></div>
 
+<div id="askFeedback" class="mb-3" style="display:none;">
+  <span class="text-muted small me-2">Was this helpful?</span>
+  <button id="askThumbUp"   type="button" class="btn btn-sm btn-outline-success"
+          aria-label="Helpful">👍</button>
+  <button id="askThumbDown" type="button" class="btn btn-sm btn-outline-danger ms-1"
+          aria-label="Not helpful">👎</button>
+  <span id="askFeedbackStatus" class="text-muted small ms-2"></span>
+</div>
+
 <details id="askToolsPanel" class="text-muted small" style="display:none;">
   <summary>Tools used</summary>
   <ul id="askToolsList" class="mb-0"></ul>
@@ -41,6 +50,10 @@
   var panel   = document.getElementById('askToolsPanel');
   var toolsUl = document.getElementById('askToolsList');
   var micBtn  = document.getElementById('askMic');
+  var fb      = document.getElementById('askFeedback');
+  var fbUp    = document.getElementById('askThumbUp');
+  var fbDown  = document.getElementById('askThumbDown');
+  var fbStat  = document.getElementById('askFeedbackStatus');
 
   // ─── Web Speech API: press-and-hold dictation ────────────────────────────
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -125,6 +138,10 @@
     answer.textContent = '';
     toolsUl.innerHTML = '';
     panel.style.display = 'none';
+    fb.style.display = 'none';
+    fbStat.textContent = '';
+    fbUp.disabled = false;
+    fbDown.disabled = false;
     status.textContent = 'Thinking…';
     submit.disabled = true;
 
@@ -157,7 +174,10 @@
           if (payload.type === 'token')      answer.textContent += payload.text;
           else if (payload.type === 'tool_call') renderToolCall(payload);
           else if (payload.type === 'error') status.textContent = payload.message;
-          else if (payload.type === 'done')  status.textContent = '';
+          else if (payload.type === 'done')  {
+            status.textContent = '';
+            if (answer.textContent.trim()) fb.style.display = '';
+          }
         }
       }
     } catch (err) {
@@ -166,5 +186,31 @@
       submit.disabled = false;
     }
   });
+
+  async function sendFeedback(helpful) {
+    fbUp.disabled = true;
+    fbDown.disabled = true;
+    fbStat.textContent = 'Saving…';
+    try {
+      var resp = await fetch('/chat/feedback', {
+        method:  'POST',
+        headers: {'Content-Type': 'application/json'},
+        body:    JSON.stringify({helpful: helpful}),
+      });
+      if (resp.ok) {
+        fbStat.textContent = 'Thanks!';
+      } else {
+        fbStat.textContent = 'Could not save';
+        fbUp.disabled = false;
+        fbDown.disabled = false;
+      }
+    } catch (e) {
+      fbStat.textContent = 'Network error';
+      fbUp.disabled = false;
+      fbDown.disabled = false;
+    }
+  }
+  fbUp.addEventListener('click',   function () { sendFeedback(true);  });
+  fbDown.addEventListener('click', function () { sendFeedback(false); });
 })();
 </script>

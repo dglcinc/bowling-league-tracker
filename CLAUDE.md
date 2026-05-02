@@ -246,6 +246,16 @@ with app.app_context():
         # call send_otp_invite, send_otp, etc.
 ```
 
+### Local LLM stats assistant (`/chat`, Records → Ask tab)
+- **Surface**: standalone page at `/chat` plus an "Ask" tab on `/records` (partial: `templates/reports/chat_panel.html`). Streaming Q&A — type a stats question, watch tokens render live, tool-call disclosure panel shows what the model looked up. Optional press-and-hold mic button uses the browser's Web Speech API (iOS Safari + Chrome/Edge); hidden where unsupported. Thumbs-up/down under each answer POSTs to `POST /chat/feedback`, which updates `ChatLog.helpful` on the caller's most recent row.
+- **Routes** (`routes/chat.py`, blueprint `chat_bp` at `/chat`): `GET /chat` (page), `POST /chat/ask` (SSE stream — `tool_call` / `token` / `done` / `error` events), `POST /chat/feedback`. All `@login_required`. `chat.ask` is in `viewer_permissions` so viewers see the same UI as editors. Per-IP rate limit on `/chat/ask`: `20/hour;5/minute`.
+- **Ollama service**: `127.0.0.1:11434` via `~/Library/LaunchAgents/com.dglc.ollama.plist` (loaded as `com.dglc.ollama`). Localhost only — never exposed to the internet. Reload after edits with `launchctl unload …/com.dglc.ollama.plist && launchctl load …/com.dglc.ollama.plist`.
+- **Model**: `llama3.1:8b-instruct-q4_K_M` (~5 GB resident). Measured warm generation on the M4 base ≈ 20 tok/s — streaming is **required**, a non-streamed answer feels broken. Caps in `routes/chat.py`: 4 tool-call rounds, 30 s wall-clock, 2048-token answer.
+- **Architecture: tool calling, NOT text-to-SQL**. The model never writes SQL and never sees the DB. It picks from the ~10 read-only tools in `chat_tools.py`: `list_seasons`, `list_bowlers`, `bowler_career_stats`, `bowler_season_stats`, `season_leaders`, `all_time_records`, `most_improved`, `fun_stats`, `tournament_winners`, `team_standings`, `weekly_prizes`. Each wraps an existing helper in `calculations.py` / `routes/records.py` so the league rules (handicap 3-case, blind handling, tournament weeks excluded from averages) are reused, not re-derived.
+- **System prompt**: `SYSTEM_PROMPT` in `routes/chat.py` — league overview + handicap rules + tournament-types glossary + answering guidance. Kept under ~1500 tokens.
+- **`ChatLog` model** (`chat_log` table): `id, user_id (FK bowlers.id, nullable), question_text, answer_text, tool_calls_json, helpful (nullable bool), created_at`. Written best-effort at end of each `/chat/ask` stream. Migration in `_migrate_db()` is additive (try/except `CREATE TABLE`).
+- **Memory headroom**: Mac mini M4 base = 16 GB. Llama 3.1 8B Q4 ≈ 5 GB resident; gunicorn workers + SQLite + macOS leave plenty of room. If we ever swap in a 13B / Q5 quant, profile RSS first — Ollama keeps the model loaded between requests, so eviction pressure shows up in production, not in CLI tests.
+
 ### Push notifications
 - `PushSubscription` model + `push_subscriptions` table (endpoint, subscription JSON, platform, 3 preference booleans)
 - `/m/push/subscribe`, `/m/push/unsubscribe`, `/m/push/preferences`, `/m/push/vapid-public-key` routes
