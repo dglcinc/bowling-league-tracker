@@ -35,7 +35,7 @@ from flask_login import current_user, login_required
 
 from extensions import limiter
 from models import ChatLog, db
-from chat_tools import TOOL_SCHEMAS, dispatch
+from chat_tools import TOOL_SCHEMAS, dispatch  # TOOL_SCHEMAS is in Anthropic tool-spec shape.
 
 
 chat_bp = Blueprint('chat', __name__)
@@ -112,22 +112,6 @@ HOW TO ANSWER
 - Never invent a tool, a column, or a value. If a tool returns nothing, say so plainly.
 - If no available tool or query can answer the question, say "I don't have data on that" and explain in one short sentence what is and isn't tracked. Never substitute a different statistic.
 - Make tool calls silently. Do not narrate which tool you are about to call, what you found in intermediate results, or what you are about to do next. Output only the final answer to the user's question."""
-
-
-# ---------- tool schema adapter --------------------------------------------
-
-def _to_anthropic_tools(ollama_tools):
-    """Convert Ollama-format tool schemas to the Anthropic tool spec.
-    chat_tools.TOOL_SCHEMAS is shaped for /api/chat — nest under 'function'
-    with 'parameters'. Anthropic wants flat: name, description, input_schema."""
-    return [{
-        'name':         t['function']['name'],
-        'description':  t['function']['description'],
-        'input_schema': t['function']['parameters'],
-    } for t in ollama_tools]
-
-
-ANTHROPIC_TOOLS = _to_anthropic_tools(TOOL_SCHEMAS)
 
 
 # ---------- helpers --------------------------------------------------------
@@ -224,7 +208,7 @@ def ask():
                     model=CHAT_MODEL,
                     max_tokens=ANSWER_TOKEN_CAP,
                     system=system,
-                    tools=ANTHROPIC_TOOLS,
+                    tools=TOOL_SCHEMAS,
                     messages=messages,
                 ) as stream:
                     for event in stream:
