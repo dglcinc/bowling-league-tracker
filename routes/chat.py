@@ -19,7 +19,7 @@ reach the browser:
 Caps: max 4 tool-call rounds, 30 s wall-clock, 2 048 generated tokens.
 
 Backend: Anthropic Claude API. Requires `ANTHROPIC_API_KEY` in the
-environment. Model is `claude-sonnet-4-6` by default; override with
+environment. Model is `claude-haiku-4-5` by default; override with
 `CHAT_MODEL`. The system prompt + tool catalog are cached via
 `cache_control` (5-minute TTL) so a burst of questions in one session
 shares the same prefix.
@@ -43,7 +43,7 @@ chat_bp = Blueprint('chat', __name__)
 
 # ---------- configuration --------------------------------------------------
 
-CHAT_MODEL = os.environ.get('CHAT_MODEL', 'claude-sonnet-4-6')
+CHAT_MODEL = os.environ.get('CHAT_MODEL', 'claude-haiku-4-5')
 
 MAX_TOOL_ROUNDS = 4
 WALL_CLOCK_SECONDS = 30
