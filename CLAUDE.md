@@ -9,11 +9,12 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 **Important:** Never put player names, team names (which are player surnames), or any other personal information in the repository, code, comments, or documentation.
 
-## Repo / Branch State (as of 2026-04-30)
+## Repo / Branch State (as of 2026-05-02)
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
-- No open PRs — PRs #37–#121 all merged or closed to main
+- One open PR: **#133** (chat: add `tournament_placement_leaders` tool) — superseded by `query_db` in #135 and likely safe to close.
+- PRs #37–#136 merged to main (#136 = chat tool surface trimmed to 7 + UI copy).
 
 ## League Structure
 
@@ -227,6 +228,7 @@ Production is live at **https://mlb.dglc.com** on Mac Mini M4 (`utilityserver@10
 
 - SSH username is always `utilityserver` — never `david` or any other name.
 - Deploy from dev Mac (single command): `ssh macmini '~/bin/deploy-bowling.sh'`
+- `~/bin/deploy-bowling.sh` runs `git checkout main && git pull --ff-only && launchctl restart`. The `checkout main` is deliberate — Ralph loops can leave the working dir on a feature branch, and prior to 2026-05-02 the deploy would happily ship that branch's HEAD to production. Hardened after Ralph's `ralph-finish.sh` accidentally deployed an unmerged stack of 6 PRs.
 - Backup: `~/bin/backup-bowling.sh` → `~/bowling-data/backups/`, 3am daily via launchd; 30-day retention.
 - Route 53: `~/bin/update-r53.sh`, profile `dglc-admin`, zone `Z0225171IDMZU3O5FZM0`, every 10 min via launchd.
 - Health check: `check_health.py` + `com.dglc.bowling-health` launchd timer (5-min interval). Pings `localhost:5001`; emails `david@dglc.com` via Graph API on first failure and again on recovery. Sentinel file `/tmp/bowling-health-down` prevents repeat alerts. Logs: `/tmp/bowling-health.log` / `/tmp/bowling-health.err`.
@@ -246,15 +248,17 @@ with app.app_context():
         # call send_otp_invite, send_otp, etc.
 ```
 
-### Local LLM stats assistant (`/chat`, Records → Ask tab)
-- **Surface**: standalone page at `/chat` plus an "Ask" tab on `/records` (partial: `templates/reports/chat_panel.html`). Streaming Q&A — type a stats question, watch tokens render live, tool-call disclosure panel shows what the model looked up. Optional press-and-hold mic button uses the browser's Web Speech API (iOS Safari + Chrome/Edge); hidden where unsupported. Thumbs-up/down under each answer POSTs to `POST /chat/feedback`, which updates `ChatLog.helpful` on the caller's most recent row.
+### Stats assistant (`/chat`, Records → Ask tab)
+- **Surface**: standalone page at `/chat` plus an "Ask" tab on `/records` (partial: `templates/reports/chat_panel.html`). Streaming Q&A — type a stats question, watch tokens render live, tool-call disclosure panel shows what the model looked up. Optional press-and-hold mic uses Web Speech API (iOS Safari + Chrome/Edge); hidden where unsupported. Thumbs-up/down POSTs to `POST /chat/feedback`. The mic stop is delayed 350 ms so trailing audio isn't clipped (`templates/reports/chat_panel.html`).
 - **Routes** (`routes/chat.py`, blueprint `chat_bp` at `/chat`): `GET /chat` (page), `POST /chat/ask` (SSE stream — `tool_call` / `token` / `done` / `error` events), `POST /chat/feedback`. All `@login_required`. `chat.ask` is in `viewer_permissions` so viewers see the same UI as editors. Per-IP rate limit on `/chat/ask`: `20/hour;5/minute`.
-- **Ollama service**: `127.0.0.1:11434` via `~/Library/LaunchAgents/com.dglc.ollama.plist` (loaded as `com.dglc.ollama`). Localhost only — never exposed to the internet. Reload after edits with `launchctl unload …/com.dglc.ollama.plist && launchctl load …/com.dglc.ollama.plist`.
-- **Model**: `llama3.1:8b-instruct-q4_K_M` (~5 GB resident). Measured warm generation on the M4 base ≈ 20 tok/s — streaming is **required**, a non-streamed answer feels broken. Caps in `routes/chat.py`: 4 tool-call rounds, 30 s wall-clock, 2048-token answer.
-- **Architecture: tool calling, NOT text-to-SQL**. The model never writes SQL and never sees the DB. It picks from the ~10 read-only tools in `chat_tools.py`: `list_seasons`, `list_bowlers`, `bowler_career_stats`, `bowler_season_stats`, `season_leaders`, `all_time_records`, `most_improved`, `fun_stats`, `tournament_winners`, `team_standings`, `weekly_prizes`. Each wraps an existing helper in `calculations.py` / `routes/records.py` so the league rules (handicap 3-case, blind handling, tournament weeks excluded from averages) are reused, not re-derived.
-- **System prompt**: `SYSTEM_PROMPT` in `routes/chat.py` — league overview + handicap rules + tournament-types glossary + answering guidance. Kept under ~1500 tokens.
-- **`ChatLog` model** (`chat_log` table): `id, user_id (FK bowlers.id, nullable), question_text, answer_text, tool_calls_json, helpful (nullable bool), created_at`. Written best-effort at end of each `/chat/ask` stream. Migration in `_migrate_db()` is additive (try/except `CREATE TABLE`).
-- **Memory headroom**: Mac mini M4 base = 16 GB. Llama 3.1 8B Q4 ≈ 5 GB resident; gunicorn workers + SQLite + macOS leave plenty of room. If we ever swap in a 13B / Q5 quant, profile RSS first — Ollama keeps the model loaded between requests, so eviction pressure shows up in production, not in CLI tests.
+- **Backend**: Anthropic Claude API via the official `anthropic` SDK (PR #134, deployed 2026-05-02). Default model `claude-sonnet-4-6`; override with `CHAT_MODEL` env var (e.g. `claude-haiku-4-5` for cost). Auth via `ANTHROPIC_API_KEY` in `.env`. Manual streaming loop in `ask()` so per-token streaming + `tool_call` SSE events both work. ~$0.005–0.02 per question; system prompt + tool catalog cached via `cache_control` (5-min TTL) so follow-ups in a session pay ~0.1× on the prefix.
+- **Architecture: hybrid — focused tools for business rules + `query_db` SQL escape hatch.** The model picks per question. Seven LLM-facing tools in `chat_tools.py`:
+    - `bowler_season_stats`, `bowler_career_stats`, `season_leaders`, `all_time_records`, `most_improved`, `weekly_prizes` — wrap helpers in `calculations.py` / `routes/records.py` that encode handicap math, blind-skipping, and tournament-week-from-averages exclusion. Plain SQL on `matchup_entries` would get those wrong.
+    - `query_db(sql, params=None)` — read-only SELECT (or `WITH ... SELECT`) for everything else. Validation: single statement, must start with `SELECT` or `WITH`, mutation keywords rejected, auth/log tables denied (`user_account` / `request_log` / `chat_log` / `viewer_permission` / `audit_log` / `payout_config` / `webauthn_credential` / sqlite internals), `PRAGMA query_only=1` set on the connection as defense-in-depth, capped at 200 rows. Schema for the model lives in `SYSTEM_PROMPT`.
+- **System prompt**: `SYSTEM_PROMPT` in `routes/chat.py` — league overview + handicap rules + tournament glossary + WHAT-IS-NOT-IN-THE-DATA refusal rule + database schema + when-to-use-which-tool guidance + "make tool calls silently, do not narrate" instruction. ~5K chars; cached.
+- **Tool result truncation**: 64 KB per tool call (was 8 KB pre-#135). With `query_db` capped at 200 rows this rarely bites, but it's headroom for future tools.
+- **`ChatLog` model** (`chat_log` table): `id, user_id (FK user_account.id, nullable), question_text, answer_text, tool_calls_json, helpful (nullable bool), created_at`. Written best-effort at end of each `/chat/ask` stream. Migration in `_migrate_db()` is additive (try/except `CREATE TABLE`).
+- **Ollama service still installed but unused** (kill-switch fallback): `~/Library/LaunchAgents/com.dglc.ollama.plist`, `llama3.1:8b-instruct-q4_K_M` model, ~5 GB on disk. To revert to local LLM in an emergency: `git revert` PRs #134/#135/#136. Removal is staged in session-state next-steps once the Anthropic backend is soaked.
 
 ### Push notifications
 - `PushSubscription` model + `push_subscriptions` table (endpoint, subscription JSON, platform, 3 preference booleans)
