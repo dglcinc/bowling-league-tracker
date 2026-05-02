@@ -32,6 +32,7 @@
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-improved">Most Improved</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-funstats">Fun Stats</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-builder">Stat Builder</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-ask">Ask</a></li>
 </ul>
 {% block extra_js %}
 <script>
@@ -705,6 +706,13 @@
 </div>
 
 </div>{# /tab-builder #}
+
+{# ════════════════════════════════════════════════════════════════════════════ #}
+{# ASK tab — local LLM stats assistant (streaming).                            #}
+{# ════════════════════════════════════════════════════════════════════════════ #}
+<div class="tab-pane fade" id="tab-ask">
+  {% include "reports/chat_panel.html" %}
+</div>{# /tab-ask #}
 
 </div>{# /tab-content #}
 {% endif %}

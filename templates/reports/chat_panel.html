@@ -1,0 +1,98 @@
+{# ════════════════════════════════════════════════════════════════════════════ #}
+{# Chat panel — included by records.html as the "Ask" tab content. Streams    #}
+{# Server-Sent Events from /chat/ask (token / tool_call / done / error).      #}
+{# ════════════════════════════════════════════════════════════════════════════ #}
+<h5 class="mb-3">Ask the League Stats Assistant</h5>
+<p class="text-muted small">
+  Ask anything about bowlers, seasons, teams, and tournament history. Answers
+  come from a local Llama model running on the league server — short questions
+  work best (e.g. <em>"Who has the most career strikes?"</em>,
+  <em>"Show the 2018-2019 season leaders"</em>,
+  <em>"Compare Lewis and Drews career averages"</em>).
+</p>
+
+<form id="askForm" class="mb-3" autocomplete="off">
+  <div class="mb-2">
+    <textarea id="askInput" class="form-control" rows="2"
+              maxlength="2000" placeholder="Ask a question…" required></textarea>
+  </div>
+  <button id="askSubmit" type="submit" class="btn btn-primary btn-sm">Ask</button>
+  <span id="askStatus" class="text-muted small ms-2"></span>
+</form>
+
+<div id="askAnswer" class="mb-3" style="white-space: pre-wrap;"></div>
+
+<details id="askToolsPanel" class="text-muted small" style="display:none;">
+  <summary>Tools used</summary>
+  <ul id="askToolsList" class="mb-0"></ul>
+</details>
+
+<script>
+(function () {
+  var form    = document.getElementById('askForm');
+  var input   = document.getElementById('askInput');
+  var submit  = document.getElementById('askSubmit');
+  var status  = document.getElementById('askStatus');
+  var answer  = document.getElementById('askAnswer');
+  var panel   = document.getElementById('askToolsPanel');
+  var toolsUl = document.getElementById('askToolsList');
+
+  function renderToolCall(ev) {
+    var li = document.createElement('li');
+    var args = ev.arguments ? JSON.stringify(ev.arguments) : '{}';
+    li.textContent = ev.name + '(' + args + ')';
+    toolsUl.appendChild(li);
+    panel.style.display = '';
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var q = (input.value || '').trim();
+    if (!q) return;
+
+    answer.textContent = '';
+    toolsUl.innerHTML = '';
+    panel.style.display = 'none';
+    status.textContent = 'Thinking…';
+    submit.disabled = true;
+
+    try {
+      var resp = await fetch('/chat/ask', {
+        method:  'POST',
+        headers: {'Content-Type': 'application/json'},
+        body:    JSON.stringify({question: q}),
+      });
+      if (!resp.ok || !resp.body) {
+        var err = 'Request failed (' + resp.status + ')';
+        try { var j = await resp.json(); if (j && j.error) err = j.error; } catch (_) {}
+        status.textContent = err;
+        return;
+      }
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      var buf = '';
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buf += decoder.decode(chunk.value, {stream: true});
+        var parts = buf.split('\n\n');
+        buf = parts.pop();
+        for (var i = 0; i < parts.length; i++) {
+          var line = parts[i];
+          if (!line.startsWith('data:')) continue;
+          var payload;
+          try { payload = JSON.parse(line.slice(5).trim()); } catch (_) { continue; }
+          if (payload.type === 'token')      answer.textContent += payload.text;
+          else if (payload.type === 'tool_call') renderToolCall(payload);
+          else if (payload.type === 'error') status.textContent = payload.message;
+          else if (payload.type === 'done')  status.textContent = '';
+        }
+      }
+    } catch (err) {
+      status.textContent = 'Network error';
+    } finally {
+      submit.disabled = false;
+    }
+  });
+})();
+</script>
