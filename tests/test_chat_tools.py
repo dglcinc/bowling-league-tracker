@@ -140,23 +140,44 @@ class ChatToolsTest(unittest.TestCase):
         # on a brand-new DB, so this just asserts the tool runs and returns a list.
         self.assertIsInstance(rows, list)
 
-    def test_fun_stats(self):
-        out = chat_tools.fun_stats()
-        for key in ('worst_avg', 'most_season_games', 'most_career_games',
-                    'most_200', 'lowest_games', 'min_qualified',
-                    'tournament_placements_per_type',
-                    'tournament_placements_overall'):
-            self.assertIn(key, out)
-        self.assertTrue(out['most_career_games'])
+    def test_query_db_basic_select(self):
+        out = chat_tools.query_db(sql='SELECT COUNT(*) AS n FROM bowlers')
+        self.assertNotIn('error', out)
+        self.assertEqual(out['row_count'], 1)
+        self.assertGreater(out['rows'][0]['n'], 0)
 
-    def test_tournament_winners(self):
-        rows = chat_tools.tournament_winners()
-        self.assertIsInstance(rows, list)
-        # Most DBs have at least one season with tournament data; if not, the
-        # list is empty but the tool still ran.
-        if rows:
-            self.assertIn('season', rows[0])
-            self.assertIn('club_by_place', rows[0])
+    def test_query_db_with_named_params(self):
+        out = chat_tools.query_db(
+            sql='SELECT id, last_name FROM bowlers WHERE id = :bid',
+            params={'bid': self.bowler_id},
+        )
+        self.assertEqual(out['row_count'], 1)
+        self.assertEqual(out['rows'][0]['id'], self.bowler_id)
+
+    def test_query_db_rejects_mutation(self):
+        for sql in (
+            'DELETE FROM bowlers',
+            'UPDATE bowlers SET last_name = "x"',
+            'DROP TABLE bowlers',
+            'INSERT INTO bowlers VALUES (1)',
+            'SELECT 1; DROP TABLE bowlers',
+            'WITH x AS (UPDATE bowlers SET last_name="x") SELECT * FROM x',
+        ):
+            out = chat_tools.query_db(sql=sql)
+            self.assertIn('error', out, f'should reject: {sql!r}')
+
+    def test_query_db_rejects_forbidden_tables(self):
+        out = chat_tools.query_db(sql='SELECT * FROM user_account')
+        self.assertIn('error', out)
+        self.assertIn('user_account', out['error'])
+
+    def test_query_db_caps_at_200_rows(self):
+        out = chat_tools.query_db(sql='SELECT id FROM bowlers')
+        self.assertLessEqual(out['row_count'], 200)
+        # If the DB has >200 bowlers (currently ~280), truncated should be True.
+        from models import Bowler
+        if Bowler.query.count() > 200:
+            self.assertTrue(out['truncated'])
 
     def test_team_standings(self):
         rows = chat_tools.team_standings(self.season_id)

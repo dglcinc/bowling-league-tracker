@@ -25,8 +25,6 @@ from routes.records import (
     _compute_bowler_season_summaries,
     _all_time_records,
     _most_improved,
-    _fun_stats,
-    _tournament_winners_by_season,
     _VENUE_LABELS,
 )
 
@@ -208,86 +206,65 @@ def most_improved(venue='all', limit=20):
     } for r in rows]
 
 
-def fun_stats(venue='all'):
-    """Novelty stats: lowest avg (>=30 games), most games, most 200+ games,
-    lowest individual games, tournament placement counts."""
-    filtered, filtered_seasons = _filtered_summaries(venue if venue != 'all' else None)
-    fs = _fun_stats(filtered, filtered_seasons)
+def query_db(sql, params=None):
+    """Run a read-only SELECT against the league SQLite DB. Up to 200 rows
+    are returned. Single statement only, mutation keywords rejected at
+    string level, and PRAGMA query_only is set on the connection as a
+    second layer of defense."""
+    import re
+    from sqlalchemy import text
 
-    def _avg_row(r):
-        return {'bowler': _bowler_dict(r['bowler']),
-                'avg':    r['avg'],
-                'games':  r['games'],
-                'season': _season_dict(r['season'])}
+    if not isinstance(sql, str):
+        return {'error': 'sql must be a string'}
+    cleaned = sql.strip().rstrip(';').strip()
+    if not cleaned:
+        return {'error': 'sql is empty'}
+    if ';' in cleaned:
+        return {'error': 'only one statement allowed; remove embedded ;'}
 
-    def _games_row(r):
-        return {'bowler': _bowler_dict(r['bowler']),
-                'games':  r['games'],
-                'season': _season_dict(r['season'])}
+    tokens = [t for t in re.split(r'[\s(),;]+', cleaned.upper()) if t]
+    if not tokens or tokens[0] not in ('SELECT', 'WITH'):
+        return {'error': 'must start with SELECT or WITH'}
 
-    def _lowest_row(r):
-        return {'bowler':   _bowler_dict(r['bowler']),
-                'score':    r['score'],
-                'season':   _season_dict(r['season']),
-                'week_num': r['week_num']}
-
-    def _placement_row(r):
-        return {'bowler':   _bowler_dict(r['bowler']) if r['bowler'] else None,
-                'is_guest': r['is_guest'],
-                'name':     r['name'],
-                'ones':     r['ones'],
-                'twos':     r['twos'],
-                'threes':   r['threes'],
-                'total':    r['total']}
-
-    return {
-        'min_qualified':     fs['min_qualified'],
-        'worst_avg':         [_avg_row(r) for r in fs['worst_avg']],
-        'most_season_games': [_games_row(r) for r in fs['most_season_games']],
-        'most_career_games': [{'bowler':  _bowler_dict(r['bowler']),
-                               'total':   r['total'],
-                               'seasons': r['seasons']}
-                              for r in fs['most_career_games']],
-        'most_200':          [{'bowler': _bowler_dict(r['bowler']),
-                               'count':  r['count']} for r in fs['most_200']],
-        'lowest_games':      [_lowest_row(r) for r in fs['lowest_games']],
-        'tournament_placements_per_type': {
-            tt: [_placement_row(r) for r in rows]
-            for tt, rows in fs['tourn_per_type'].items()
-        },
-        'tournament_placements_overall': [_placement_row(r) for r in fs['tourn_overall']],
+    forbidden_keywords = {
+        'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER',
+        'ATTACH', 'DETACH', 'PRAGMA', 'REPLACE', 'GRANT', 'REVOKE',
+        'TRUNCATE', 'VACUUM',
     }
+    bad = forbidden_keywords & set(tokens)
+    if bad:
+        return {'error': f'forbidden keyword(s): {", ".join(sorted(bad))}'}
 
+    forbidden_tables = (
+        'user_account', 'request_log', 'chat_log', 'push_subscription',
+        'viewer_permission', 'audit_log', 'payout_config',
+        'webauthn_credential', 'sqlite_master', 'sqlite_sequence',
+    )
+    cleaned_lower = cleaned.lower()
+    for name in forbidden_tables:
+        if name in cleaned_lower:
+            return {'error': f'forbidden table: {name}'}
 
-def tournament_winners(venue='all'):
-    """Top-3 individual tournament finishers and club championship results per season."""
-    _, filtered_seasons = _filtered_summaries(venue if venue != 'all' else None)
-    rows = _tournament_winners_by_season(filtered_seasons)
+    if params is not None and not isinstance(params, dict):
+        return {'error': 'params must be an object/dict'}
 
-    def _entry(e):
-        if e is None:
-            return None
-        return {
-            'bowler':         _bowler_dict(e.bowler) if e.bowler_id else None,
-            'guest_name':     e.guest_name,
-            'place':          e.place,
-            'total_scratch':  getattr(e, 'total_scratch', None),
-            'total_with_hcp': getattr(e, 'total_with_hcp', None),
-        }
+    try:
+        with db.engine.connect() as conn:
+            conn.exec_driver_sql('PRAGMA query_only = 1')
+            try:
+                result = conn.execute(text(cleaned), params or {})
+                rows = result.mappings().all()
+            finally:
+                conn.exec_driver_sql('PRAGMA query_only = 0')
+    except Exception as exc:
+        return {'error': f'{type(exc).__name__}: {exc}'}
 
-    def _club(cr):
-        return {
-            'place':     cr.place,
-            'team':      _team_dict(cr.team) if cr.team else None,
-        }
-
-    return [{
-        'season':        _season_dict(r['season']),
-        'indiv_scratch': [_entry(e) for e in r['indiv_scratch']],
-        'indiv_hcp_1':   [_entry(e) for e in r['indiv_hcp_1']],
-        'indiv_hcp_2':   [_entry(e) for e in r['indiv_hcp_2']],
-        'club_by_place': {place: _club(cr) for place, cr in r['club_by_place'].items()},
-    } for r in rows]
+    capped = [dict(r) for r in rows[:200]]
+    return {
+        'rows':      capped,
+        'row_count': len(capped),
+        'truncated': len(rows) > 200,
+    }
 
 
 def team_standings(season_id, half=None, through_week=None):
@@ -438,28 +415,15 @@ TOOL_SCHEMAS = [
     {
         'type': 'function',
         'function': {
-            'name': 'fun_stats',
-            'description': 'Novelty leaderboards: lowest season averages, most games in a season, most career games, most 200+ games, lowest individual games, tournament placement counts.',
+            'name': 'query_db',
+            'description': 'Run a read-only SELECT (or WITH ... SELECT) against the league SQLite DB. Up to 200 rows returned. Use for counts, sums, mins/maxes, tournament placements, and other ad-hoc aggregations that do not require handicap math. The schema is in the system prompt. Reject any non-SELECT statement.',
             'parameters': {
                 'type': 'object',
                 'properties': {
-                    'venue': {'type': 'string', 'enum': ['all', 'mountain_lakes_club', 'boonton_lanes']},
+                    'sql':    {'type': 'string', 'description': 'A single SELECT or WITH...SELECT statement.'},
+                    'params': {'type': 'object', 'description': 'Optional named parameters bound to :name placeholders in the SQL.'},
                 },
-                'required': [],
-            },
-        },
-    },
-    {
-        'type': 'function',
-        'function': {
-            'name': 'tournament_winners',
-            'description': 'Top-3 finishers in each individual tournament (Harry Russell scratch, hcp 1, hcp 2) and club championship team results, per season.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'venue': {'type': 'string', 'enum': ['all', 'mountain_lakes_club', 'boonton_lanes']},
-                },
-                'required': [],
+                'required': ['sql'],
             },
         },
     },
@@ -505,8 +469,7 @@ _DISPATCH = {
     'season_leaders':       season_leaders,
     'all_time_records':     all_time_records,
     'most_improved':        most_improved,
-    'fun_stats':            fun_stats,
-    'tournament_winners':   tournament_winners,
+    'query_db':             query_db,
     'team_standings':       team_standings,
     'weekly_prizes':        weekly_prizes,
 }
