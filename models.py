@@ -490,6 +490,24 @@ class Snapshot(db.Model):
         return f'<Snapshot season={self.season_id} week={self.week_num}>'
 
 
+class ChatLog(db.Model):
+    """One question/answer exchange with the local LLM stats assistant."""
+    __tablename__ = 'chat_log'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('bowlers.id'), nullable=True)
+    question_text = db.Column(db.Text, nullable=False)
+    answer_text = db.Column(db.Text)
+    tool_calls_json = db.Column(db.Text)
+    helpful = db.Column(db.Boolean, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('Bowler', foreign_keys=[user_id])
+
+    def __repr__(self):
+        return f'<ChatLog id={self.id} user={self.user_id}>'
+
+
 class RequestLog(db.Model):
     """Per-request access log stored in the DB for the activity dashboard."""
     __tablename__ = 'request_log'
