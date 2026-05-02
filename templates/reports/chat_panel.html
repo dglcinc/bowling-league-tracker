@@ -150,6 +150,45 @@
     panel.style.display = '';
   }
 
+  // Minimal markdown → HTML for chat answers. Handles bold/italic, ul/ol lists,
+  // and paragraph breaks. HTML-escapes input first so any model-emitted tags
+  // are inert. Duplicated in templates/chat/index.html — keep them in sync.
+  function renderMarkdown(src) {
+    function esc(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function inline(s) {
+      return s.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+              .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
+    }
+    var lines = esc(src).split('\n');
+    var out = [];
+    var inList = null;
+    function closeList() {
+      if (inList) { out.push('</' + inList + '>'); inList = null; }
+    }
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var ulm = line.match(/^[-*]\s+(.*)$/);
+      var olm = line.match(/^\d+\.\s+(.*)$/);
+      if (ulm) {
+        if (inList !== 'ul') { closeList(); out.push('<ul>'); inList = 'ul'; }
+        out.push('<li>' + inline(ulm[1]) + '</li>');
+      } else if (olm) {
+        if (inList !== 'ol') { closeList(); out.push('<ol>'); inList = 'ol'; }
+        out.push('<li>' + inline(olm[1]) + '</li>');
+      } else {
+        closeList();
+        out.push(inline(line));
+      }
+    }
+    closeList();
+    return out.join('\n')
+              .replace(/\n(?=<\/?(ul|ol|li)>)/g, '')
+              .replace(/(<\/(ul|ol|li)>)\n/g, '$1')
+              .replace(/\n/g, '<br>');
+  }
+
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
     var q = (input.value || '').trim();
@@ -196,7 +235,10 @@
           else if (payload.type === 'error') status.textContent = payload.message;
           else if (payload.type === 'done')  {
             status.textContent = '';
-            if (answer.textContent.trim()) fb.style.display = '';
+            if (answer.textContent.trim()) {
+              answer.innerHTML = renderMarkdown(answer.textContent);
+              fb.style.display = '';
+            }
           }
         }
       }
