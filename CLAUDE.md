@@ -287,8 +287,6 @@ These are all distinct people with separate DB records and non-overlapping or di
 
 CLAUDE.md pushes directly to main. All other code and documentation changes use feature branches + PRs. See global CLAUDE.md for full workflow.
 
-Always run `git pull` and other git network operations with `dangerouslyDisableSandbox: true` — the sandbox blocks writes to `.git/FETCH_HEAD`.
-
 For `gh` CLI: token is embedded in the remote URL — prefix commands with:
 ```bash
 GITHUB_TOKEN=$(git remote get-url origin | sed 's/.*:\(.*\)@.*/\1/')
