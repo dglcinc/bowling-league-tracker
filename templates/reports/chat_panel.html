@@ -12,7 +12,11 @@
 </p>
 
 <form id="askForm" class="mb-3" autocomplete="off">
-  <div class="mb-2">
+  <div class="mb-2 d-flex gap-2 align-items-stretch">
+    <button id="askMic" type="button"
+            class="btn btn-outline-secondary"
+            style="display:none; width:48px; flex-shrink:0;"
+            title="Hold to talk" aria-label="Hold to talk">🎤</button>
     <textarea id="askInput" class="form-control" rows="2"
               maxlength="2000" placeholder="Ask a question…" required></textarea>
   </div>
@@ -36,6 +40,74 @@
   var answer  = document.getElementById('askAnswer');
   var panel   = document.getElementById('askToolsPanel');
   var toolsUl = document.getElementById('askToolsList');
+  var micBtn  = document.getElementById('askMic');
+
+  // ─── Web Speech API: press-and-hold dictation ────────────────────────────
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SR && micBtn) {
+    micBtn.style.display = '';
+    var recognition = null;
+    var holding = false;
+    var baseText = '';
+
+    function startRecognition() {
+      recognition = new SR();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = function (e) {
+        var transcript = '';
+        for (var i = e.resultIndex; i < e.results.length; i++) {
+          transcript += e.results[i][0].transcript;
+        }
+        var prefix = baseText ? baseText + ' ' : '';
+        input.value = (prefix + transcript).replace(/\s+/g, ' ').trimStart();
+      };
+
+      recognition.onend = function () {
+        // iOS Safari ends recognition after each utterance — restart while held.
+        if (holding) {
+          baseText = input.value;
+          try { recognition.start(); } catch (_) {}
+        }
+      };
+
+      recognition.onerror = function () { /* swallow; user can retry */ };
+
+      try { recognition.start(); } catch (_) {}
+    }
+
+    function pressDown(e) {
+      e.preventDefault();
+      if (holding) return;
+      holding = true;
+      baseText = input.value;
+      micBtn.classList.remove('btn-outline-secondary');
+      micBtn.classList.add('btn-danger');
+      startRecognition();
+    }
+
+    function pressUp(e) {
+      if (e) e.preventDefault();
+      if (!holding) return;
+      holding = false;
+      if (recognition) {
+        try { recognition.stop(); } catch (_) {}
+        recognition = null;
+      }
+      micBtn.classList.remove('btn-danger');
+      micBtn.classList.add('btn-outline-secondary');
+    }
+
+    micBtn.addEventListener('mousedown',  pressDown);
+    micBtn.addEventListener('mouseup',    pressUp);
+    micBtn.addEventListener('mouseleave', pressUp);
+    micBtn.addEventListener('touchstart', pressDown, {passive: false});
+    micBtn.addEventListener('touchend',   pressUp,   {passive: false});
+    micBtn.addEventListener('touchcancel', pressUp,  {passive: false});
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   function renderToolCall(ev) {
     var li = document.createElement('li');
