@@ -142,6 +142,16 @@ def _migrate_db(db):
             team_id   INTEGER NOT NULL REFERENCES teams(id),
             place     INTEGER NOT NULL
         )""",
+        # Local LLM chat log — one row per Q&A exchange on the Records → Ask tab
+        """CREATE TABLE IF NOT EXISTS chat_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES bowlers(id),
+            question_text TEXT NOT NULL,
+            answer_text TEXT,
+            tool_calls_json TEXT,
+            helpful BOOLEAN,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:
