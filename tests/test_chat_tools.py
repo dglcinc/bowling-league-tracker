@@ -158,6 +158,28 @@ class ChatToolsTest(unittest.TestCase):
             self.assertIn('season', rows[0])
             self.assertIn('club_by_place', rows[0])
 
+    def test_tournament_placement_leaders(self):
+        wins = chat_tools.tournament_placement_leaders(
+            tournament_type='indiv_scratch', mode='wins', limit=5)
+        self.assertIsInstance(wins, list)
+        if wins:
+            self.assertIn('wins', wins[0])
+            self.assertIn('placements', wins[0])
+            # Sorted by wins descending.
+            for i in range(len(wins) - 1):
+                self.assertGreaterEqual(wins[i]['wins'], wins[i + 1]['wins'])
+
+        placements = chat_tools.tournament_placement_leaders(
+            tournament_type='indiv_scratch', mode='placements', limit=5)
+        self.assertIsInstance(placements, list)
+        if placements:
+            for i in range(len(placements) - 1):
+                self.assertGreaterEqual(placements[i]['placements'],
+                                        placements[i + 1]['placements'])
+
+        bad = chat_tools.tournament_placement_leaders(tournament_type='nonsense')
+        self.assertIn('error', bad)
+
     def test_team_standings(self):
         rows = chat_tools.team_standings(self.season_id)
         self.assertGreater(len(rows), 0)

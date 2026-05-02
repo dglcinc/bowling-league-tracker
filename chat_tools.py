@@ -290,6 +290,35 @@ def tournament_winners(venue='all'):
     } for r in rows]
 
 
+def tournament_placement_leaders(tournament_type, mode='wins', limit=10, venue='all'):
+    """Bowlers ranked by tournament placement count across all seasons.
+
+    tournament_type: 'club_championship' | 'indiv_scratch' | 'indiv_hcp_1' | 'indiv_hcp_2'.
+        Map common names: Harry Russell → 'indiv_scratch'; Chad Harris (Buzz Bedford
+        pre-2023) → 'indiv_hcp_1'; Shep Belyea (Rose Bowl pre-2023) → 'indiv_hcp_2'.
+    mode: 'wins' ranks by 1st-place finishes only; 'placements' ranks by total
+        top-3 finishes (1 + 2 + 3).
+    """
+    valid_types = ('club_championship', 'indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2')
+    if tournament_type not in valid_types:
+        return {'error': f'tournament_type must be one of {valid_types}'}
+    if mode not in ('wins', 'placements'):
+        return {'error': "mode must be 'wins' or 'placements'"}
+
+    filtered, filtered_seasons = _filtered_summaries(venue if venue != 'all' else None)
+    rows = _fun_stats(filtered, filtered_seasons)['tourn_per_type'].get(tournament_type, [])
+    sort_key = 'ones' if mode == 'wins' else 'total'
+    rows = sorted(rows, key=lambda r: r[sort_key], reverse=True)[:limit]
+    return [{
+        'bowler':     _bowler_dict(r['bowler']) if r['bowler'] else None,
+        'guest_name': r['name'] if r['is_guest'] else None,
+        'wins':       r['ones'],
+        'seconds':    r['twos'],
+        'thirds':     r['threes'],
+        'placements': r['total'],
+    } for r in rows]
+
+
 def team_standings(season_id, half=None, through_week=None):
     """Team points totals for one season. `half` = 1 (first half), 2 (second
     half), or None (full season). `through_week` caps the week range."""
@@ -466,6 +495,23 @@ TOOL_SCHEMAS = [
     {
         'type': 'function',
         'function': {
+            'name': 'tournament_placement_leaders',
+            'description': "All-time bowler rankings for one tournament type. Use for questions like 'who has won the Harry Russell most' (tournament_type='indiv_scratch', mode='wins') or 'who has placed in the Chad Harris most' (tournament_type='indiv_hcp_1', mode='placements'). Tournament name → type: Harry Russell=indiv_scratch, Chad Harris/Buzz Bedford=indiv_hcp_1, Shep Belyea/Rose Bowl=indiv_hcp_2, Club Championship=club_championship.",
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'tournament_type': {'type': 'string', 'enum': ['club_championship', 'indiv_scratch', 'indiv_hcp_1', 'indiv_hcp_2']},
+                    'mode':            {'type': 'string', 'enum': ['wins', 'placements'], 'description': "'wins' = 1st-place only; 'placements' = top-3 combined."},
+                    'limit':           {'type': 'integer'},
+                    'venue':           {'type': 'string', 'enum': ['all', 'mountain_lakes_club', 'boonton_lanes']},
+                },
+                'required': ['tournament_type'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
             'name': 'team_standings',
             'description': 'Team points totals for one season. half=1 → first-half, half=2 → second-half, omitted → full season.',
             'parameters': {
@@ -507,6 +553,7 @@ _DISPATCH = {
     'most_improved':        most_improved,
     'fun_stats':            fun_stats,
     'tournament_winners':   tournament_winners,
+    'tournament_placement_leaders': tournament_placement_leaders,
     'team_standings':       team_standings,
     'weekly_prizes':        weekly_prizes,
 }
