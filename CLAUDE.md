@@ -258,7 +258,6 @@ with app.app_context():
 - **System prompt**: `SYSTEM_PROMPT` in `routes/chat.py` — league overview + handicap rules + tournament glossary + WHAT-IS-NOT-IN-THE-DATA refusal rule + database schema + when-to-use-which-tool guidance + "make tool calls silently, do not narrate" instruction. ~5K chars; cached.
 - **Tool result truncation**: 64 KB per tool call (was 8 KB pre-#135). With `query_db` capped at 200 rows this rarely bites, but it's headroom for future tools.
 - **`ChatLog` model** (`chat_log` table): `id, user_id (FK user_account.id, nullable), question_text, answer_text, tool_calls_json, helpful (nullable bool), created_at`. Written best-effort at end of each `/chat/ask` stream. Migration in `_migrate_db()` is additive (try/except `CREATE TABLE`).
-- **Ollama service still installed but unused** (kill-switch fallback): `~/Library/LaunchAgents/com.dglc.ollama.plist`, `llama3.1:8b-instruct-q4_K_M` model, ~5 GB on disk. To revert to local LLM in an emergency: `git revert` PRs #134/#135/#136. Removal is staged in session-state next-steps once the Anthropic backend is soaked.
 
 ### Push notifications
 - `PushSubscription` model + `push_subscriptions` table (endpoint, subscription JSON, platform, 3 preference booleans)

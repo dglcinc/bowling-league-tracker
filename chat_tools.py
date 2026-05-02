@@ -257,115 +257,97 @@ def weekly_prizes(season_id, week_num):
     }
 
 
-# ---------- Ollama tool schemas ----------
+# ---------- tool schemas ----------
+#
+# Anthropic's tool spec: flat dicts with `name`, `description`, `input_schema`.
+# Passed straight to `client.messages.stream(tools=...)`.
 
 TOOL_SCHEMAS = [
     {
-        'type': 'function',
-        'function': {
-            'name': 'bowler_career_stats',
-            'description': 'Per-season stats for one bowler across every season they bowled. Returns avg, games, high game/series (scratch and handicap) per season.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'bowler_id': {'type': 'integer', 'description': 'Bowler id from the bowlers table.'},
-                },
-                'required': ['bowler_id'],
+        'name': 'bowler_career_stats',
+        'description': 'Per-season stats for one bowler across every season they bowled. Returns avg, games, high game/series (scratch and handicap) per season.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'bowler_id': {'type': 'integer', 'description': 'Bowler id from the bowlers table.'},
             },
+            'required': ['bowler_id'],
         },
     },
     {
-        'type': 'function',
-        'function': {
-            'name': 'bowler_season_stats',
-            'description': 'YTD stats for one bowler in one season: running average, games, current handicap, high game/series.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'bowler_id':    {'type': 'integer'},
-                    'season_id':    {'type': 'integer'},
-                    'through_week': {'type': 'integer', 'description': 'Optional — only include weeks <= this number.'},
-                },
-                'required': ['bowler_id', 'season_id'],
+        'name': 'bowler_season_stats',
+        'description': 'YTD stats for one bowler in one season: running average, games, current handicap, high game/series.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'bowler_id':    {'type': 'integer'},
+                'season_id':    {'type': 'integer'},
+                'through_week': {'type': 'integer', 'description': 'Optional — only include weeks <= this number.'},
             },
+            'required': ['bowler_id', 'season_id'],
         },
     },
     {
-        'type': 'function',
-        'function': {
-            'name': 'season_leaders',
-            'description': 'Ranked list of bowlers in one season by season average (descending).',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'season_id':    {'type': 'integer'},
-                    'through_week': {'type': 'integer', 'description': 'Optional — defaults to season.num_weeks.'},
-                    'min_games':    {'type': 'integer', 'description': 'Optional — minimum games to qualify.'},
-                    'top10':        {'type': 'boolean', 'description': 'If true, return only the top-10 distinct averages (with ties).'},
-                },
-                'required': ['season_id'],
+        'name': 'season_leaders',
+        'description': 'Ranked list of bowlers in one season by season average (descending).',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'season_id':    {'type': 'integer'},
+                'through_week': {'type': 'integer', 'description': 'Optional — defaults to season.num_weeks.'},
+                'min_games':    {'type': 'integer', 'description': 'Optional — minimum games to qualify.'},
+                'top10':        {'type': 'boolean', 'description': 'If true, return only the top-10 distinct averages (with ties).'},
             },
+            'required': ['season_id'],
         },
     },
     {
-        'type': 'function',
-        'function': {
-            'name': 'all_time_records',
-            'description': 'All-time per-bowler bests across every season. Pick venue and/or category to narrow the result.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'venue':    {'type': 'string', 'enum': ['all', 'mountain_lakes_club', 'boonton_lanes']},
-                    'category': {'type': 'string', 'enum': ['all', 'hg_scratch', 'hs_scratch', 'hg_hcp', 'hs_hcp', 'avg']},
-                    'limit':    {'type': 'integer', 'description': 'Top N per category (default 20).'},
-                },
-                'required': [],
+        'name': 'all_time_records',
+        'description': 'All-time per-bowler bests across every season. Pick venue and/or category to narrow the result.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'venue':    {'type': 'string', 'enum': ['all', 'mountain_lakes_club', 'boonton_lanes']},
+                'category': {'type': 'string', 'enum': ['all', 'hg_scratch', 'hs_scratch', 'hg_hcp', 'hs_hcp', 'avg']},
+                'limit':    {'type': 'integer', 'description': 'Top N per category (default 20).'},
             },
+            'required': [],
         },
     },
     {
-        'type': 'function',
-        'function': {
-            'name': 'most_improved',
-            'description': 'Largest single-season average improvements between consecutive bowled seasons.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'venue': {'type': 'string', 'enum': ['all', 'mountain_lakes_club', 'boonton_lanes']},
-                    'limit': {'type': 'integer', 'description': 'Top N (default 20).'},
-                },
-                'required': [],
+        'name': 'most_improved',
+        'description': 'Largest single-season average improvements between consecutive bowled seasons.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'venue': {'type': 'string', 'enum': ['all', 'mountain_lakes_club', 'boonton_lanes']},
+                'limit': {'type': 'integer', 'description': 'Top N (default 20).'},
             },
+            'required': [],
         },
     },
     {
-        'type': 'function',
-        'function': {
-            'name': 'query_db',
-            'description': 'Run a read-only SELECT (or WITH ... SELECT) against the league SQLite DB. Up to 200 rows returned. Use for counts, sums, mins/maxes, tournament placements, and other ad-hoc aggregations that do not require handicap math. The schema is in the system prompt. Reject any non-SELECT statement.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'sql':    {'type': 'string', 'description': 'A single SELECT or WITH...SELECT statement.'},
-                    'params': {'type': 'object', 'description': 'Optional named parameters bound to :name placeholders in the SQL.'},
-                },
-                'required': ['sql'],
+        'name': 'query_db',
+        'description': 'Run a read-only SELECT (or WITH ... SELECT) against the league SQLite DB. Up to 200 rows returned. Use for counts, sums, mins/maxes, tournament placements, and other ad-hoc aggregations that do not require handicap math. The schema is in the system prompt. Reject any non-SELECT statement.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'sql':    {'type': 'string', 'description': 'A single SELECT or WITH...SELECT statement.'},
+                'params': {'type': 'object', 'description': 'Optional named parameters bound to :name placeholders in the SQL.'},
             },
+            'required': ['sql'],
         },
     },
     {
-        'type': 'function',
-        'function': {
-            'name': 'weekly_prizes',
-            'description': 'Four prize-category winners (high game / high series, scratch and handicap) for one week of one season. Returns null if no entries.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'season_id': {'type': 'integer'},
-                    'week_num':  {'type': 'integer'},
-                },
-                'required': ['season_id', 'week_num'],
+        'name': 'weekly_prizes',
+        'description': 'Four prize-category winners (high game / high series, scratch and handicap) for one week of one season. Returns null if no entries.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'season_id': {'type': 'integer'},
+                'week_num':  {'type': 'integer'},
             },
+            'required': ['season_id', 'week_num'],
         },
     },
 ]
