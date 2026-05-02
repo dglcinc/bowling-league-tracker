@@ -119,12 +119,18 @@
       if (e) e.preventDefault();
       if (!holding) return;
       holding = false;
-      if (recognition) {
-        try { recognition.stop(); } catch (_) {}
-        recognition = null;
-      }
       micBtn.classList.remove('btn-danger');
       micBtn.classList.add('btn-outline-secondary');
+      // Delay stop() so the engine ingests the trailing audio. Without this,
+      // releasing the button on the last syllable of a word ("strike[s]")
+      // flushes the buffer before the final consonant reaches the recognizer.
+      var pending = recognition;
+      recognition = null;
+      setTimeout(function () {
+        if (pending) {
+          try { pending.stop(); } catch (_) {}
+        }
+      }, 350);
     }
 
     micBtn.addEventListener('mousedown',  pressDown);
