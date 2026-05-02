@@ -1,5 +1,5 @@
 """
-Local LLM chat endpoint — viewer-gated streaming Q&A over the bowling stats.
+Cloud LLM chat endpoint — viewer-gated streaming Q&A over the bowling stats.
 
 Architecture
 ------------
@@ -8,9 +8,8 @@ the server runs them via `chat_tools.dispatch`, and the JSON results are
 fed back to the model. All tools are read-only wrappers around helpers
 in `calculations.py` and `routes/records.py`.
 
-`/chat/ask` streams a Server-Sent Events response — measured warm
-generation on the M4 base is ~20 tok/s, so a non-streamed wait would
-feel broken. Three event types reach the browser:
+`/chat/ask` streams a Server-Sent Events response. Three event types
+reach the browser:
 
 - `tool_call`: each tool the model invokes during the run.
 - `token`: each generated token of the final answer.
@@ -18,14 +17,21 @@ feel broken. Three event types reach the browser:
   answer text and the list of tool calls actually executed.
 
 Caps: max 4 tool-call rounds, 30 s wall-clock, 2 048 generated tokens.
+
+Backend: Anthropic Claude API. Requires `ANTHROPIC_API_KEY` in the
+environment. Model is `claude-sonnet-4-6` by default; override with
+`CHAT_MODEL`. The system prompt + tool catalog are cached via
+`cache_control` (5-minute TTL) so a burst of questions in one session
+shares the same prefix.
 """
 
 import json
+import os
 import time
 
+import anthropic
 from flask import Blueprint, Response, current_app, jsonify, render_template, request, stream_with_context
 from flask_login import current_user, login_required
-import requests
 
 from extensions import limiter
 from models import ChatLog, db
@@ -37,16 +43,15 @@ chat_bp = Blueprint('chat', __name__)
 
 # ---------- configuration --------------------------------------------------
 
-OLLAMA_URL = 'http://127.0.0.1:11434/api/chat'
-OLLAMA_MODEL = 'llama3.1:8b-instruct-q4_K_M'
+CHAT_MODEL = os.environ.get('CHAT_MODEL', 'claude-sonnet-4-6')
 
 MAX_TOOL_ROUNDS = 4
 WALL_CLOCK_SECONDS = 30
 ANSWER_TOKEN_CAP = 2048
 
-# Per-IP rate limit on the streaming endpoint. Local generation is
-# expensive on the Mac mini — one in-flight ask at a time per caller is
-# plenty for this read-only stats use case.
+# Per-IP rate limit on the streaming endpoint. Each ask costs a few
+# cents in API tokens; this is a small private league, not a public
+# bot — so caps are tight to bound abuse and runaway loops.
 RATE_LIMIT = "20 per hour;5 per minute"
 
 
@@ -79,13 +84,35 @@ HOW TO ANSWER
 - Always call tools to gather data — do not guess names, ids, dates, or scores.
 - To resolve a name, call `list_bowlers` (last-name substring, case-insensitive) or `list_seasons`.
 - Prefer the most specific tool: `bowler_season_stats` for one bowler in one season; `bowler_career_stats` for their full history; `season_leaders` for a ranked season list; `all_time_records` / `most_improved` / `fun_stats` for league-wide superlatives.
+- For "who has won/placed in tournament X the most" questions, call `fun_stats` and read `tournament_placements_per_type[<tournament_type>]` — the rows have `ones` (1st-place finishes), `twos`, `threes`, and `total`. Tournament name → type: Harry Russell=indiv_scratch, Chad Harris/Buzz Bedford=indiv_hcp_1, Shep Belyea/Rose Bowl=indiv_hcp_2, Club Championship=club_championship.
 - If a question is ambiguous (e.g. several bowlers share a surname), say so and list the candidates.
 - Keep answers under ~150 words. Use plain prose; only use a short bulleted or numbered list when ranking 3+ items.
 - Never invent a tool, a column, or a value. If a tool returns nothing, say so plainly.
 - If no available tool can answer the question, say "I don't have data on that" and explain in one short sentence what is and isn't tracked. Never present a different statistic as if it answered the question."""
 
 
+# ---------- tool schema adapter --------------------------------------------
+
+def _to_anthropic_tools(ollama_tools):
+    """Convert Ollama-format tool schemas to the Anthropic tool spec.
+    chat_tools.TOOL_SCHEMAS is shaped for /api/chat — nest under 'function'
+    with 'parameters'. Anthropic wants flat: name, description, input_schema."""
+    return [{
+        'name':         t['function']['name'],
+        'description':  t['function']['description'],
+        'input_schema': t['function']['parameters'],
+    } for t in ollama_tools]
+
+
+ANTHROPIC_TOOLS = _to_anthropic_tools(TOOL_SCHEMAS)
+
+
 # ---------- helpers --------------------------------------------------------
+
+def _client():
+    """Lazy-initialised Anthropic client. Reads ANTHROPIC_API_KEY from env."""
+    return anthropic.Anthropic()
+
 
 def _sse(event_type, payload):
     """Format one Server-Sent Events frame. Each event is a single JSON
@@ -94,49 +121,13 @@ def _sse(event_type, payload):
     return f"data: {body}\n\n"
 
 
-def _post_chat(messages, tools, *, stream):
-    """Call Ollama /api/chat. Returns the streaming Response when
-    stream=True; otherwise returns the parsed JSON body."""
-    payload = {
-        'model':    OLLAMA_MODEL,
-        'messages': messages,
-        'tools':    tools,
-        'stream':   stream,
-        'options':  {'num_predict': ANSWER_TOKEN_CAP},
-    }
-    if stream:
-        return requests.post(OLLAMA_URL, json=payload, stream=True, timeout=WALL_CLOCK_SECONDS + 5)
-    resp = requests.post(OLLAMA_URL, json=payload, timeout=WALL_CLOCK_SECONDS + 5)
-    resp.raise_for_status()
-    return resp.json()
-
-
-def _run_tool_calls(tool_calls):
-    """Execute every tool call from one assistant turn. Returns a list of
-    `tool` messages plus a parallel list of (name, args, result) tuples
-    suitable for the SSE stream and the ChatLog row."""
-    tool_messages = []
-    executed = []
-    for call in tool_calls or []:
-        fn = call.get('function') or {}
-        name = fn.get('name') or ''
-        args = fn.get('arguments') or {}
-        if isinstance(args, str):
-            try:
-                args = json.loads(args)
-            except Exception:
-                args = {}
-        try:
-            result = dispatch(name, args)
-        except Exception as exc:
-            result = {'error': f'{type(exc).__name__}: {exc}'}
-        executed.append({'name': name, 'arguments': args, 'result': result})
-        tool_messages.append({
-            'role':    'tool',
-            'name':    name,
-            'content': json.dumps(result, default=str)[:8000],
-        })
-    return tool_messages, executed
+def _dispatch_tool(name, args):
+    """Run one tool. On exception, return an error dict — the model will
+    see it in the next turn and can recover or refuse."""
+    try:
+        return dispatch(name, args)
+    except Exception as exc:
+        return {'error': f'{type(exc).__name__}: {exc}'}
 
 
 def _log_exchange(question, answer, executed):
@@ -163,9 +154,8 @@ def _log_exchange(question, answer, executed):
 @chat_bp.route('/')
 @login_required
 def index():
-    """Standalone Ask page. The Records → Ask tab will reuse the same
-    JS/SSE plumbing once that PR lands; this page is a working surface
-    for the streaming endpoint in the meantime."""
+    """Standalone Ask page. The Records → Ask tab reuses the same JS/SSE
+    plumbing; this page is a thin wrapper around the streaming endpoint."""
     return render_template('chat/index.html')
 
 
@@ -174,8 +164,9 @@ def index():
 @limiter.limit(RATE_LIMIT)
 def ask():
     """SSE streaming endpoint. Loops over assistant turns: when the
-    model emits tool_calls we execute them and feed the results back;
-    when it emits final text we stream tokens straight to the browser."""
+    model emits tool_use blocks we execute them and feed the results
+    back as a tool_result; when it emits final text we stream tokens
+    straight to the browser."""
     data = request.get_json(silent=True) or {}
     question = (data.get('question') or '').strip()
     if not question:
@@ -183,10 +174,17 @@ def ask():
     if len(question) > 2000:
         return jsonify({'error': 'question too long'}), 400
 
-    messages = [
-        {'role': 'system', 'content': SYSTEM_PROMPT},
-        {'role': 'user',   'content': question},
-    ]
+    client = _client()
+
+    # `system` as a list of text blocks lets us attach cache_control.
+    # Tools render before system in the request, so this single
+    # breakpoint caches both tools and system together.
+    system = [{
+        'type':          'text',
+        'text':          SYSTEM_PROMPT,
+        'cache_control': {'type': 'ephemeral'},
+    }]
+    messages = [{'role': 'user', 'content': question}]
 
     @stream_with_context
     def generate():
@@ -199,56 +197,57 @@ def ask():
                     yield _sse('error', {'message': 'timed out'})
                     break
 
-                # Non-streaming call when we still expect possible tool
-                # calls — Ollama only returns the parsed `tool_calls`
-                # array reliably in non-streaming mode. The final answer
-                # round is streamed token-by-token below.
-                if round_idx < MAX_TOOL_ROUNDS:
-                    body = _post_chat(messages, TOOL_SCHEMAS, stream=False)
-                    msg = body.get('message') or {}
-                    tool_calls = msg.get('tool_calls') or []
-                    if tool_calls:
-                        tool_msgs, executed = _run_tool_calls(tool_calls)
-                        executed_all.extend(executed)
-                        messages.append({
-                            'role':       'assistant',
-                            'content':    msg.get('content') or '',
-                            'tool_calls': tool_calls,
-                        })
-                        messages.extend(tool_msgs)
-                        for ev in executed:
-                            yield _sse('tool_call', {
-                                'name':      ev['name'],
-                                'arguments': ev['arguments'],
-                            })
-                        continue
-                    # Model went straight to a final answer with no
-                    # tools — emit it as tokens and stop.
-                    text = msg.get('content') or ''
-                    if text:
-                        final_answer_chunks.append(text)
-                        yield _sse('token', {'text': text})
+                with client.messages.stream(
+                    model=CHAT_MODEL,
+                    max_tokens=ANSWER_TOKEN_CAP,
+                    system=system,
+                    tools=ANTHROPIC_TOOLS,
+                    messages=messages,
+                ) as stream:
+                    for event in stream:
+                        if time.monotonic() > deadline:
+                            yield _sse('error', {'message': 'timed out'})
+                            return
+                        if event.type == 'content_block_delta' and event.delta.type == 'text_delta':
+                            text = event.delta.text
+                            if text:
+                                final_answer_chunks.append(text)
+                                yield _sse('token', {'text': text})
+                    final = stream.get_final_message()
+
+                if final.stop_reason != 'tool_use':
+                    # end_turn / max_tokens / refusal — we're done.
                     break
 
-                # Final round: stream the answer.
-                resp = _post_chat(messages, TOOL_SCHEMAS, stream=True)
-                for line in resp.iter_lines():
-                    if not line:
-                        continue
-                    if time.monotonic() > deadline:
-                        yield _sse('error', {'message': 'timed out'})
-                        break
-                    try:
-                        chunk = json.loads(line)
-                    except Exception:
-                        continue
-                    piece = (chunk.get('message') or {}).get('content') or ''
-                    if piece:
-                        final_answer_chunks.append(piece)
-                        yield _sse('token', {'text': piece})
-                    if chunk.get('done'):
-                        break
-                break
+                # Extract tool calls, dispatch each, build tool_result blocks.
+                tool_use_blocks = [b for b in final.content if b.type == 'tool_use']
+                tool_results = []
+                for tu in tool_use_blocks:
+                    result = _dispatch_tool(tu.name, dict(tu.input or {}))
+                    executed_all.append({
+                        'name':      tu.name,
+                        'arguments': dict(tu.input or {}),
+                        'result':    result,
+                    })
+                    yield _sse('tool_call', {
+                        'name':      tu.name,
+                        'arguments': dict(tu.input or {}),
+                    })
+                    tool_results.append({
+                        'type':         'tool_result',
+                        'tool_use_id':  tu.id,
+                        'content':      json.dumps(result, default=str)[:8000],
+                    })
+
+                # Append the assistant's full content (text + tool_use blocks)
+                # and the tool_result user turn. Anthropic requires these to
+                # be paired in order.
+                messages.append({'role': 'assistant', 'content': final.content})
+                messages.append({'role': 'user', 'content': tool_results})
+
+                if round_idx == MAX_TOOL_ROUNDS:
+                    yield _sse('error', {'message': 'too many tool rounds'})
+                    break
 
             answer = ''.join(final_answer_chunks).strip()
             _log_exchange(question, answer, executed_all)
@@ -256,9 +255,9 @@ def ask():
                 'answer':     answer,
                 'tool_calls': executed_all,
             })
-        except requests.RequestException as exc:
-            current_app.logger.warning('Ollama call failed: %s', exc)
-            yield _sse('error', {'message': 'local model unavailable'})
+        except anthropic.APIError as exc:
+            current_app.logger.warning('Anthropic call failed: %s', exc)
+            yield _sse('error', {'message': 'chat backend unavailable'})
         except Exception as exc:  # pragma: no cover — last-ditch
             current_app.logger.exception('chat.ask failed')
             yield _sse('error', {'message': f'{type(exc).__name__}'})
