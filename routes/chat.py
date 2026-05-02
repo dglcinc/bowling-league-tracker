@@ -264,3 +264,26 @@ def ask():
         'X-Accel-Buffering': 'no',  # disable nginx/proxy buffering
     }
     return Response(generate(), headers=headers)
+
+
+@chat_bp.route('/feedback', methods=['POST'])
+@login_required
+def feedback():
+    """Record a thumbs-up / thumbs-down on the caller's most recent
+    ChatLog row. Body: {"helpful": true|false}. Scoped to the current
+    user so a click only ever updates their own row."""
+    data = request.get_json(silent=True) or {}
+    helpful = data.get('helpful')
+    if helpful not in (True, False):
+        return jsonify({'error': 'helpful must be true or false'}), 400
+
+    row = (ChatLog.query
+           .filter_by(user_id=current_user.id)
+           .order_by(ChatLog.id.desc())
+           .first())
+    if row is None:
+        return jsonify({'error': 'no recent question to mark'}), 404
+
+    row.helpful = helpful
+    db.session.commit()
+    return jsonify({'ok': True, 'id': row.id, 'helpful': helpful})
