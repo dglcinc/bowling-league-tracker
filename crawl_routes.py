@@ -83,9 +83,13 @@ def get_endpoint(app, path):
         return None
 
 
+CRAWLER_UA = 'crawl_routes.py/1.0'
+
+
 def make_client(app, bowler_id):
     """Return a test client pre-authenticated as bowler_id."""
     client = app.test_client()
+    client.environ_base['HTTP_USER_AGENT'] = CRAWLER_UA
     with client.session_transaction() as sess:
         sess['_user_id'] = str(bowler_id)
         sess['_fresh']   = True
