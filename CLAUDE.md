@@ -9,12 +9,12 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 **Important:** Never put player names, team names (which are player surnames), or any other personal information in the repository, code, comments, or documentation.
 
-## Repo / Branch State (as of 2026-05-02)
+## Repo / Branch State (as of 2026-05-07)
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
 - No open PRs.
-- PRs #37–#141 merged to main; #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138).
+- PRs #37–#142 merged to main; #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138).
 
 ## League Structure
 
@@ -218,6 +218,7 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 - **Admin Send Email modal** (`templates/admin/season_detail.html`): Subject prefills with `league_settings.league_name` (PR #117). Different route from the weekly email — `admin.send_email`, ad-hoc, no preview modal.
 - **Prizes page / print batch**: prize calculation skipped entirely for tournament weeks (`tournament_type` not None); YTD leaders and high averages are still shown for all weeks including tournament weeks. Print orientation is portrait (`@page { size: portrait }` in `week_prizes.html`).
 - **Gunicorn error log**: tracebacks go to `/tmp/bowling-app.err`, not `/tmp/bowling-app.log` (which is stdout/access).
+- **Traffic auditing**: `request_log` table is the authoritative source for in-app traffic (bowler_id, endpoint, path, status, remote_addr, user_agent). `healthz`, `static`, and `admin.activity` are excluded from logging in `app.py:349`. Filter `WHERE user_agent NOT LIKE 'crawl_routes.py%'` to drop test-crawler runs (PR #142 tagged `crawl_routes.py` with `User-Agent: crawl_routes.py/1.0`; older crawl runs show as `Werkzeug/3.1.8` from `127.0.0.1`). nginx logs on the Pi are dominated by bot probes hitting the default vhost — filter by `Host: mlb.dglc.com` first to see only app traffic. A full `crawl_routes.py` run writes 50–75k rows because BFS expands season × bowler × week × query-string variants × (editor + viewer pass).
 - **Season selector JS** (base.html): admin routes use `/seasons/<id>` (plural, no trailing slash); entry routes use `/season/<id>` (singular, NO trailing slash — week_list is `/entry/season/<id>` with no slash). `replaceSeasonInPath()` uses `(\/|$)` to handle both trailing-slash and end-of-path cases. `onSeasonScopedPage` uses same pattern. Records/BowlerDir pages set `isCrossSeasonPage=true` (via Jinja endpoint check) to suppress stored-season restore. Pages arrived at via `?back=records` set `arrivedFromRecords=true` to skip localStorage update (prevents browsing historical records from corrupting the working season).
 - **Sortable columns**: `sortable-head` class on `<thead>`, `data-sort="num"|"text"` on `<th>`, optional `data-sort-val` on `<td>` when display differs from sort value (e.g. medal emoji, "3, 3, 3" games string, score+name cell). Applied to: Weekly Alpha, YTD Alpha, Bowler Directory, Records (All-Time + By Season + Most Improved), Bowler Detail (all 3 tables).
 - Records By Season tab: two-row merged header was flattened to single row (required for column-index sort to match td positions). Column labels abbreviated to HG Scr / HG Hcp / HS Scr / HS Hcp.
