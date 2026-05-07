@@ -1,9 +1,12 @@
 """
 check_health.py — Health check for the bowling league app.
 
-Pings http://localhost:5001/ on each run. On first failure, emails an alert to
-the admin. On recovery, emails a notice. A sentinel file at /tmp/bowling-health-down
-prevents repeated alerts while the app stays down.
+Runs two independent probes on each invocation:
+  1. local  — http://localhost:5001/healthz (the gunicorn app on this host)
+  2. public — https://mlb.dglc.com/healthz (DNS + Pi nginx + TLS + app)
+
+Each probe has its own sentinel and alert/recovery flow, so a Pi or network
+outage that leaves the local app healthy still produces a distinct alert.
 
 Install the launchd timer (run on utilityserver):
 
@@ -23,10 +26,12 @@ from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv()
 
-HEALTH_URL = 'http://localhost:5001/healthz'
-SENTINEL   = '/tmp/bowling-health-down'
-TIMEOUT    = 10  # seconds
-RECIPIENT  = 'david@dglc.com'
+LOCAL_URL       = 'http://localhost:5001/healthz'
+PUBLIC_URL      = 'https://mlb.dglc.com/healthz'
+SENTINEL_LOCAL  = '/tmp/bowling-health-down'
+SENTINEL_PUBLIC = '/tmp/bowling-health-public-down'
+TIMEOUT         = 10  # seconds
+RECIPIENT       = 'david@dglc.com'
 
 
 def _graph_token(tenant_id, client_id, client_secret):
@@ -72,49 +77,76 @@ def _send_email(subject, body):
         pass  # 202 Accepted
 
 
-def check():
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    error = None
+def _probe(url):
     try:
-        urllib.request.urlopen(HEALTH_URL, timeout=TIMEOUT)
-        up = True
+        urllib.request.urlopen(url, timeout=TIMEOUT)
+        return True, None
     except urllib.error.HTTPError:
-        up = True   # gunicorn is serving even if the app returns an error page
+        return True, None  # something is serving even if it returns an error page
     except Exception as exc:
-        up = False
-        error = str(exc)
+        return False, str(exc)
 
-    was_down = os.path.exists(SENTINEL)
+
+def _evaluate(label, url, sentinel, down_subject, down_body_extra, up_subject, now):
+    up, error = _probe(url)
+    was_down = os.path.exists(sentinel)
 
     if not up and not was_down:
-        with open(SENTINEL, 'w') as f:
+        with open(sentinel, 'w') as f:
             f.write(now)
         try:
             _send_email(
-                'mlb.dglc.com is DOWN',
-                f'<p>The bowling league app did not respond at {now}.</p>'
+                down_subject,
+                f'<p>{label} probe failed at {now}.</p>'
+                f'<p>URL: <code>{url}</code></p>'
                 f'<p>Error: <code>{error}</code></p>'
-                f'<p>Check <code>/tmp/bowling-app.err</code> on utilityserver.</p>',
+                f'{down_body_extra}',
             )
-            print(f'{now} DOWN — alert sent')
+            print(f'{now} {label} DOWN — alert sent')
         except Exception as e:
-            print(f'{now} DOWN — failed to send alert: {e}', file=sys.stderr)
+            print(f'{now} {label} DOWN — failed to send alert: {e}', file=sys.stderr)
 
     elif up and was_down:
-        os.remove(SENTINEL)
+        os.remove(sentinel)
         try:
             _send_email(
-                'mlb.dglc.com is back UP',
-                f'<p>The bowling league app recovered and is responding normally at {now}.</p>',
+                up_subject,
+                f'<p>{label} probe recovered at {now}. URL: <code>{url}</code></p>',
             )
-            print(f'{now} UP — recovery notice sent')
+            print(f'{now} {label} UP — recovery notice sent')
         except Exception as e:
-            print(f'{now} UP — failed to send recovery notice: {e}', file=sys.stderr)
+            print(f'{now} {label} UP — failed to send recovery notice: {e}', file=sys.stderr)
 
     elif not up:
-        print(f'{now} still DOWN (alert already sent at {open(SENTINEL).read().strip()})')
+        print(f'{now} {label} still DOWN (alert sent at {open(sentinel).read().strip()})')
     else:
-        print(f'{now} OK')
+        print(f'{now} {label} OK')
+
+
+def check():
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    _evaluate(
+        label='local',
+        url=LOCAL_URL,
+        sentinel=SENTINEL_LOCAL,
+        down_subject='mlb.dglc.com is DOWN (local app)',
+        down_body_extra='<p>Check <code>/tmp/bowling-app.err</code> on utilityserver.</p>',
+        up_subject='mlb.dglc.com is back UP (local app)',
+        now=now,
+    )
+    _evaluate(
+        label='public',
+        url=PUBLIC_URL,
+        sentinel=SENTINEL_PUBLIC,
+        down_subject='mlb.dglc.com unreachable from public internet',
+        down_body_extra=(
+            '<p>The local app on utilityserver may still be fine — this probe '
+            'goes through DNS, the Pi at 10.0.0.82, nginx, and TLS. Likely '
+            'culprit: Pi offline, network, or DNS.</p>'
+        ),
+        up_subject='mlb.dglc.com public URL recovered',
+        now=now,
+    )
 
 
 if __name__ == '__main__':
