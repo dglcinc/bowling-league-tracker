@@ -26,6 +26,9 @@
   <div class="col-auto">
     <a href="{{ url_for('payout.payout_config', season_id=season.id) }}" class="btn btn-outline-success btn-sm">Payout Config</a>
   </div>
+  <div class="col-auto">
+    <a href="{{ url_for('admin.banquet_config', season_id=season.id) }}" class="btn btn-outline-success btn-sm">🍽 Banquet Config</a>
+  </div>
 </div>
 
 <h5>Teams <small class="text-muted fw-normal" style="font-size:0.75rem">Click a team to edit name &amp; captain</small></h5>
@@ -402,6 +405,12 @@
               <input class="form-check-input" type="checkbox" name="bcc_recipients" id="bccRecipients" value="1" checked>
               <label class="form-check-label" for="bccRecipients">
                 BCC all recipients (uncheck to CC them instead — captains stay on TO)
+              </label>
+            </div>
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" name="include_banquet" id="includeBanquet" value="1">
+              <label class="form-check-label" for="includeBanquet">
+                Include banquet attendance list (appended to the body for editing on the review page)
               </label>
             </div>
           </div>

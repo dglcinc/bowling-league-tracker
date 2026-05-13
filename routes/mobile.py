@@ -265,6 +265,25 @@ def home():
     if season and upcoming_week and upcoming_week.tournament_type == 'indiv_scratch':
         _, _, hr_qualifiers = get_hr_qualifiers(season.id, upcoming_week.week_num)
 
+    # Banquet reminder
+    from datetime import date as _date
+    from models import BanquetConfig as _BC
+    banquet_info = None
+    if season:
+        banquet_week = Week.query.filter_by(
+            season_id=season.id, tournament_type='banquet'
+        ).first()
+        if banquet_week and banquet_week.date and banquet_week.date >= _date.today():
+            bc = _BC.query.filter_by(season_id=season.id).first()
+            if bc and (bc.location or bc.start_time or bc.price is not None):
+                banquet_info = {
+                    'date': banquet_week.date,
+                    'location': bc.location,
+                    'start_time': bc.start_time,
+                    'price': bc.price,
+                    'label': season.tournament_labels.get('banquet', 'End of Season Banquet'),
+                }
+
     return render_template('mobile/home.html',
                            season=season,
                            my_team=my_team,
@@ -280,7 +299,8 @@ def home():
                            last_week_opp=last_week_opp,
                            last_week_champ=last_week_champ,
                            last_week_top3=last_week_top3,
-                           roster_by_team=roster_by_team)
+                           roster_by_team=roster_by_team,
+                           banquet_info=banquet_info)
 
 
 # ---------------------------------------------------------------------------

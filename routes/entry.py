@@ -4,7 +4,8 @@ Score entry routes: weekly matchup entry, blind management, points calculation.
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
-                    TeamPoints, Roster, Bowler, TournamentEntry, Team)
+                    TeamPoints, Roster, Bowler, TournamentEntry, Team,
+                    BanquetConfig, BanquetAttendee)
 from calculations import (score_matchup, score_position_night, calculate_handicap,
                           get_weekly_prizes, get_team_standings, get_matchup_breakdown,
                           get_position_night_breakdown, get_bowler_stats,
@@ -593,6 +594,8 @@ def tournament_entry(season_id, week_num):
     if not week.tournament_type:
         flash('This week is not a tournament week.', 'warning')
         return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+    if week.tournament_type == 'banquet':
+        return redirect(url_for('entry.banquet_entry', season_id=season_id))
 
     tt = week.tournament_type
     label = season.tournament_labels.get(tt, tt)
@@ -702,3 +705,158 @@ def tournament_entry(season_id, week_num):
                            num_games=num_games,
                            use_handicap=use_handicap,
                            bowler_handicaps=bowler_handicaps)
+
+
+# ---------------------------------------------------------------------------
+# Banquet attendance + payment tracking
+# ---------------------------------------------------------------------------
+
+def _build_banquet_rows(season_id):
+    """Return ordered list of (kind, bowler_or_None, attendee_or_None) for the page.
+
+    kind = 'bowler' for active rostered bowlers (with or without an attendee row yet)
+    kind = 'writein' for write-in attendee rows.
+    Sorted alphabetical by last name, with write-ins after rostered bowlers.
+    """
+    active_rosters = (Roster.query
+                      .filter_by(season_id=season_id, active=True)
+                      .join(Bowler)
+                      .order_by(Bowler.last_name, Bowler.first_name)
+                      .all())
+    bowler_ids = [r.bowler_id for r in active_rosters]
+    attendees = BanquetAttendee.query.filter_by(season_id=season_id).all()
+    by_bowler = {a.bowler_id: a for a in attendees if a.bowler_id}
+    writeins = [a for a in attendees if not a.bowler_id]
+    writeins.sort(key=lambda a: (a.guest_name or '').lower())
+
+    rows = []
+    for r in active_rosters:
+        rows.append(('bowler', r.bowler, by_bowler.get(r.bowler_id)))
+    for a in writeins:
+        rows.append(('writein', None, a))
+
+    # Also surface attendee rows for bowlers no longer on the active roster
+    # (e.g. someone marked attending then deactivated). Treat as bowler rows.
+    extra_bowler_ids = [bid for bid in by_bowler if bid not in set(bowler_ids)]
+    if extra_bowler_ids:
+        extras = (Bowler.query
+                  .filter(Bowler.id.in_(extra_bowler_ids))
+                  .order_by(Bowler.last_name)
+                  .all())
+        for b in extras:
+            rows.append(('bowler', b, by_bowler[b.id]))
+
+    return rows
+
+
+@entry_bp.route('/season/<int:season_id>/banquet', methods=['GET'])
+def banquet_entry(season_id):
+    season = Season.query.get_or_404(season_id)
+    config = BanquetConfig.query.filter_by(season_id=season_id).first()
+    banquet_week = Week.query.filter_by(
+        season_id=season_id, tournament_type='banquet'
+    ).first()
+    rows = _build_banquet_rows(season_id)
+
+    counts = {'yes_paid': 0, 'yes_unpaid': 0, 'no': 0, 'unknown': 0}
+    expected_revenue = 0
+    for _kind, _bowler, att in rows:
+        if att is None:
+            counts['unknown'] += 1
+            continue
+        if att.attending == 'yes':
+            if att.paid:
+                counts['yes_paid'] += 1
+            else:
+                counts['yes_unpaid'] += 1
+        elif att.attending == 'no':
+            counts['no'] += 1
+        else:
+            counts['unknown'] += 1
+    if config and config.price is not None:
+        expected_revenue = float(config.price) * (counts['yes_paid'] + counts['yes_unpaid'])
+
+    return render_template('entry/banquet_entry.html',
+                           season=season,
+                           config=config,
+                           banquet_week=banquet_week,
+                           rows=rows,
+                           counts=counts,
+                           expected_revenue=expected_revenue,
+                           label=season.tournament_labels.get('banquet', 'End of Season Banquet'))
+
+
+@entry_bp.route('/season/<int:season_id>/banquet/update', methods=['POST'])
+def banquet_update(season_id):
+    from flask_login import current_user
+    if not current_user.is_editor:
+        abort(403)
+    Season.query.get_or_404(season_id)
+
+    active_bowler_ids = {
+        r.bowler_id for r in
+        Roster.query.filter_by(season_id=season_id, active=True).all()
+    }
+
+    all_existing = BanquetAttendee.query.filter_by(season_id=season_id).all()
+    existing_by_bowler = {a.bowler_id: a for a in all_existing if a.bowler_id}
+    existing_by_id = {a.id: a for a in all_existing}
+
+    # Update / create bowler rows
+    for bid in active_bowler_ids:
+        attending = request.form.get(f'attending_b{bid}')
+        if attending not in ('yes', 'no', 'unknown'):
+            continue
+        paid = request.form.get(f'paid_b{bid}') == '1'
+        notes = request.form.get(f'notes_b{bid}', '').strip() or None
+        att = existing_by_bowler.get(bid)
+        # Skip creating a row if nothing was touched
+        if att is None and attending == 'unknown' and not paid and not notes:
+            continue
+        if att is None:
+            att = BanquetAttendee(season_id=season_id, bowler_id=bid)
+            db.session.add(att)
+        att.attending = attending
+        att.paid = paid
+        att.notes = notes
+
+    # Existing write-in rows — update or delete
+    for att_id, att in list(existing_by_id.items()):
+        if att.bowler_id is not None:
+            continue
+        guest_name = request.form.get(f'guest_w{att_id}', '').strip()
+        if not guest_name:
+            db.session.delete(att)
+            continue
+        att.guest_name = guest_name
+        attending = request.form.get(f'attending_w{att_id}', 'yes')
+        if attending in ('yes', 'no', 'unknown'):
+            att.attending = attending
+        att.paid = request.form.get(f'paid_w{att_id}') == '1'
+        att.notes = request.form.get(f'notes_w{att_id}', '').strip() or None
+
+    # New write-ins (blank rows the page rendered for adding)
+    new_names = request.form.getlist('new_guest_name')
+    new_attending = request.form.getlist('new_attending')
+    new_paid = request.form.getlist('new_paid')
+    new_notes = request.form.getlist('new_notes')
+    for i, name in enumerate(new_names):
+        name = name.strip()
+        if not name:
+            continue
+        attending = new_attending[i] if i < len(new_attending) else 'yes'
+        if attending not in ('yes', 'no', 'unknown'):
+            attending = 'yes'
+        paid = (new_paid[i] == '1') if i < len(new_paid) else False
+        notes = (new_notes[i].strip() or None) if i < len(new_notes) else None
+        db.session.add(BanquetAttendee(
+            season_id=season_id,
+            guest_name=name,
+            attending=attending,
+            paid=paid,
+            notes=notes,
+        ))
+
+    db.session.commit()
+    flash('Banquet attendance saved.', 'success')
+    return redirect(url_for('entry.banquet_entry', season_id=season_id))

@@ -43,13 +43,14 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 - Lane assignments determined by standings: top-2 teams play each other, bottom-2 play each other
 - **Auto-assigned**: whenever prior week's scores are saved, the position night's ScheduleEntry rows update automatically if the position night hasn't been entered yet
 
-### Post-Season Tournaments (weeks 23–26)
-Four tournament weeks are appended after every regular season. The order is the default; can be reordered via Admin → Week Dates without structural changes.
+### Post-Season Tournaments (weeks 23–27)
+Five post-season weeks are appended after every regular season. The first four are tournaments; week 27 is the end-of-season banquet. The order is the default; can be reordered via Admin → Week Dates without structural changes.
 
 - **Club Championship** (`tournament_type='club_championship'`, `is_position_night=True`): team competition scored as a position night; uses normal matchup entry; auto-assigns lane assignments from standings
 - **Harry E. Russell Championship** (`indiv_scratch`): individual scratch, 5 games; entry dropdown shows top-10 qualifiers (≥30 regular-season games, active rostered, top avg) in the main list + write-in; all-time winners (place=1) who are NOT current qualifiers appear in a "Past Champions" optgroup (covers both rostered-but-below-30-games and un-rostered past winners); entry page starts with 10 rows; desktop and mobile home pages both show qualifiers list when Russell is upcoming. Shared helpers: `get_hr_qualifiers()` and `get_hr_past_champions()` in `calculations.py`.
 - **Hcp Tournament 1** (`indiv_hcp_1`): individual handicap, 3 games; active bowlers + write-in (named "Buzz Bedford Championship" pre-2023, "Shep Belyea Open" 2023+)
 - **Hcp Tournament 2** (`indiv_hcp_2`): individual handicap, 3 games; active bowlers + write-in (named "Rose Bowl" pre-2023, "Chad Harris Memorial Bowl" 2023+)
+- **End of Season Banquet** (`banquet`): not a scored event; date/location/time/price configured per season at Admin → Banquet Config (location/time/price in `banquet_configs`, date in `Week.date`). Attendance + payment tracked at `/entry/season/<id>/banquet` (viewer-accessible; admin-editable) — active rostered bowlers + write-ins with tri-state attending (yes/no/unknown) + paid checkbox. Home pages show a green banner with date/location/price + "Track attendance" link when banquet date is in the future. Both email flows (`admin.send_email` and `admin.email_compose`) have an **Include banquet attendance list** checkbox that appends a formatted list (grouped by paid-status, sorted by last name) to the email body.
 
 Tournament display names are configurable per season via Admin → Week Dates and stored as JSON in `Season.tournament_labels`. Tournament scores stored in `tournament_entries` table (game1=300/200/100 for placement ordering on the prizes page). All tournament weeks excluded from `get_bowler_entries` so they never affect season averages/handicaps. Tournament entry form shows live JS rankings. Top-3 placement can also be set via Admin → Tournament Placements (uses dummy scores 300/200/100).
 

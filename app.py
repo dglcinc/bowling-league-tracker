@@ -59,6 +59,7 @@ _VIEWER_DEFAULTS = [
     ('records.bowler_dir',    'Bowler Directory',    True),
     ('entry.week_list',       'Scores (week list)',  True),
     ('entry.week_entry',      'Scores (week view)',  True),
+    ('entry.banquet_entry',   'Banquet attendance',  True),
     ('chat.index',            'Ask (LLM stats)',     True),
     ('chat.ask',              'Ask (LLM stats)',     True),
 ]
@@ -154,6 +155,28 @@ def _migrate_db(db):
             helpful BOOLEAN,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )""",
+        # Banquet — display name + description on Season
+        "ALTER TABLE seasons ADD COLUMN name_banquet VARCHAR(128) DEFAULT 'End of Season Banquet'",
+        "ALTER TABLE seasons ADD COLUMN desc_banquet TEXT DEFAULT ''",
+        # Banquet config — date lives on weeks.date for the banquet week
+        """CREATE TABLE IF NOT EXISTS banquet_configs (
+            season_id INTEGER PRIMARY KEY REFERENCES seasons(id),
+            location VARCHAR(256),
+            start_time VARCHAR(16),
+            price NUMERIC(8, 2),
+            notes TEXT
+        )""",
+        # Banquet attendance + payment tracking (one row per rostered bowler or write-in)
+        """CREATE TABLE IF NOT EXISTS banquet_attendees (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            season_id INTEGER NOT NULL REFERENCES seasons(id),
+            bowler_id INTEGER REFERENCES bowlers(id),
+            guest_name VARCHAR(128),
+            attending VARCHAR(8) DEFAULT 'unknown',
+            paid BOOLEAN DEFAULT 0,
+            notes VARCHAR(256),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:
@@ -220,6 +243,25 @@ def _migrate_db(db):
                 if last and last.date:
                     wk.date = last.date + timedelta(weeks=1)
                 db.session.add(wk)
+
+    # Backfill banquet week for seasons that have the 4 tournament weeks but no banquet.
+    # Active seasons only — historical seasons don't need a banquet slot.
+    for season in seasons:
+        if not season.is_active:
+            continue
+        has_banquet = Week.query.filter_by(
+            season_id=season.id, tournament_type='banquet'
+        ).first()
+        if has_banquet:
+            continue
+        max_wk = db.session.query(db.func.max(Week.week_num)).filter_by(season_id=season.id).scalar() or 0
+        if max_wk == season.num_weeks + 4:
+            wn = max_wk + 1
+            last = Week.query.filter_by(season_id=season.id, week_num=max_wk).first()
+            wk = Week(season_id=season.id, week_num=wn, tournament_type='banquet')
+            if last and last.date:
+                wk.date = last.date + timedelta(weeks=1)
+            db.session.add(wk)
     db.session.commit()
 
 
@@ -628,6 +670,24 @@ def create_app():
         if upcoming_week and upcoming_week.tournament_type == 'indiv_scratch':
             _, _, hr_qualifiers = get_hr_qualifiers(season.id, upcoming_week.week_num)
 
+        # Banquet reminder — show banner if banquet_config exists and date hasn't passed.
+        from datetime import date as _date
+        from models import BanquetConfig as _BC
+        banquet_info = None
+        banquet_week = Week.query.filter_by(
+            season_id=season.id, tournament_type='banquet'
+        ).first()
+        if banquet_week and banquet_week.date and banquet_week.date >= _date.today():
+            bc = _BC.query.filter_by(season_id=season.id).first()
+            if bc and (bc.location or bc.start_time or bc.price is not None):
+                banquet_info = {
+                    'date': banquet_week.date,
+                    'location': bc.location,
+                    'start_time': bc.start_time,
+                    'price': bc.price,
+                    'label': season.tournament_labels.get('banquet', 'End of Season Banquet'),
+                }
+
         return render_template('home.html',
                                season=season,
                                upcoming_week=upcoming_week,
@@ -650,7 +710,8 @@ def create_app():
                                entries=entries,
                                avg=avg,
                                hg_scratch=hg_scratch,
-                               hs_scratch=hs_scratch)
+                               hs_scratch=hs_scratch,
+                               banquet_info=banquet_info)
 
     return app
 

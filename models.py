@@ -96,6 +96,9 @@ class Season(db.Model):
     desc_indiv_hcp_1       = db.Column(db.Text, default='Any active bowler can bowl. 3 games with handicap.')
     desc_indiv_hcp_2       = db.Column(db.Text, default='Bowlers 50+ years old with 30+ games this season. 3 games with handicap.')
 
+    name_banquet = db.Column(db.String(128), default='End of Season Banquet')
+    desc_banquet = db.Column(db.Text, default='')
+
     @property
     def tournament_labels(self):
         """Map tournament_type key → display name for this season."""
@@ -104,6 +107,7 @@ class Season(db.Model):
             'indiv_scratch':     self.name_indiv_scratch     or 'Individual Scratch Championship',
             'indiv_hcp_1':       self.name_indiv_hcp_1       or 'Individual Handicap Tournament 1',
             'indiv_hcp_2':       self.name_indiv_hcp_2       or 'Individual Handicap Tournament 2',
+            'banquet':           self.name_banquet           or 'End of Season Banquet',
         }
 
     teams = db.relationship('Team', back_populates='season', lazy='dynamic')
@@ -506,6 +510,56 @@ class ChatLog(db.Model):
 
     def __repr__(self):
         return f'<ChatLog id={self.id} user={self.user_id}>'
+
+
+class BanquetConfig(db.Model):
+    """End-of-season banquet configuration (one row per season).
+    Date lives on Week.date for the week with tournament_type='banquet'."""
+    __tablename__ = 'banquet_configs'
+
+    season_id = db.Column(db.Integer, db.ForeignKey('seasons.id'), primary_key=True)
+    location = db.Column(db.String(256))
+    start_time = db.Column(db.String(16))    # free-form, e.g. "6:30 PM"
+    price = db.Column(db.Numeric(8, 2))
+    notes = db.Column(db.Text)
+
+    season = db.relationship('Season')
+
+    def __repr__(self):
+        return f'<BanquetConfig season={self.season_id}>'
+
+
+class BanquetAttendee(db.Model):
+    """One attendance record for the season banquet.
+    Rostered bowlers: bowler_id set, guest_name None.
+    Write-ins: bowler_id None, guest_name set."""
+    __tablename__ = 'banquet_attendees'
+
+    id = db.Column(db.Integer, primary_key=True)
+    season_id = db.Column(db.Integer, db.ForeignKey('seasons.id'), nullable=False)
+    bowler_id = db.Column(db.Integer, db.ForeignKey('bowlers.id'), nullable=True)
+    guest_name = db.Column(db.String(128), nullable=True)
+    attending = db.Column(db.String(8), default='unknown')   # 'yes' | 'no' | 'unknown'
+    paid = db.Column(db.Boolean, default=False)
+    notes = db.Column(db.String(256))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    bowler = db.relationship('Bowler')
+
+    @property
+    def display_name(self):
+        if self.bowler:
+            return self.bowler.display_name
+        return self.guest_name or '(unknown)'
+
+    @property
+    def sort_key(self):
+        if self.bowler:
+            return (self.bowler.last_name or '', self.bowler.first_name or '')
+        return (self.guest_name or '', '')
+
+    def __repr__(self):
+        return f'<BanquetAttendee season={self.season_id} who={self.display_name}>'
 
 
 class RequestLog(db.Model):
