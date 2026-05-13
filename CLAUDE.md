@@ -9,12 +9,12 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 **Important:** Never put player names, team names (which are player surnames), or any other personal information in the repository, code, comments, or documentation.
 
-## Repo / Branch State (as of 2026-05-07)
+## Repo / Branch State (as of 2026-05-12)
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
 - No open PRs.
-- PRs #37–#143 merged to main; #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138).
+- PRs #37–#148 merged to main; #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138); #145 superseded by #146 (CC-me checkbox replaced by BCC-all-recipients).
 
 ## League Structure
 
@@ -215,7 +215,7 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 - **Tournament entry row buffer + draft saves** (PR #114): all three `tournament_entry` types (`indiv_scratch`, `indiv_hcp_1`, `indiv_hcp_2`) render `max(existing+5, 10)` rows so there's always headroom to add bowlers. POST handler persists rows that have a bowler/guest_name even when no scores are entered (names-only "draft" save). `week.is_entered` is only set when at least one score is present — names-only saves leave the week in draft state so the "scores posted" push notification doesn't fire prematurely.
 - **Email send flow** (`admin/email_compose`): two-step POST — first POST resolves recipients and renders a preview modal; second POST with `send_confirmed=1` actually sends. Preview modal renders **TO / CC / BCC / Body** as editable fields with recipient counts (PR #117); `cc_override` and `bcc_override` textareas let the editor adjust either list at the last step. The `body_text` is now a visible textarea in the preview, not a hidden input — typos can be caught right before send. PDF attachment is the same `reports/week_prizes.html` the navbar serves (PR #116) — both go through `routes.reports.build_week_prizes_context()` so they can never drift; `week_prizes_pdf.html` is gone. Tournament weeks still get the PDF (PR #115 dropped the `not week.tournament_type` guard).
 - **`_send_via_graph` signature** (PR #117): `(app_config, subject, html_body, to_list, bcc_list, cc_list=None, pdf_attachment=None, pdf_filename=None)`. `cc_list` is keyword-only-by-convention because it's optional; passes through to Graph as `ccRecipients`.
-- **Admin Send Email modal** (`templates/admin/season_detail.html`): Subject prefills with `league_settings.league_name` (PR #117). Different route from the weekly email — `admin.send_email`, ad-hoc, no preview modal.
+- **Admin Send Email modal** (`templates/admin/season_detail.html`): Subject prefills with `league_settings.league_name` (PR #117). Different route from the weekly email — `admin.send_email`, ad-hoc. Now has its own two-step review/confirm (PR #144): first POST resolves recipients by mode, second POST with `send_confirmed=1` actually sends. Review screen lives at `templates/admin/email_review.html` (full-page, not a modal — distinct from the weekly path's inline modal). Default routing: **TO = team captains** via `_resolve_captain_emails`, **BCC = selected recipients**. The `bcc_recipients` checkbox in the modal (checked by default, PR #146) controls recipient placement — unchecked routes recipients to **CC** with captains still on TO (PR #148). `cc_self`/`bcc_self` are gone.
 - **Prizes page / print batch**: prize calculation skipped entirely for tournament weeks (`tournament_type` not None); YTD leaders and high averages are still shown for all weeks including tournament weeks. Print orientation is portrait (`@page { size: portrait }` in `week_prizes.html`).
 - **Gunicorn error log**: tracebacks go to `/tmp/bowling-app.err`, not `/tmp/bowling-app.log` (which is stdout/access).
 - **Traffic auditing**: `request_log` table is the authoritative source for in-app traffic (bowler_id, endpoint, path, status, remote_addr, user_agent). `healthz`, `static`, and `admin.activity` are excluded from logging in `app.py:349`. Filter `WHERE user_agent NOT LIKE 'crawl_routes.py%'` to drop test-crawler runs (PR #142 tagged `crawl_routes.py` with `User-Agent: crawl_routes.py/1.0`; older crawl runs show as `Werkzeug/3.1.8` from `127.0.0.1`). nginx logs on the Pi are dominated by bot probes hitting the default vhost — filter by `Host: mlb.dglc.com` first to see only app traffic. A full `crawl_routes.py` run writes 50–75k rows because BFS expands season × bowler × week × query-string variants × (editor + viewer pass).
