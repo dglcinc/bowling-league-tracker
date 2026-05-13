@@ -394,11 +394,9 @@
                 <div id="haPreview" class="small text-muted ms-4 mt-1" style="display:none"></div>
               </div>
             </div>
-            <div class="form-check mt-2">
-              <input class="form-check-input" type="checkbox" name="bcc_self" id="bccSelf" value="1">
-              <label class="form-check-label" for="bccSelf">
-                BCC recipients — send to <em>{{ sender_email }}</em> with recipients in BCC
-              </label>
+            <div class="form-text small text-muted mt-2">
+              Email will be sent <strong>TO team captains</strong> with
+              <strong>recipients in BCC</strong>. You'll review TO/CC/BCC and the body on the next screen before sending.
             </div>
           </div>
           <div id="selectedPreview" class="mb-2 text-muted small" style="display:none"></div>
@@ -415,7 +413,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Send Email</button>
+          <button type="submit" class="btn btn-primary">Review and Send</button>
         </div>
       </form>
     </div>
