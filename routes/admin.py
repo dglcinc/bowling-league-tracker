@@ -236,12 +236,33 @@ def send_email(season_id):
     season = Season.query.get_or_404(season_id)
     subject = request.form.get('subject', '').strip()
     body_text = request.form.get('body', '').strip()
-    recipient_mode = request.form.get('recipient_mode', 'selected')
-    bcc_self = request.form.get('bcc_self') == '1'
+    send_confirmed = request.form.get('send_confirmed') == '1'
 
     if not subject or not body_text:
         flash('Subject and body are required.', 'warning')
         return redirect(url_for('admin.season_detail', season_id=season_id))
+
+    if send_confirmed:
+        # Second POST — read possibly-edited recipient lists and send.
+        to_list  = [e.strip() for e in request.form.get('to_emails', '').splitlines() if e.strip()]
+        cc_list  = [e.strip() for e in request.form.get('cc_emails', '').splitlines() if e.strip()]
+        bcc_list = [e.strip() for e in request.form.get('bcc_emails', '').splitlines() if e.strip()]
+        if not to_list and not bcc_list:
+            flash('No recipients — set at least one TO or BCC address.', 'warning')
+            return redirect(url_for('admin.season_detail', season_id=season_id))
+        html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
+        try:
+            _send_via_graph(current_app.config, subject, html_body,
+                            to_list, bcc_list, cc_list=cc_list)
+            total = len(to_list) + len(cc_list) + len(bcc_list)
+            flash(f'Email sent ({len(to_list)} TO, {len(cc_list)} CC, '
+                  f'{len(bcc_list)} BCC — {total} total).', 'success')
+        except Exception as exc:
+            flash(f'Email failed: {exc}', 'danger')
+        return redirect(url_for('admin.season_detail', season_id=season_id))
+
+    # First POST — resolve recipients based on mode, then render review page.
+    recipient_mode = request.form.get('recipient_mode', 'selected')
 
     if recipient_mode == 'selected':
         bowler_ids = request.form.getlist('bowler_ids', type=int)
@@ -281,28 +302,29 @@ def send_email(season_id):
     else:
         bowlers = []
 
-    recipient_emails = [b.email for b in bowlers if b.email]
-    if not recipient_emails:
+    bcc_emails = [b.email for b in bowlers if b.email]
+    no_email_bowlers = [b for b in bowlers if not b.email]
+
+    # Default routing: TO = team captains, BCC = recipients.
+    teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
+    captain_info = _resolve_captain_emails(teams, season_id)
+    to_emails = [e for _t, _b, e in captain_info if e]
+    missing_captains = [t for t, _b, e in captain_info if not e]
+
+    if not bcc_emails and not to_emails:
         flash('No recipients with email addresses found.', 'warning')
         return redirect(url_for('admin.season_detail', season_id=season_id))
 
-    html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
-
-    sender_email = current_app.config.get('GRAPH_SENDER_EMAIL', '')
-    if bcc_self and sender_email:
-        to_list = [sender_email]
-        bcc_list = recipient_emails
-    else:
-        to_list = recipient_emails
-        bcc_list = []
-
-    try:
-        _send_via_graph(current_app.config, subject, html_body, to_list, bcc_list)
-        flash(f'Email sent to {len(recipient_emails)} recipient(s).', 'success')
-    except Exception as exc:
-        flash(f'Email failed: {exc}', 'danger')
-
-    return redirect(url_for('admin.season_detail', season_id=season_id))
+    return render_template('admin/email_review.html',
+                           season=season,
+                           subject=subject,
+                           body_text=body_text,
+                           to_emails=to_emails,
+                           cc_emails=[],
+                           bcc_emails=bcc_emails,
+                           missing_captains=missing_captains,
+                           no_email_bowlers=no_email_bowlers,
+                           recipient_mode=recipient_mode)
 
 
 @admin_bp.route('/viewer-access', methods=['GET', 'POST'])

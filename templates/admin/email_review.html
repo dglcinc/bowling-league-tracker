@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Review Email — {{ season.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.seasons') }}">Seasons</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.season_detail', season_id=season.id) }}">{{ season.name }}</a></li>
+    <li class="breadcrumb-item active">Review Email</li>
+  </ol>
+</nav>
+
+<h2>Review Email Before Sending</h2>
+<p class="text-muted mb-3">
+  Edit any field below, then click <strong>Send Now</strong>.
+  Default routing: <strong>TO</strong> = team captains, <strong>BCC</strong> = recipients.
+</p>
+
+{% if missing_captains %}
+<div class="alert alert-warning">
+  <strong>Captain email missing for:</strong>
+  {{ missing_captains | map(attribute='name') | join(', ') }}.
+  Add their email to the TO list below if you want them included.
+</div>
+{% endif %}
+
+{% if no_email_bowlers %}
+<div class="alert alert-info small mb-3">
+  Skipped (no email on file):
+  {{ no_email_bowlers | map(attribute='last_name') | join(', ') }}.
+</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('admin.send_email', season_id=season.id) }}">
+  <input type="hidden" name="send_confirmed" value="1">
+  <input type="hidden" name="recipient_mode" value="{{ recipient_mode }}">
+
+  <div class="mb-3">
+    <label class="form-label fw-semibold">Subject</label>
+    <input type="text" class="form-control" name="subject" value="{{ subject | e }}" required>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label fw-semibold">
+      TO — Captains (<span id="toCount">{{ to_emails | length }}</span>)
+    </label>
+    <textarea class="form-control font-monospace" name="to_emails" rows="2" id="toEmails"
+              style="font-size:0.85rem"
+              placeholder="(none)">{{ to_emails | join('\n') }}</textarea>
+    <div class="form-text">One address per line.</div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label fw-semibold">
+      CC (<span id="ccCount">{{ cc_emails | length }}</span>)
+    </label>
+    <textarea class="form-control font-monospace" name="cc_emails" rows="2" id="ccEmails"
+              style="font-size:0.85rem"
+              placeholder="(none)">{{ cc_emails | join('\n') }}</textarea>
+    <div class="form-text">One address per line.</div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label fw-semibold">
+      BCC — Recipients (<span id="bccCount">{{ bcc_emails | length }}</span>)
+    </label>
+    <textarea class="form-control font-monospace" name="bcc_emails" rows="6" id="bccEmails"
+              style="font-size:0.85rem"
+              placeholder="(none)">{{ bcc_emails | join('\n') }}</textarea>
+    <div class="form-text">One address per line.</div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label fw-semibold">Body</label>
+    <textarea class="form-control" name="body" rows="10" required>{{ body_text }}</textarea>
+  </div>
+
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin.season_detail', season_id=season.id) }}"
+       class="btn btn-secondary">Cancel</a>
+    <button type="submit" class="btn btn-primary">Send Now</button>
+  </div>
+</form>
+
+<script>
+(function() {
+  function countLines(id, badgeId) {
+    var ta = document.getElementById(id);
+    if (!ta) return;
+    var n = ta.value.split('\n').filter(function(l) { return l.trim().length > 0; }).length;
+    var badge = document.getElementById(badgeId);
+    if (badge) badge.textContent = n;
+  }
+  ['toEmails:toCount', 'ccEmails:ccCount', 'bccEmails:bccCount'].forEach(function(pair) {
+    var parts = pair.split(':');
+    var ta = document.getElementById(parts[0]);
+    if (ta) ta.addEventListener('input', function() { countLines(parts[0], parts[1]); });
+  });
+})();
+</script>
+{% endblock %}
