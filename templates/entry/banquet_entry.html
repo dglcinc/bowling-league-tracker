@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}{{ label }} — {{ season.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .banquet-tbl td, .banquet-tbl th { vertical-align: middle; }
+  .banquet-tbl .attend-cell { white-space: nowrap; }
+  .banquet-tbl .notes-cell input { min-width: 160px; }
+  .att-yes  { background: #d1e7dd; }
+  .att-no   { background: #f8d7da; }
+  .att-unkn { background: transparent; }
+  .print-only { display: none; }
+  @media print {
+    .no-print, form .no-print, .breadcrumb, button, .btn,
+    .banquet-tbl .btn-group, .banquet-tbl input[type=radio], .banquet-tbl label,
+    .banquet-tbl input[type=checkbox],
+    .banquet-tbl .notes-cell input, .banquet-tbl .delete-cell { display: none !important; }
+    .print-only { display: inline !important; }
+    .banquet-tbl .attend-cell { font-weight: 600; }
+    .banquet-tbl thead { display: table-header-group; }
+    .banquet-tbl .notes-cell { font-size: 0.85rem; }
+    @page { size: portrait; margin: 0.5in; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="no-print">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('entry.week_list', season_id=season.id) }}">Weeks</a></li>
+    <li class="breadcrumb-item active">{{ label }}</li>
+  </ol>
+</nav>
+
+<div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
+  <h4 class="mb-0">🍽 {{ label }}</h4>
+  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary no-print">🖨 Print</button>
+  {% if current_user.is_editor %}
+  <a href="{{ url_for('admin.banquet_config', season_id=season.id) }}"
+     class="btn btn-sm btn-outline-secondary no-print">Edit details</a>
+  {% endif %}
+</div>
+
+<div class="card mb-3" style="max-width:600px">
+  <div class="card-body py-2">
+    <div class="row g-3 small">
+      <div class="col-sm-6">
+        <strong>Date:</strong>
+        {{ banquet_week.date.strftime('%A, %B %d, %Y') if banquet_week and banquet_week.date else '—' }}
+        {% if config and config.start_time %} · {{ config.start_time }}{% endif %}
+      </div>
+      <div class="col-sm-6">
+        <strong>Location:</strong> {{ config.location if config and config.location else '—' }}
+      </div>
+      <div class="col-sm-6">
+        <strong>Price:</strong>
+        {% if config and config.price is not none %}${{ '%.2f'|format(config.price) }} per person{% else %}—{% endif %}
+      </div>
+      {% if config and config.notes %}
+      <div class="col-12"><strong>Notes:</strong> {{ config.notes }}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="mb-3">
+  <span class="badge bg-success">Attending &amp; paid: {{ counts.yes_paid }}</span>
+  <span class="badge bg-warning text-dark">Attending, not paid: {{ counts.yes_unpaid }}</span>
+  <span class="badge bg-danger">Not attending: {{ counts.no }}</span>
+  <span class="badge bg-secondary">No response: {{ counts.unknown }}</span>
+  {% if expected_revenue %}
+  <span class="badge bg-primary">Expected revenue: ${{ '%.2f'|format(expected_revenue) }}</span>
+  {% endif %}
+</div>
+
+<form method="post" action="{{ url_for('entry.banquet_update', season_id=season.id) }}">
+<table class="table table-sm table-bordered banquet-tbl">
+  <thead class="table-light">
+    <tr>
+      <th>Name</th>
+      <th class="attend-cell text-center" style="width:240px">Attending</th>
+      <th class="text-center" style="width:80px">Paid</th>
+      <th class="notes-cell">Notes</th>
+      {% if current_user.is_editor %}<th class="delete-cell text-center" style="width:60px">Remove</th>{% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for kind, bowler, att in rows %}
+    {% set state = att.attending if att else 'unknown' %}
+    <tr class="att-{{ 'yes' if state == 'yes' else ('no' if state == 'no' else 'unkn') }}">
+      <td>
+        {% if kind == 'bowler' %}
+          {{ bowler.last_name }}{% if bowler.first_name %}, {{ bowler.first_name }}{% endif %}
+        {% else %}
+          {% if current_user.is_editor %}
+          <input type="text" name="guest_w{{ att.id }}" class="form-control form-control-sm"
+                 value="{{ att.guest_name or '' }}">
+          <span class="print-only">{{ att.guest_name or '—' }}</span>
+          {% else %}
+            {{ att.guest_name or '—' }}
+          {% endif %}
+          <span class="badge bg-info text-dark ms-1" style="font-size:0.65rem">Write-in</span>
+        {% endif %}
+      </td>
+      <td class="attend-cell text-center">
+        {% set fld = ('b' ~ bowler.id) if kind == 'bowler' else ('w' ~ att.id) %}
+        {% if current_user.is_editor %}
+        <div class="btn-group btn-group-sm" role="group">
+          <input type="radio" class="btn-check" name="attending_{{ fld }}" id="att_{{ fld }}_yes" value="yes"
+                 {% if state == 'yes' %}checked{% endif %}>
+          <label class="btn btn-outline-success" for="att_{{ fld }}_yes">Yes</label>
+
+          <input type="radio" class="btn-check" name="attending_{{ fld }}" id="att_{{ fld }}_no" value="no"
+                 {% if state == 'no' %}checked{% endif %}>
+          <label class="btn btn-outline-danger" for="att_{{ fld }}_no">No</label>
+
+          <input type="radio" class="btn-check" name="attending_{{ fld }}" id="att_{{ fld }}_unkn" value="unknown"
+                 {% if state == 'unknown' %}checked{% endif %}>
+          <label class="btn btn-outline-secondary" for="att_{{ fld }}_unkn">—</label>
+        </div>
+        <span class="print-only">
+          {% if state == 'yes' %}✓ Yes
+          {% elif state == 'no' %}✗ No
+          {% else %}—{% endif %}
+        </span>
+        {% else %}
+          {% if state == 'yes' %}<span class="text-success">✓ Yes</span>
+          {% elif state == 'no' %}<span class="text-danger">✗ No</span>
+          {% else %}<span class="text-muted">—</span>{% endif %}
+        {% endif %}
+      </td>
+      <td class="text-center">
+        {% if current_user.is_editor %}
+        <input type="checkbox" class="form-check-input" name="paid_{{ fld }}" value="1"
+               {% if att and att.paid %}checked{% endif %}>
+        <span class="print-only">{% if att and att.paid %}✓{% else %}—{% endif %}</span>
+        {% else %}
+          {% if att and att.paid %}✓{% else %}—{% endif %}
+        {% endif %}
+      </td>
+      <td class="notes-cell">
+        {% if current_user.is_editor %}
+        <input type="text" class="form-control form-control-sm" name="notes_{{ fld }}"
+               value="{{ (att.notes if att and att.notes else '') }}">
+        <span class="print-only">{{ att.notes if att and att.notes else '' }}</span>
+        {% else %}
+          {{ att.notes if att and att.notes else '' }}
+        {% endif %}
+      </td>
+      {% if current_user.is_editor %}
+      <td class="delete-cell text-center">
+        {% if kind == 'writein' %}
+        <button type="button" class="btn btn-sm btn-outline-danger"
+                onclick="this.closest('tr').querySelector('input[name=guest_w{{ att.id }}]').value=''; this.closest('tr').style.display='none';">
+          ✕
+        </button>
+        {% endif %}
+      </td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if current_user.is_editor %}
+<div class="mt-3 no-print" id="writein-section">
+  <h6>Add write-ins</h6>
+  <table class="table table-sm" id="writein-table" style="max-width:900px">
+    <thead><tr>
+      <th>Name</th>
+      <th style="width:240px">Attending</th>
+      <th class="text-center" style="width:80px">Paid</th>
+      <th>Notes</th>
+    </tr></thead>
+    <tbody id="writein-body">
+      {% for i in range(3) %}
+      <tr>
+        <td><input type="text" class="form-control form-control-sm" name="new_guest_name" placeholder="Guest name"></td>
+        <td>
+          <select class="form-select form-select-sm" name="new_attending">
+            <option value="yes" selected>Yes</option>
+            <option value="no">No</option>
+            <option value="unknown">—</option>
+          </select>
+        </td>
+        <td class="text-center">
+          <input type="checkbox" class="form-check-input" name="new_paid" value="1">
+        </td>
+        <td><input type="text" class="form-control form-control-sm" name="new_notes" placeholder="Optional"></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addWriteinRow()">+ Add another row</button>
+</div>
+
+<div class="mt-3 d-flex gap-2 no-print">
+  <button type="submit" class="btn btn-primary">Save</button>
+  <a href="{{ url_for('entry.week_list', season_id=season.id) }}" class="btn btn-outline-secondary">Cancel</a>
+</div>
+{% endif %}
+</form>
+
+{% if current_user.is_editor %}
+<script>
+function addWriteinRow() {
+  const tbody = document.getElementById('writein-body');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" class="form-control form-control-sm" name="new_guest_name" placeholder="Guest name"></td>
+    <td>
+      <select class="form-select form-select-sm" name="new_attending">
+        <option value="yes" selected>Yes</option>
+        <option value="no">No</option>
+        <option value="unknown">—</option>
+      </select>
+    </td>
+    <td class="text-center">
+      <input type="checkbox" class="form-check-input" name="new_paid" value="1">
+    </td>
+    <td><input type="text" class="form-control form-control-sm" name="new_notes" placeholder="Optional"></td>`;
+  tbody.appendChild(tr);
+}
+</script>
+{% endif %}
+{% endblock %}

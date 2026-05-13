@@ -51,7 +51,18 @@
 </div>
 {% endif %}
 
-{% if week.tournament_type and week.tournament_type != 'club_championship' %}
+{% if week.tournament_type == 'banquet' %}
+<div class="alert alert-success">
+  <strong>{{ tournament_labels.get('banquet', 'End of Season Banquet') }}:</strong>
+  Track attendance and payments — not a scored event.
+</div>
+<div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
+  <a href="{{ url_for('entry.banquet_entry', season_id=season.id) }}"
+     class="btn btn-primary">
+    {% if current_user.is_editor %}Track Attendance{% else %}View Attendance{% endif %}
+  </a>
+</div>
+{% elif week.tournament_type and week.tournament_type != 'club_championship' %}
 <div class="alert alert-info">
   <strong>{{ tournament_labels.get(week.tournament_type, week.tournament_type) }}:</strong>
   Individual competition — use the tournament entry form.

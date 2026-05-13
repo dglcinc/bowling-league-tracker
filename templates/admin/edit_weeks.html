@@ -40,6 +40,13 @@
         <textarea name="desc_indiv_hcp_2" class="form-control form-control-sm" rows="2">{{ season.desc_indiv_hcp_2 or '' }}</textarea>
       </div>
       <div class="col-md-6">
+        <label class="form-label small fw-semibold">End-of-Season Banquet — Name</label>
+        <input type="text" name="name_banquet" class="form-control form-control-sm"
+               value="{{ season.name_banquet }}">
+        <label class="form-label small fw-semibold mt-2">Description</label>
+        <textarea name="desc_banquet" class="form-control form-control-sm" rows="2">{{ season.desc_banquet or '' }}</textarea>
+      </div>
+      <div class="col-md-6">
         <label class="form-label small fw-semibold">Venue</label>
         <select name="venue" class="form-select form-select-sm">
           <option value="boonton_lanes" {{ 'selected' if season.venue == 'boonton_lanes' else '' }}>Boonton Lanes</option>

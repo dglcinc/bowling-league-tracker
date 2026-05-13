@@ -122,6 +122,13 @@
 
       <div class="mb-3">
         <div class="form-check mb-1">
+          <input type="checkbox" class="form-check-input" name="include_banquet" value="1"
+                 id="includeBanquetWk">
+          <label class="form-check-label" for="includeBanquetWk">
+            Include banquet attendance list (appended to the HTML body)
+          </label>
+        </div>
+        <div class="form-check mb-1">
           <input type="checkbox" class="form-check-input" name="attach_pdf" value="1"
                  id="attachPdf" checked>
           <label class="form-check-label" for="attachPdf">
@@ -230,6 +237,7 @@
       <form method="post">
         <input type="hidden" name="send_confirmed" value="1">
         <input type="hidden" name="attach_pdf" value="{{ '1' if email_preview.attach_pdf else '0' }}">
+        {% if email_preview.include_banquet %}<input type="hidden" name="include_banquet" value="1">{% endif %}
         <input type="hidden" name="pdf_min_games" value="{{ email_preview.pdf_min_games }}">
         {% if email_preview.pdf_top10 %}<input type="hidden" name="pdf_top10" value="1">{% endif %}
         <input type="hidden" name="bcc_scope" value="{{ email_preview.bcc_scope }}">

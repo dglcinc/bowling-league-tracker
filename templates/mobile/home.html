@@ -4,6 +4,24 @@
 
 {% block content %}
 
+{% if banquet_info %}
+<div class="m-card" style="background:#d1e7dd;border-left:4px solid #198754">
+  <div class="m-card-title" style="color:#0f5132">🍽 {{ banquet_info.label }}</div>
+  <div class="m-card-main" style="font-size:1rem">
+    {{ banquet_info.date.strftime('%A, %B %-d') }}
+    {% if banquet_info.start_time %} · {{ banquet_info.start_time }}{% endif %}
+  </div>
+  <div style="font-size:.85rem;color:#0f5132">
+    {% if banquet_info.location %}{{ banquet_info.location }}{% endif %}
+    {% if banquet_info.price is not none %} · ${{ '%.2f'|format(banquet_info.price) }}{% endif %}
+  </div>
+  <div class="mt-2">
+    <a href="{{ url_for('entry.banquet_entry', season_id=season.id) }}"
+       class="btn btn-sm btn-success">Track attendance →</a>
+  </div>
+</div>
+{% endif %}
+
 {# ── Upcoming event ── #}
 {% if upcoming_week %}
 
@@ -20,6 +38,9 @@
 {% elif upcoming_week.tournament_type == 'indiv_hcp_2' %}
   {% set event_label = season.tournament_labels['indiv_hcp_2'] %}
   {% set event_type = 'indiv_hcp_2' %}
+{% elif upcoming_week.tournament_type == 'banquet' %}
+  {% set event_label = season.tournament_labels['banquet'] %}
+  {% set event_type = 'banquet' %}
 {% elif upcoming_week.is_position_night %}
   {% set event_label = 'Position Night' %}
   {% set event_type = 'lanes' %}
@@ -42,6 +63,11 @@
   <div class="mt-2" style="font-size:.85rem;color:#495057">
     {% if event_type == 'indiv_scratch' %}
       <strong>Arrive:</strong> 6:45 PM &nbsp;·&nbsp; <strong>Start:</strong> 7:00 PM
+    {% elif event_type == 'banquet' %}
+      {% if banquet_info %}
+        {% if banquet_info.start_time %}<strong>Start:</strong> {{ banquet_info.start_time }}<br>{% endif %}
+        {% if banquet_info.location %}<strong>Location:</strong> {{ banquet_info.location }}{% endif %}
+      {% endif %}
     {% else %}
       <strong>Arrive:</strong> {{ season.arrival_time or '7:45 PM' }}
       &nbsp;·&nbsp;

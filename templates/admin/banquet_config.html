@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Banquet Config — {{ season.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.seasons') }}">Seasons</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.season_detail', season_id=season.id) }}">{{ season.name }}</a></li>
+    <li class="breadcrumb-item active">Banquet Config</li>
+  </ol>
+</nav>
+
+<h4>Banquet Config — {{ season.name }}</h4>
+<p class="text-muted small">
+  Date, location, time, and price for the {{ season.tournament_labels.get('banquet', 'End of Season Banquet') }}.
+  Once set, the banquet appears as the last row on the
+  <a href="{{ url_for('entry.week_list', season_id=season.id) }}">Scores</a> page,
+  and a reminder banner appears on the home page until the banquet date passes.
+</p>
+
+{% if not banquet_week %}
+<div class="alert alert-warning">
+  <strong>No banquet week found.</strong>
+  Use the <a href="{{ url_for('admin.edit_weeks', season_id=season.id) }}" class="alert-link">Week Dates</a> page
+  to set a week's tournament type to "{{ season.tournament_labels.get('banquet', 'End of Season Banquet') }}" first.
+</div>
+{% else %}
+
+<form method="post" style="max-width:520px">
+  <div class="mb-3">
+    <label class="form-label fw-semibold">Date</label>
+    <input type="date" name="banquet_date" class="form-control"
+           value="{{ banquet_week.date.isoformat() if banquet_week.date else '' }}">
+    <div class="form-text">This is week {{ banquet_week.week_num }} on the schedule.</div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label fw-semibold">Start Time</label>
+    <input type="text" name="start_time" class="form-control"
+           placeholder="e.g. 6:30 PM"
+           value="{{ config.start_time if config and config.start_time else '' }}">
+  </div>
+  <div class="mb-3">
+    <label class="form-label fw-semibold">Location</label>
+    <input type="text" name="location" class="form-control"
+           placeholder="e.g. The Lakeside Tavern"
+           value="{{ config.location if config and config.location else '' }}">
+  </div>
+  <div class="mb-3">
+    <label class="form-label fw-semibold">Price (per person)</label>
+    <div class="input-group" style="max-width:180px">
+      <span class="input-group-text">$</span>
+      <input type="number" step="0.01" min="0" name="price" class="form-control"
+             value="{{ '%.2f'|format(config.price) if config and config.price is not none else '' }}">
+    </div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label fw-semibold">Notes</label>
+    <textarea name="notes" class="form-control" rows="3"
+              placeholder="e.g. BYOB. Cash preferred.">{{ config.notes if config and config.notes else '' }}</textarea>
+  </div>
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{{ url_for('admin.season_detail', season_id=season.id) }}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

@@ -3,7 +3,7 @@ Admin routes: season setup, roster management, schedule entry, season rollover.
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
-from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission, TournamentEntry, ClubChampionshipResult, RequestLog
+from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission, TournamentEntry, ClubChampionshipResult, RequestLog, BanquetConfig, BanquetAttendee
 from extensions import cache
 from datetime import date, timedelta
 import io
@@ -17,6 +17,7 @@ _POSTSEASON_WEEKS = [
     ('indiv_scratch',     False),  # Individual scratch championship
     ('indiv_hcp_1',       False),  # Individual handicap tournament 1
     ('indiv_hcp_2',       False),  # Individual handicap tournament 2
+    ('banquet',           False),  # End-of-season banquet (attendance + payment tracking)
 ]
 
 
@@ -263,6 +264,12 @@ def send_email(season_id):
 
     # First POST — resolve recipients based on mode, then render review page.
     recipient_mode = request.form.get('recipient_mode', 'selected')
+
+    # Optionally append banquet attendance block to the body before review.
+    if request.form.get('include_banquet') == '1':
+        block = _banquet_block_text(season_id)
+        if block:
+            body_text = (body_text.rstrip() + '\n' + block).strip()
 
     if recipient_mode == 'selected':
         bowler_ids = request.form.getlist('bowler_ids', type=int)
@@ -703,6 +710,7 @@ def edit_weeks(season_id):
         ('indiv_scratch',     labels['indiv_scratch']),
         ('indiv_hcp_1',       labels['indiv_hcp_1']),
         ('indiv_hcp_2',       labels['indiv_hcp_2']),
+        ('banquet',           labels['banquet']),
     ]
 
     if request.method == 'POST':
@@ -711,10 +719,12 @@ def edit_weeks(season_id):
         season.name_indiv_scratch     = request.form.get('name_indiv_scratch', '').strip()     or season.name_indiv_scratch
         season.name_indiv_hcp_1       = request.form.get('name_indiv_hcp_1', '').strip()       or season.name_indiv_hcp_1
         season.name_indiv_hcp_2       = request.form.get('name_indiv_hcp_2', '').strip()       or season.name_indiv_hcp_2
+        season.name_banquet           = request.form.get('name_banquet', '').strip()           or season.name_banquet
         season.desc_club_championship = request.form.get('desc_club_championship', '').strip()
         season.desc_indiv_scratch     = request.form.get('desc_indiv_scratch', '').strip()
         season.desc_indiv_hcp_1       = request.form.get('desc_indiv_hcp_1', '').strip()
         season.desc_indiv_hcp_2       = request.form.get('desc_indiv_hcp_2', '').strip()
+        season.desc_banquet           = request.form.get('desc_banquet', '').strip()
         venue = request.form.get('venue', '').strip()
         if venue in ('mountain_lakes_club', 'boonton_lanes'):
             season.venue = venue
@@ -733,6 +743,49 @@ def edit_weeks(season_id):
 
     return render_template('admin/edit_weeks.html', season=season, weeks=weeks,
                            tournament_types=TOURNAMENT_TYPES)
+
+
+# ---------------------------------------------------------------------------
+# Banquet config
+# ---------------------------------------------------------------------------
+
+@admin_bp.route('/seasons/<int:season_id>/banquet-config', methods=['GET', 'POST'])
+def banquet_config(season_id):
+    from decimal import Decimal, InvalidOperation
+    season = Season.query.get_or_404(season_id)
+    config = BanquetConfig.query.filter_by(season_id=season_id).first()
+    banquet_week = Week.query.filter_by(
+        season_id=season_id, tournament_type='banquet'
+    ).first()
+
+    if request.method == 'POST':
+        if not config:
+            config = BanquetConfig(season_id=season_id)
+            db.session.add(config)
+        config.location = request.form.get('location', '').strip() or None
+        config.start_time = request.form.get('start_time', '').strip() or None
+        price_str = request.form.get('price', '').strip()
+        if price_str:
+            try:
+                config.price = Decimal(price_str)
+            except InvalidOperation:
+                flash('Price must be a number.', 'warning')
+                return redirect(url_for('admin.banquet_config', season_id=season_id))
+        else:
+            config.price = None
+        config.notes = request.form.get('notes', '').strip() or None
+
+        date_str = request.form.get('banquet_date', '').strip()
+        if date_str and banquet_week:
+            banquet_week.date = date.fromisoformat(date_str)
+
+        db.session.commit()
+        flash('Banquet config saved.', 'success')
+        return redirect(url_for('admin.season_detail', season_id=season_id))
+
+    return render_template('admin/banquet_config.html',
+                           season=season, config=config,
+                           banquet_week=banquet_week)
 
 
 # ---------------------------------------------------------------------------
@@ -1308,6 +1361,8 @@ def email_compose(season_id, week_num):
 
             # Confirmed — send now
             html_body = _build_email_html(body_text, above_avg, season, week)
+            if request.form.get('include_banquet') == '1':
+                html_body += _banquet_block_html(season_id)
 
             pdf_bytes = None
             if attach_pdf:
@@ -1346,6 +1401,7 @@ def email_compose(season_id, week_num):
                 'bcc_list':     send_bcc,
                 'bcc_scope':    bcc_scope,
                 'attach_pdf':   attach_pdf,
+                'include_banquet': request.form.get('include_banquet') == '1',
                 'pdf_min_games': pdf_min_games,
                 'pdf_top10':    pdf_top10,
                 'to_emails_raw': ', '.join(send_to),
@@ -1456,6 +1512,103 @@ def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
     except urllib.error.HTTPError as e:
         body = e.read().decode('utf-8', errors='replace')
         raise RuntimeError(f'Graph API error {e.code}: {body}')
+
+
+def _banquet_summary(season_id):
+    """Return dict with banquet config + grouped attendee lists, or None.
+
+    Lists are alphabetical by last name (bowlers) or by guest name (write-ins).
+    """
+    season = Season.query.get(season_id)
+    if not season:
+        return None
+    config = BanquetConfig.query.filter_by(season_id=season_id).first()
+    banquet_week = Week.query.filter_by(
+        season_id=season_id, tournament_type='banquet'
+    ).first()
+    if not banquet_week and not config:
+        return None
+    attendees = BanquetAttendee.query.filter_by(season_id=season_id).all()
+    groups = {'yes_paid': [], 'yes_unpaid': [], 'no': [], 'unknown': []}
+    for a in attendees:
+        key = ('yes_paid' if a.attending == 'yes' and a.paid
+               else 'yes_unpaid' if a.attending == 'yes'
+               else 'no' if a.attending == 'no'
+               else 'unknown')
+        groups[key].append(a)
+    for k in groups:
+        groups[k].sort(key=lambda x: x.sort_key)
+    return {
+        'season': season,
+        'config': config,
+        'week': banquet_week,
+        'groups': groups,
+        'label': season.tournament_labels.get('banquet', 'End of Season Banquet'),
+    }
+
+
+def _banquet_block_html(season_id):
+    """HTML block summarizing banquet attendance for email body. Empty string if not configured."""
+    import html as h
+    summary = _banquet_summary(season_id)
+    if not summary:
+        return ''
+    config, week, groups, label = summary['config'], summary['week'], summary['groups'], summary['label']
+
+    header_bits = []
+    if week and week.date:
+        header_bits.append(week.date.strftime('%A, %B %d, %Y'))
+    if config and config.start_time:
+        header_bits.append(config.start_time)
+    if config and config.location:
+        header_bits.append(h.escape(config.location))
+    if config and config.price is not None:
+        header_bits.append(f'${float(config.price):.2f} per person')
+    header_line = ' · '.join(b for b in header_bits if b)
+
+    def names(items):
+        return ', '.join(h.escape(a.display_name) for a in items) or '<em>(none)</em>'
+
+    return (
+        f'<hr><p><strong>{h.escape(label)}</strong>'
+        f'{("<br>" + header_line) if header_line else ""}</p>'
+        f'<p><strong>Attending &amp; paid ({len(groups["yes_paid"])}):</strong> {names(groups["yes_paid"])}</p>'
+        f'<p><strong>Attending, not yet paid ({len(groups["yes_unpaid"])}):</strong> {names(groups["yes_unpaid"])}</p>'
+        f'<p><strong>Not attending ({len(groups["no"])}):</strong> {names(groups["no"])}</p>'
+        f'<p><strong>No response ({len(groups["unknown"])}):</strong> {names(groups["unknown"])}</p>'
+    )
+
+
+def _banquet_block_text(season_id):
+    """Plain-text block for the editable body textarea (ad-hoc flow)."""
+    summary = _banquet_summary(season_id)
+    if not summary:
+        return ''
+    config, week, groups, label = summary['config'], summary['week'], summary['groups'], summary['label']
+
+    header_bits = []
+    if week and week.date:
+        header_bits.append(week.date.strftime('%A, %B %d, %Y'))
+    if config and config.start_time:
+        header_bits.append(config.start_time)
+    if config and config.location:
+        header_bits.append(config.location)
+    if config and config.price is not None:
+        header_bits.append(f'${float(config.price):.2f} per person')
+    header_line = ' · '.join(header_bits)
+
+    def names(items):
+        return ', '.join(a.display_name for a in items) or '(none)'
+
+    lines = ['', '----', label]
+    if header_line:
+        lines.append(header_line)
+    lines.append('')
+    lines.append(f'Attending & paid ({len(groups["yes_paid"])}): {names(groups["yes_paid"])}')
+    lines.append(f'Attending, not yet paid ({len(groups["yes_unpaid"])}): {names(groups["yes_unpaid"])}')
+    lines.append(f'Not attending ({len(groups["no"])}): {names(groups["no"])}')
+    lines.append(f'No response ({len(groups["unknown"])}): {names(groups["unknown"])}')
+    return '\n'.join(lines)
 
 
 def _build_email_html(body_text, above_avg, season, week):

@@ -70,6 +70,20 @@
 
 {% block content %}
 
+{% if banquet_info %}
+<div class="alert alert-success d-flex flex-wrap align-items-center gap-3 mb-3" style="border-left:4px solid #198754">
+  <div>
+    <strong>🍽 {{ banquet_info.label }}</strong>
+    — {{ banquet_info.date.strftime('%A, %B %-d') }}
+    {% if banquet_info.start_time %} at {{ banquet_info.start_time }}{% endif %}
+    {% if banquet_info.location %} · {{ banquet_info.location }}{% endif %}
+    {% if banquet_info.price is not none %} · ${{ '%.2f'|format(banquet_info.price) }}{% endif %}
+  </div>
+  <a href="{{ url_for('entry.banquet_entry', season_id=season.id) }}"
+     class="btn btn-sm btn-success ms-auto">Track attendance →</a>
+</div>
+{% endif %}
+
 {# Determine upcoming event type (mirrors mobile home.html logic) #}
 {% if upcoming_week %}
   {% if upcoming_week.tournament_type == 'club_championship' %}
@@ -84,6 +98,9 @@
   {% elif upcoming_week.tournament_type == 'indiv_hcp_2' %}
     {% set event_label = season.tournament_labels['indiv_hcp_2'] %}
     {% set event_type  = 'indiv_hcp_2' %}
+  {% elif upcoming_week.tournament_type == 'banquet' %}
+    {% set event_label = season.tournament_labels['banquet'] %}
+    {% set event_type  = 'banquet' %}
   {% elif upcoming_week.is_position_night %}
     {% set event_label = 'Position Night' %}
     {% set event_type  = 'lanes' %}
@@ -115,6 +132,11 @@
         <div class="home-event-times mt-2">
           {% if event_type == 'indiv_scratch' %}
             <strong>Arrive:</strong> 6:45 PM &nbsp;·&nbsp; <strong>Start:</strong> 7:00 PM
+          {% elif event_type == 'banquet' %}
+            {% if banquet_info %}
+              {% if banquet_info.start_time %}<strong>Start:</strong> {{ banquet_info.start_time }}<br>{% endif %}
+              {% if banquet_info.location %}<strong>Location:</strong> {{ banquet_info.location }}{% endif %}
+            {% endif %}
           {% else %}
             <strong>Arrive:</strong> {{ season.arrival_time or '7:45 PM' }}
             &nbsp;·&nbsp;
@@ -355,6 +377,10 @@
         {% elif w.tournament_type == 'indiv_hcp_2' %}
           {% set lbl = season.tournament_labels['indiv_hcp_2'] %}
           {% set lbl_color = '#5a1a8a' %}
+          {% set show_matchups = false %}
+        {% elif w.tournament_type == 'banquet' %}
+          {% set lbl = season.tournament_labels['banquet'] %}
+          {% set lbl_color = '#0f5132' %}
           {% set show_matchups = false %}
         {% elif w.is_position_night %}
           {% set lbl = 'Week ' ~ w.week_num ~ ' — Position Night' %}
