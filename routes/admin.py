@@ -315,18 +315,21 @@ def send_email(season_id):
         flash('No recipients with email addresses found.', 'warning')
         return redirect(url_for('admin.season_detail', season_id=season_id))
 
-    cc_emails = []
-    if request.form.get('cc_self') == '1':
-        sender_email = current_app.config.get('GRAPH_SENDER_EMAIL', '')
-        if sender_email:
-            cc_emails.append(sender_email)
+    # Checkbox: BCC all recipients (default). When unchecked, fold recipients
+    # into the TO list alongside captains and leave BCC empty.
+    bcc_recipients = request.form.get('bcc_recipients') == '1'
+    if not bcc_recipients:
+        for e in bcc_emails:
+            if e not in to_emails:
+                to_emails.append(e)
+        bcc_emails = []
 
     return render_template('admin/email_review.html',
                            season=season,
                            subject=subject,
                            body_text=body_text,
                            to_emails=to_emails,
-                           cc_emails=cc_emails,
+                           cc_emails=[],
                            bcc_emails=bcc_emails,
                            missing_captains=missing_captains,
                            no_email_bowlers=no_email_bowlers,
