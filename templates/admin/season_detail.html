@@ -398,6 +398,12 @@
               Email will be sent <strong>TO team captains</strong> with
               <strong>recipients in BCC</strong>. You'll review TO/CC/BCC and the body on the next screen before sending.
             </div>
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" name="cc_self" id="ccSelf" value="1" checked>
+              <label class="form-check-label" for="ccSelf">
+                CC me — also send to <em>{{ sender_email }}</em>
+              </label>
+            </div>
           </div>
           <div id="selectedPreview" class="mb-2 text-muted small" style="display:none"></div>
           <div class="mb-3">
