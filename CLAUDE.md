@@ -9,12 +9,12 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 **Important:** Never put player names, team names (which are player surnames), or any other personal information in the repository, code, comments, or documentation.
 
-## Repo / Branch State (as of 2026-05-12)
+## Repo / Branch State (as of 2026-05-13)
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
 - No open PRs.
-- PRs #37–#148 merged to main; #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138); #145 superseded by #146 (CC-me checkbox replaced by BCC-all-recipients).
+- PRs #37–#150 merged to main; #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138); #145 superseded by #146 (CC-me checkbox replaced by BCC-all-recipients).
 
 ## League Structure
 
@@ -208,6 +208,7 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 - **`get_bowler_stats()` key names**: average is `running_avg`, not `current_average`. Games count is `cumulative_games`.
 - **`login_manager.login_view = 'auth.login'`** is set in `extensions.py`. Without it, `@login_required` calls `abort(401)` instead of redirecting to the login page. If users report bare 401 pages on login flows, verify this is still set and `auth.login` still resolves.
 - **`/healthz`** is the public health probe — no auth, no DB, no `request_log` row. Used by `check_health.py` and `com.dglc.bowling-health` launchd timer. Do NOT route the health check at `/` — that goes through `index()` which redirects unauthenticated callers to `/auth/login`, which polluted the access log with 1,700+ entries per week pre-PR.
+- **Mobile UA redirect** (`app.py:mobile_redirect`): bounces every non-`mobile.*` / non-`auth.*` endpoint to `mobile.home` for iPhone/Android UAs unless the `prefer_desktop` cookie is set. Pages that don't have a mobile-specific template but render responsively (the banquet attendance page) are listed in `_MOBILE_ALLOWED_ENDPOINTS` so phones reach the desktop page directly. Add new responsive endpoints to that set rather than building parallel `/m/` routes when a `<table>` works on phones.
 - **WebAuthn `authenticate/begin`:`complete` ratio is intentionally lopsided.** `templates/auth/login.html` calls `startConditionalPasskey()` on every login page load — this POSTs `/auth/webauthn/authenticate/begin` to enable passkey autofill mediation, but `complete` only fires if the user actually picks a passkey from the autofill prompt. Most page loads end without a `complete`. This is normal; not a bug.
 - **Flask-Limiter storage**: `extensions.py` uses `storage_uri="memory://"`. Each gunicorn worker has its own counter, so the worst-case effective limit per IP is `configured_limit × num_workers` (≈ 2× at current config). Tighten configured limits accordingly, or move to a shared backend (Redis, memcached) if effective limits ever matter.
 - **Shared helpers in `calculations.py`** (PR #110): `entry_handicap(entry, season, season_id, week_num, entries_by_bowler=None)` and `entry_total_wood(...)` centralise the blind/non-blind handicap expression. `get_bowler_entries_bulk(bowler_ids, season_id)` pre-fetches season entries for N bowlers in 2 queries (pass result as `entries_by_bowler` to avoid N+1). `build_leaders_list(season_id, through_week, min_games, top10)` returns `(leaders, avg_rows)`. `get_latest_entered_week(season_id, exclude_cancelled=False)` replaces the inline `Week.query.filter_by(is_entered=True)...first()` pattern. `auto_assign_position_night(season_id, week_num)` moved here from `entry.py`.
