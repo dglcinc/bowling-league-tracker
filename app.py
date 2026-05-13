@@ -321,12 +321,22 @@ def create_app():
         ua = request.user_agent.string.lower()
         return 'iphone' in ua or ('android' in ua and 'mobile' in ua)
 
+    # Endpoints that mobile users can reach without being bounced to mobile.home.
+    # The banquet page is responsive and works as-is on phones; there's no
+    # separate mobile/banquet template, so let mobile UAs through.
+    _MOBILE_ALLOWED_ENDPOINTS = {
+        'entry.banquet_entry',
+        'entry.banquet_update',
+    }
+
     @app.before_request
     def mobile_redirect():
         ep = request.endpoint
         if ep is None or ep == 'static':
             return
         if ep.startswith('auth.') or ep.startswith('mobile.'):
+            return
+        if ep in _MOBILE_ALLOWED_ENDPOINTS:
             return
         if request.cookies.get('prefer_desktop'):
             return

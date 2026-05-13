@@ -397,14 +397,15 @@
         {% endif %}
 
         {% set is_upcoming_row = upcoming_week and w.week_num == upcoming_week.week_num %}
+        {% set row_href = url_for('entry.banquet_entry', season_id=season.id) if w.tournament_type == 'banquet' else '' %}
 
-        <div class="sched-row {% if is_upcoming_row %}sched-upcoming{% endif %}" style="align-items:flex-start">
+        <{% if row_href %}a href="{{ row_href }}" class="sched-row" style="text-decoration:none;color:inherit;align-items:flex-start;{% if w.tournament_type == 'banquet' and not w.is_entered %}background:#d1e7dd;{% endif %}"{% else %}div class="sched-row {% if is_upcoming_row %}sched-upcoming{% endif %}" style="align-items:flex-start"{% endif %}>
           <span class="sched-date" style="padding-top:1px">
             {% if row.date %}{{ row.date.strftime('%b %-d') }}{% else %}—{% endif %}
           </span>
           <span class="sched-label fw-{% if is_upcoming_row or w.tournament_type or w.is_position_night %}semibold{% else %}normal{% endif %}"
                 style="color:{% if w.is_entered %}#adb5bd{% else %}{{ lbl_color }}{% endif %}">
-            {{ lbl }}
+            {{ '🍽 ' if w.tournament_type == 'banquet' else '' }}{{ lbl }}
             {# Lane assignments #}
             {% if show_matchups and row.matchups %}
             <div style="margin-top:3px">
@@ -426,7 +427,7 @@
           <span class="sched-status">
             {% if w.is_entered %}✓{% endif %}
           </span>
-        </div>
+        </{% if row_href %}a{% else %}div{% endif %}>
         {% endif %}
 
         {% endfor %}
