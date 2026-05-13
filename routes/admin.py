@@ -1517,6 +1517,11 @@ def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
 def _banquet_summary(season_id):
     """Return dict with banquet config + grouped attendee lists, or None.
 
+    Active rostered bowlers without an attendee row are included as "no response"
+    so the email summary matches the entry-page count — otherwise "no response"
+    only reflects rows explicitly marked unknown, missing every bowler who's
+    never been touched.
+
     Lists are alphabetical by last name (bowlers) or by guest name (write-ins).
     """
     season = Season.query.get(season_id)
@@ -1528,14 +1533,40 @@ def _banquet_summary(season_id):
     ).first()
     if not banquet_week and not config:
         return None
+
     attendees = BanquetAttendee.query.filter_by(season_id=season_id).all()
+    by_bowler = {a.bowler_id: a for a in attendees if a.bowler_id}
+    writeins = [a for a in attendees if not a.bowler_id]
+    active_rosters = (Roster.query
+                      .filter_by(season_id=season_id, active=True)
+                      .join(Bowler)
+                      .all())
+
+    def classify(a):
+        if a.attending == 'yes':
+            return 'yes_paid' if a.paid else 'yes_unpaid'
+        if a.attending == 'no':
+            return 'no'
+        return 'unknown'
+
     groups = {'yes_paid': [], 'yes_unpaid': [], 'no': [], 'unknown': []}
-    for a in attendees:
-        key = ('yes_paid' if a.attending == 'yes' and a.paid
-               else 'yes_unpaid' if a.attending == 'yes'
-               else 'no' if a.attending == 'no'
-               else 'unknown')
-        groups[key].append(a)
+    seen_bowler_ids = set()
+    for r in active_rosters:
+        seen_bowler_ids.add(r.bowler_id)
+        att = by_bowler.get(r.bowler_id)
+        if att is None:
+            # Transient placeholder — not added to the session.
+            att = BanquetAttendee(season_id=season_id, bowler_id=r.bowler_id,
+                                  attending='unknown', paid=False)
+            att.bowler = r.bowler
+        groups[classify(att)].append(att)
+    # Bowlers no longer rostered but with an attendee row (e.g. deactivated).
+    for bid, att in by_bowler.items():
+        if bid not in seen_bowler_ids:
+            groups[classify(att)].append(att)
+    for att in writeins:
+        groups[classify(att)].append(att)
+
     for k in groups:
         groups[k].sort(key=lambda x: x.sort_key)
     return {
