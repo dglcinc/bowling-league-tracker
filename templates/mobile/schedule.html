@@ -56,6 +56,9 @@
   {% elif w.tournament_type == 'indiv_hcp_2' %}
     {% set label = season.tournament_labels['indiv_hcp_2'] %}
     {% set badge = 'tournament' %}
+  {% elif w.tournament_type == 'banquet' %}
+    {% set label = season.tournament_labels['banquet'] %}
+    {% set badge = 'banquet' %}
   {% elif w.is_position_night %}
     {% set label = 'Position Night' %}
     {% set badge = 'position' %}
@@ -70,9 +73,13 @@
   {# Row styling: upcoming = white highlighted, entered = muted, future = normal #}
   {% set is_entered = w.is_entered %}
   {% set is_upcoming = not w.is_entered and not w.is_cancelled %}
+  {% set row_href = url_for('entry.banquet_entry', season_id=season.id) if badge == 'banquet' else '' %}
 
-  <div style="padding:11px 16px;border-bottom:1px solid #f0f0f0;
-              {% if loop.first and is_upcoming %}background:#f0f4ff;{% endif %}">
+  <{% if row_href %}a href="{{ row_href }}"{% else %}div{% endif %}
+    style="display:block;text-decoration:none;color:inherit;
+           padding:11px 16px;border-bottom:1px solid #f0f0f0;
+           {% if loop.first and is_upcoming %}background:#f0f4ff;{% endif %}
+           {% if badge == 'banquet' and not is_entered %}background:#d1e7dd;{% endif %}">
 
     <div style="display:flex;align-items:center">
       {# Date column #}
@@ -95,17 +102,19 @@
                           {% elif badge == 'championship' %}#8b0000
                           {% elif badge == 'tournament' %}#5a1a8a
                           {% elif badge == 'position' %}#1a5a3a
+                          {% elif badge == 'banquet' %}#0f5132
                           {% elif badge == 'cancelled' %}#adb5bd
                           {% elif is_upcoming %}#1b3a6b
                           {% else %}#212529{% endif %}">
-          {{ label }}
+          {{ '🍽 ' if badge == 'banquet' else '' }}{{ label }}
           {% if w.is_cancelled %}<span style="font-size:.75rem;color:#dc3545"> — cancelled</span>{% endif %}
         </div>
-        {% if badge in ('championship', 'tournament', 'position') and not is_entered %}
+        {% if badge in ('championship', 'tournament', 'position', 'banquet') and not is_entered %}
         <div style="font-size:.72rem;color:#6c757d;margin-top:1px">
           {% if badge == 'championship' %}Club Championship
           {% elif badge == 'tournament' %}Individual Tournament
           {% elif badge == 'position' %}Position Night
+          {% elif badge == 'banquet' %}Track attendance →
           {% endif %}
         </div>
         {% endif %}
@@ -139,7 +148,7 @@
     </div>
     {% endif %}
 
-  </div>
+  </{% if row_href %}a{% else %}div{% endif %}>
   {% endif %}
 
   {% endfor %}
