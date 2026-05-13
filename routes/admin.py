@@ -1517,8 +1517,11 @@ def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
 def _banquet_summary(season_id):
     """Return dict with banquet config + grouped attendee lists, or None.
 
+    Calls `_ensure_banquet_rows` first so every active rostered bowler has a
+    row — then the grouping is a simple iteration over `banquet_attendees`.
     Lists are alphabetical by last name (bowlers) or by guest name (write-ins).
     """
+    from routes.entry import _ensure_banquet_rows
     season = Season.query.get(season_id)
     if not season:
         return None
@@ -1528,6 +1531,8 @@ def _banquet_summary(season_id):
     ).first()
     if not banquet_week and not config:
         return None
+
+    _ensure_banquet_rows(season_id)
     attendees = BanquetAttendee.query.filter_by(season_id=season_id).all()
     groups = {'yes_paid': [], 'yes_unpaid': [], 'no': [], 'unknown': []}
     for a in attendees:

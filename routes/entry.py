@@ -711,6 +711,32 @@ def tournament_entry(season_id, week_num):
 # Banquet attendance + payment tracking
 # ---------------------------------------------------------------------------
 
+def _ensure_banquet_rows(season_id):
+    """Create placeholder BanquetAttendee rows for any active rostered bowler
+    that doesn't have one yet (attending='unknown', paid=False). Idempotent.
+    No-op if the season has no banquet config or banquet week. Commits new rows.
+    """
+    config = BanquetConfig.query.filter_by(season_id=season_id).first()
+    banquet_week = Week.query.filter_by(
+        season_id=season_id, tournament_type='banquet'
+    ).first()
+    if not banquet_week and not config:
+        return
+    existing = {a.bowler_id for a in
+                BanquetAttendee.query.filter_by(season_id=season_id).all()
+                if a.bowler_id}
+    active = Roster.query.filter_by(season_id=season_id, active=True).all()
+    added = False
+    for r in active:
+        if r.bowler_id not in existing:
+            db.session.add(BanquetAttendee(
+                season_id=season_id, bowler_id=r.bowler_id,
+                attending='unknown', paid=False))
+            added = True
+    if added:
+        db.session.commit()
+
+
 def _build_banquet_rows(season_id):
     """Return ordered list of (kind, bowler_or_None, attendee_or_None) for the page.
 
@@ -756,23 +782,18 @@ def banquet_entry(season_id):
     banquet_week = Week.query.filter_by(
         season_id=season_id, tournament_type='banquet'
     ).first()
+    _ensure_banquet_rows(season_id)
     rows = _build_banquet_rows(season_id)
 
     counts = {'yes_paid': 0, 'yes_unpaid': 0, 'no': 0, 'unknown': 0}
     expected_revenue = 0
     for _kind, _bowler, att in rows:
-        if att is None:
+        if att is None or att.attending == 'unknown':
             counts['unknown'] += 1
-            continue
-        if att.attending == 'yes':
-            if att.paid:
-                counts['yes_paid'] += 1
-            else:
-                counts['yes_unpaid'] += 1
+        elif att.attending == 'yes':
+            counts['yes_paid' if att.paid else 'yes_unpaid'] += 1
         elif att.attending == 'no':
             counts['no'] += 1
-        else:
-            counts['unknown'] += 1
     if config and config.price is not None:
         expected_revenue = float(config.price) * (counts['yes_paid'] + counts['yes_unpaid'])
 
