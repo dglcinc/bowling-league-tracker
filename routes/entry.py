@@ -738,41 +738,54 @@ def _ensure_banquet_rows(season_id):
 
 
 def _build_banquet_rows(season_id):
-    """Return ordered list of (kind, bowler_or_None, attendee_or_None) for the page.
+    """Return banquet attendees organized by team for the entry page.
 
-    kind = 'bowler' for active rostered bowlers (with or without an attendee row yet)
-    kind = 'writein' for write-in attendee rows.
-    Sorted alphabetical by last name, with write-ins after rostered bowlers.
+    Returns dict:
+      'team_groups': [(team, [(bowler, attendee_or_None), ...]), ...]
+                     ordered by team.number, bowlers sorted by last name
+      'writeins':    [attendee, ...]
+      'extras':      [(bowler, attendee), ...] for bowlers with a row but no
+                     longer on the active roster — rendered in an "Other" section
     """
+    teams = (Team.query
+             .filter_by(season_id=season_id)
+             .order_by(Team.number)
+             .all())
     active_rosters = (Roster.query
                       .filter_by(season_id=season_id, active=True)
                       .join(Bowler)
                       .order_by(Bowler.last_name, Bowler.first_name)
                       .all())
-    bowler_ids = [r.bowler_id for r in active_rosters]
     attendees = BanquetAttendee.query.filter_by(season_id=season_id).all()
     by_bowler = {a.bowler_id: a for a in attendees if a.bowler_id}
-    writeins = [a for a in attendees if not a.bowler_id]
-    writeins.sort(key=lambda a: (a.guest_name or '').lower())
+    writeins = sorted([a for a in attendees if not a.bowler_id],
+                     key=lambda a: (a.guest_name or '').lower())
 
-    rows = []
+    rosters_by_team = {}
+    rostered_bowler_ids = set()
     for r in active_rosters:
-        rows.append(('bowler', r.bowler, by_bowler.get(r.bowler_id)))
-    for a in writeins:
-        rows.append(('writein', None, a))
+        rosters_by_team.setdefault(r.team_id, []).append(r)
+        rostered_bowler_ids.add(r.bowler_id)
 
-    # Also surface attendee rows for bowlers no longer on the active roster
-    # (e.g. someone marked attending then deactivated). Treat as bowler rows.
-    extra_bowler_ids = [bid for bid in by_bowler if bid not in set(bowler_ids)]
+    team_groups = []
+    for team in teams:
+        rs = rosters_by_team.get(team.id, [])  # already sorted by last_name
+        team_groups.append((team, [(r.bowler, by_bowler.get(r.bowler_id)) for r in rs]))
+
+    extra_bowler_ids = [bid for bid in by_bowler if bid not in rostered_bowler_ids]
+    extras = []
     if extra_bowler_ids:
-        extras = (Bowler.query
-                  .filter(Bowler.id.in_(extra_bowler_ids))
-                  .order_by(Bowler.last_name)
-                  .all())
-        for b in extras:
-            rows.append(('bowler', b, by_bowler[b.id]))
+        bowlers = (Bowler.query
+                   .filter(Bowler.id.in_(extra_bowler_ids))
+                   .order_by(Bowler.last_name, Bowler.first_name)
+                   .all())
+        extras = [(b, by_bowler[b.id]) for b in bowlers]
 
-    return rows
+    return {
+        'team_groups': team_groups,
+        'writeins': writeins,
+        'extras': extras,
+    }
 
 
 @entry_bp.route('/season/<int:season_id>/banquet', methods=['GET'])
@@ -783,17 +796,24 @@ def banquet_entry(season_id):
         season_id=season_id, tournament_type='banquet'
     ).first()
     _ensure_banquet_rows(season_id)
-    rows = _build_banquet_rows(season_id)
+    data = _build_banquet_rows(season_id)
 
     counts = {'yes_paid': 0, 'yes_unpaid': 0, 'no': 0, 'unknown': 0}
     expected_revenue = 0
-    for _kind, _bowler, att in rows:
+    def _tally(att):
         if att is None or att.attending == 'unknown':
             counts['unknown'] += 1
         elif att.attending == 'yes':
             counts['yes_paid' if att.paid else 'yes_unpaid'] += 1
         elif att.attending == 'no':
             counts['no'] += 1
+    for _team, rs in data['team_groups']:
+        for _b, att in rs:
+            _tally(att)
+    for att in data['writeins']:
+        _tally(att)
+    for _b, att in data['extras']:
+        _tally(att)
     if config and config.price is not None:
         expected_revenue = float(config.price) * (counts['yes_paid'] + counts['yes_unpaid'])
 
@@ -801,7 +821,9 @@ def banquet_entry(season_id):
                            season=season,
                            config=config,
                            banquet_week=banquet_week,
-                           rows=rows,
+                           team_groups=data['team_groups'],
+                           writeins=data['writeins'],
+                           extras=data['extras'],
                            counts=counts,
                            expected_revenue=expected_revenue,
                            label=season.tournament_labels.get('banquet', 'End of Season Banquet'))

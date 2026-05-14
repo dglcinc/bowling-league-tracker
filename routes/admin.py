@@ -1519,9 +1519,11 @@ def _banquet_summary(season_id):
 
     Calls `_ensure_banquet_rows` first so every active rostered bowler has a
     row — then the grouping is a simple iteration over `banquet_attendees`.
-    Lists are alphabetical by last name (bowlers) or by guest name (write-ins).
+    Within each status group, attendees are sorted by (team number, last name)
+    so the email captains can scan their team quickly.
     """
     from routes.entry import _ensure_banquet_rows
+    from models import Roster, Team
     season = Season.query.get(season_id)
     if not season:
         return None
@@ -1533,6 +1535,14 @@ def _banquet_summary(season_id):
         return None
 
     _ensure_banquet_rows(season_id)
+    teams = (Team.query.filter_by(season_id=season_id)
+             .order_by(Team.number).all())
+    # team_by_bowler covers all rostered bowlers (active or not) so attendees
+    # who've been deactivated still group with their team in the email block.
+    rosters = (Roster.query.filter_by(season_id=season_id)
+               .join(Team).all())
+    team_by_bowler = {r.bowler_id: r.team for r in rosters}
+
     attendees = BanquetAttendee.query.filter_by(season_id=season_id).all()
     groups = {'yes_paid': [], 'yes_unpaid': [], 'no': [], 'unknown': []}
     for a in attendees:
@@ -1541,15 +1551,51 @@ def _banquet_summary(season_id):
                else 'no' if a.attending == 'no'
                else 'unknown')
         groups[key].append(a)
+
+    def sort_key(a):
+        team = team_by_bowler.get(a.bowler_id) if a.bowler_id else None
+        team_num = team.number if team else 999  # write-ins last
+        if a.bowler:
+            return (team_num,
+                    (a.bowler.last_name or '').lower(),
+                    (a.bowler.first_name or '').lower())
+        return (team_num, (a.guest_name or '').lower(), '')
+
     for k in groups:
-        groups[k].sort(key=lambda x: x.sort_key)
+        groups[k].sort(key=sort_key)
+
     return {
         'season': season,
         'config': config,
         'week': banquet_week,
         'groups': groups,
+        'teams': teams,
+        'team_by_bowler': team_by_bowler,
         'label': season.tournament_labels.get('banquet', 'End of Season Banquet'),
     }
+
+
+def _banquet_team_segments(items, name_for, team_by_bowler, teams):
+    """Subdivide a status group's attendees by team for the email block.
+
+    Returns list of (label, [name, ...]) ordered by team.number, with a final
+    'Write-ins' bucket for non-rostered guests. Empty teams are skipped.
+    """
+    by_team = {}
+    writein_names = []
+    for a in items:
+        if a.bowler_id and a.bowler_id in team_by_bowler:
+            tnum = team_by_bowler[a.bowler_id].number
+            by_team.setdefault(tnum, []).append(name_for[a.id])
+        else:
+            writein_names.append(name_for[a.id])
+    segments = []
+    for t in teams:
+        if t.number in by_team:
+            segments.append((f'Team {t.number}', by_team[t.number]))
+    if writein_names:
+        segments.append(('Write-ins', writein_names))
+    return segments
 
 
 def _email_name_map(groups):
@@ -1583,6 +1629,7 @@ def _banquet_block_html(season_id):
     if not summary:
         return ''
     config, week, groups, label = summary['config'], summary['week'], summary['groups'], summary['label']
+    teams, team_by_bowler = summary['teams'], summary['team_by_bowler']
 
     header_bits = []
     if week and week.date:
@@ -1596,16 +1643,29 @@ def _banquet_block_html(season_id):
     header_line = ' · '.join(b for b in header_bits if b)
 
     name_for = _email_name_map(groups)
-    def names(items):
-        return ', '.join(h.escape(name_for[a.id]) for a in items) or '<em>(none)</em>'
+
+    def section(title, items):
+        count = len(items)
+        if not items:
+            body = '<div style="margin-left:1.5em"><em>(none)</em></div>'
+        else:
+            segments = _banquet_team_segments(items, name_for, team_by_bowler, teams)
+            lines = []
+            for seg_label, names in segments:
+                names_html = ', '.join(h.escape(n) for n in names)
+                lines.append(
+                    f'<div style="margin-left:1.5em"><strong>{seg_label}:</strong> {names_html}</div>'
+                )
+            body = ''.join(lines)
+        return f'<p style="margin-bottom:0.25em"><strong>{title} ({count}):</strong></p>{body}'
 
     return (
         f'<hr><p><strong>{h.escape(label)}</strong>'
         f'{("<br>" + header_line) if header_line else ""}</p>'
-        f'<p><strong>Attending &amp; paid ({len(groups["yes_paid"])}):</strong> {names(groups["yes_paid"])}</p>'
-        f'<p><strong>Attending, not yet paid ({len(groups["yes_unpaid"])}):</strong> {names(groups["yes_unpaid"])}</p>'
-        f'<p><strong>Not attending ({len(groups["no"])}):</strong> {names(groups["no"])}</p>'
-        f'<p><strong>No response ({len(groups["unknown"])}):</strong> {names(groups["unknown"])}</p>'
+        + section('Attending &amp; paid', groups['yes_paid'])
+        + section('Attending, not yet paid', groups['yes_unpaid'])
+        + section('Not attending', groups['no'])
+        + section('No response', groups['unknown'])
     )
 
 
@@ -1615,6 +1675,7 @@ def _banquet_block_text(season_id):
     if not summary:
         return ''
     config, week, groups, label = summary['config'], summary['week'], summary['groups'], summary['label']
+    teams, team_by_bowler = summary['teams'], summary['team_by_bowler']
 
     header_bits = []
     if week and week.date:
@@ -1628,17 +1689,24 @@ def _banquet_block_text(season_id):
     header_line = ' · '.join(header_bits)
 
     name_for = _email_name_map(groups)
-    def names(items):
-        return ', '.join(name_for[a.id] for a in items) or '(none)'
+
+    def section_lines(title, items):
+        out = [f'{title} ({len(items)}):']
+        if not items:
+            out.append('  (none)')
+            return out
+        for seg_label, names in _banquet_team_segments(items, name_for, team_by_bowler, teams):
+            out.append(f'  {seg_label}: ' + ', '.join(names))
+        return out
 
     lines = ['', '----', label]
     if header_line:
         lines.append(header_line)
     lines.append('')
-    lines.append(f'Attending & paid ({len(groups["yes_paid"])}): {names(groups["yes_paid"])}')
-    lines.append(f'Attending, not yet paid ({len(groups["yes_unpaid"])}): {names(groups["yes_unpaid"])}')
-    lines.append(f'Not attending ({len(groups["no"])}): {names(groups["no"])}')
-    lines.append(f'No response ({len(groups["unknown"])}): {names(groups["unknown"])}')
+    lines += section_lines('Attending & paid', groups['yes_paid'])
+    lines += section_lines('Attending, not yet paid', groups['yes_unpaid'])
+    lines += section_lines('Not attending', groups['no'])
+    lines += section_lines('No response', groups['unknown'])
     return '\n'.join(lines)
 
 

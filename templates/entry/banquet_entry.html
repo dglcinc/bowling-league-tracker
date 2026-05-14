@@ -9,6 +9,12 @@
   .att-yes  { background: #d1e7dd; }
   .att-no   { background: #f8d7da; }
   .att-unkn { background: transparent; }
+  .banquet-tbl .team-header td {
+    background: #e9ecef;
+    font-weight: 600;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
   .print-only { display: none; }
   @media print {
     .no-print, form .no-print, .breadcrumb, button, .btn,
@@ -23,6 +29,81 @@
   }
 </style>
 {% endblock %}
+
+{% macro render_row(kind, bowler, att) %}
+  {% set state = att.attending if att else 'unknown' %}
+  {% set fld = ('b' ~ bowler.id) if kind == 'bowler' else ('w' ~ att.id) %}
+  <tr class="att-{{ 'yes' if state == 'yes' else ('no' if state == 'no' else 'unkn') }}">
+    <td>
+      {% if kind == 'bowler' %}
+        {{ bowler.last_name }}{% if bowler.first_name %}, {{ bowler.first_name }}{% endif %}
+      {% else %}
+        {% if current_user.is_editor %}
+        <input type="text" name="guest_w{{ att.id }}" class="form-control form-control-sm"
+               value="{{ att.guest_name or '' }}">
+        <span class="print-only">{{ att.guest_name or '—' }}</span>
+        {% else %}
+          {{ att.guest_name or '—' }}
+        {% endif %}
+        <span class="badge bg-info text-dark ms-1" style="font-size:0.65rem">Write-in</span>
+      {% endif %}
+    </td>
+    <td class="attend-cell text-center">
+      {% if current_user.is_editor %}
+      <div class="btn-group btn-group-sm" role="group">
+        <input type="radio" class="btn-check" name="attending_{{ fld }}" id="att_{{ fld }}_yes" value="yes"
+               {% if state == 'yes' %}checked{% endif %}>
+        <label class="btn btn-outline-success" for="att_{{ fld }}_yes">Yes</label>
+
+        <input type="radio" class="btn-check" name="attending_{{ fld }}" id="att_{{ fld }}_no" value="no"
+               {% if state == 'no' %}checked{% endif %}>
+        <label class="btn btn-outline-danger" for="att_{{ fld }}_no">No</label>
+
+        <input type="radio" class="btn-check" name="attending_{{ fld }}" id="att_{{ fld }}_unkn" value="unknown"
+               {% if state == 'unknown' %}checked{% endif %}>
+        <label class="btn btn-outline-secondary" for="att_{{ fld }}_unkn">—</label>
+      </div>
+      <span class="print-only">
+        {% if state == 'yes' %}✓ Yes
+        {% elif state == 'no' %}✗ No
+        {% else %}—{% endif %}
+      </span>
+      {% else %}
+        {% if state == 'yes' %}<span class="text-success">✓ Yes</span>
+        {% elif state == 'no' %}<span class="text-danger">✗ No</span>
+        {% else %}<span class="text-muted">—</span>{% endif %}
+      {% endif %}
+    </td>
+    <td class="text-center">
+      {% if current_user.is_editor %}
+      <input type="checkbox" class="form-check-input" name="paid_{{ fld }}" value="1"
+             {% if att and att.paid %}checked{% endif %}>
+      <span class="print-only">{% if att and att.paid %}✓{% else %}—{% endif %}</span>
+      {% else %}
+        {% if att and att.paid %}✓{% else %}—{% endif %}
+      {% endif %}
+    </td>
+    <td class="notes-cell">
+      {% if current_user.is_editor %}
+      <input type="text" class="form-control form-control-sm" name="notes_{{ fld }}"
+             value="{{ (att.notes if att and att.notes else '') }}">
+      <span class="print-only">{{ att.notes if att and att.notes else '' }}</span>
+      {% else %}
+        {{ att.notes if att and att.notes else '' }}
+      {% endif %}
+    </td>
+    {% if current_user.is_editor %}
+    <td class="delete-cell text-center">
+      {% if kind == 'writein' %}
+      <button type="button" class="btn btn-sm btn-outline-danger"
+              onclick="this.closest('tr').querySelector('input[name=guest_w{{ att.id }}]').value=''; this.closest('tr').style.display='none';">
+        ✕
+      </button>
+      {% endif %}
+    </td>
+    {% endif %}
+  </tr>
+{% endmacro %}
 
 {% block content %}
 <nav aria-label="breadcrumb" class="no-print">
@@ -74,6 +155,7 @@
 </div>
 
 <form method="post" action="{{ url_for('entry.banquet_update', season_id=season.id) }}">
+{% set ncols = 5 if current_user.is_editor else 4 %}
 <table class="table table-sm table-bordered banquet-tbl">
   <thead class="table-light">
     <tr>
@@ -85,80 +167,32 @@
     </tr>
   </thead>
   <tbody>
-    {% for kind, bowler, att in rows %}
-    {% set state = att.attending if att else 'unknown' %}
-    <tr class="att-{{ 'yes' if state == 'yes' else ('no' if state == 'no' else 'unkn') }}">
-      <td>
-        {% if kind == 'bowler' %}
-          {{ bowler.last_name }}{% if bowler.first_name %}, {{ bowler.first_name }}{% endif %}
-        {% else %}
-          {% if current_user.is_editor %}
-          <input type="text" name="guest_w{{ att.id }}" class="form-control form-control-sm"
-                 value="{{ att.guest_name or '' }}">
-          <span class="print-only">{{ att.guest_name or '—' }}</span>
-          {% else %}
-            {{ att.guest_name or '—' }}
-          {% endif %}
-          <span class="badge bg-info text-dark ms-1" style="font-size:0.65rem">Write-in</span>
-        {% endif %}
-      </td>
-      <td class="attend-cell text-center">
-        {% set fld = ('b' ~ bowler.id) if kind == 'bowler' else ('w' ~ att.id) %}
-        {% if current_user.is_editor %}
-        <div class="btn-group btn-group-sm" role="group">
-          <input type="radio" class="btn-check" name="attending_{{ fld }}" id="att_{{ fld }}_yes" value="yes"
-                 {% if state == 'yes' %}checked{% endif %}>
-          <label class="btn btn-outline-success" for="att_{{ fld }}_yes">Yes</label>
-
-          <input type="radio" class="btn-check" name="attending_{{ fld }}" id="att_{{ fld }}_no" value="no"
-                 {% if state == 'no' %}checked{% endif %}>
-          <label class="btn btn-outline-danger" for="att_{{ fld }}_no">No</label>
-
-          <input type="radio" class="btn-check" name="attending_{{ fld }}" id="att_{{ fld }}_unkn" value="unknown"
-                 {% if state == 'unknown' %}checked{% endif %}>
-          <label class="btn btn-outline-secondary" for="att_{{ fld }}_unkn">—</label>
-        </div>
-        <span class="print-only">
-          {% if state == 'yes' %}✓ Yes
-          {% elif state == 'no' %}✗ No
-          {% else %}—{% endif %}
-        </span>
-        {% else %}
-          {% if state == 'yes' %}<span class="text-success">✓ Yes</span>
-          {% elif state == 'no' %}<span class="text-danger">✗ No</span>
-          {% else %}<span class="text-muted">—</span>{% endif %}
-        {% endif %}
-      </td>
-      <td class="text-center">
-        {% if current_user.is_editor %}
-        <input type="checkbox" class="form-check-input" name="paid_{{ fld }}" value="1"
-               {% if att and att.paid %}checked{% endif %}>
-        <span class="print-only">{% if att and att.paid %}✓{% else %}—{% endif %}</span>
-        {% else %}
-          {% if att and att.paid %}✓{% else %}—{% endif %}
-        {% endif %}
-      </td>
-      <td class="notes-cell">
-        {% if current_user.is_editor %}
-        <input type="text" class="form-control form-control-sm" name="notes_{{ fld }}"
-               value="{{ (att.notes if att and att.notes else '') }}">
-        <span class="print-only">{{ att.notes if att and att.notes else '' }}</span>
-        {% else %}
-          {{ att.notes if att and att.notes else '' }}
-        {% endif %}
-      </td>
-      {% if current_user.is_editor %}
-      <td class="delete-cell text-center">
-        {% if kind == 'writein' %}
-        <button type="button" class="btn btn-sm btn-outline-danger"
-                onclick="this.closest('tr').querySelector('input[name=guest_w{{ att.id }}]').value=''; this.closest('tr').style.display='none';">
-          ✕
-        </button>
-        {% endif %}
-      </td>
-      {% endif %}
-    </tr>
+    {% for team, rs in team_groups %}
+      <tr class="team-header">
+        <td colspan="{{ ncols }}">
+          Team {{ team.number }}{% if team.name and team.name != ('Team ' ~ team.number) %} — {{ team.name }}{% endif %}{% if team.captain_name %} (Captain: {{ team.captain_name }}){% endif %}
+        </td>
+      </tr>
+      {% for bowler, att in rs %}
+        {{ render_row('bowler', bowler, att) }}
+      {% endfor %}
     {% endfor %}
+    {% if extras %}
+      <tr class="team-header">
+        <td colspan="{{ ncols }}">Other (not on active roster)</td>
+      </tr>
+      {% for bowler, att in extras %}
+        {{ render_row('bowler', bowler, att) }}
+      {% endfor %}
+    {% endif %}
+    {% if writeins %}
+      <tr class="team-header">
+        <td colspan="{{ ncols }}">Write-ins</td>
+      </tr>
+      {% for att in writeins %}
+        {{ render_row('writein', none, att) }}
+      {% endfor %}
+    {% endif %}
   </tbody>
 </table>
 
