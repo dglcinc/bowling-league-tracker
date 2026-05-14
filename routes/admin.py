@@ -1552,6 +1552,30 @@ def _banquet_summary(season_id):
     }
 
 
+def _email_name_map(groups):
+    """Build {attendee.id: display_name} for the email block.
+
+    Rostered bowlers: last name only, or "F. Last" if the last name collides
+    with another rostered attendee. Write-ins: guest_name as typed.
+    """
+    last_counts = {}
+    all_attendees = [a for items in groups.values() for a in items]
+    for a in all_attendees:
+        if a.bowler and a.bowler.last_name:
+            last_counts[a.bowler.last_name] = last_counts.get(a.bowler.last_name, 0) + 1
+    name_for = {}
+    for a in all_attendees:
+        if a.bowler:
+            last = a.bowler.last_name or ''
+            if last_counts.get(last, 0) > 1 and a.bowler.first_name:
+                name_for[a.id] = f'{a.bowler.first_name[:1]}. {last}'
+            else:
+                name_for[a.id] = last or (a.bowler.first_name or '(unknown)')
+        else:
+            name_for[a.id] = a.guest_name or '(unknown)'
+    return name_for
+
+
 def _banquet_block_html(season_id):
     """HTML block summarizing banquet attendance for email body. Empty string if not configured."""
     import html as h
@@ -1571,8 +1595,9 @@ def _banquet_block_html(season_id):
         header_bits.append(f'${float(config.price):.2f} per person')
     header_line = ' · '.join(b for b in header_bits if b)
 
+    name_for = _email_name_map(groups)
     def names(items):
-        return ', '.join(h.escape(a.display_name) for a in items) or '<em>(none)</em>'
+        return ', '.join(h.escape(name_for[a.id]) for a in items) or '<em>(none)</em>'
 
     return (
         f'<hr><p><strong>{h.escape(label)}</strong>'
@@ -1602,8 +1627,9 @@ def _banquet_block_text(season_id):
         header_bits.append(f'${float(config.price):.2f} per person')
     header_line = ' · '.join(header_bits)
 
+    name_for = _email_name_map(groups)
     def names(items):
-        return ', '.join(a.display_name for a in items) or '(none)'
+        return ', '.join(name_for[a.id] for a in items) or '(none)'
 
     lines = ['', '----', label]
     if header_line:
