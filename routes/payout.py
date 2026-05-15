@@ -60,6 +60,8 @@ def _calculate_payout(season_id, config):
                         .order_by(Week.week_num)
                         .all())
 
+    tournament_labels = season.tournament_labels or {}
+
     tournament_items = []  # one dict per place per tournament
     for tw in tournament_weeks:
         entries = (TournamentEntry.query
@@ -75,15 +77,16 @@ def _calculate_payout(season_id, config):
             if amt <= 0:
                 continue
             tournament_items.append({
-                'bowler':          entry.bowler,         # None for guest
-                'guest_name':      entry.guest_name,
-                'display_name':    entry.display_name,
-                'place':           PLACE_LABELS[i],
-                'place_num':       i + 1,
-                'score':           entry.total_with_hcp,
-                'amount':          amt,
-                'week_num':        tw.week_num,
-                'tournament_type': tw.tournament_type,
+                'bowler':           entry.bowler,         # None for guest
+                'guest_name':       entry.guest_name,
+                'display_name':     entry.display_name,
+                'place':            PLACE_LABELS[i],
+                'place_num':        i + 1,
+                'score':            entry.total_with_hcp,
+                'amount':           amt,
+                'week_num':         tw.week_num,
+                'tournament_type':  tw.tournament_type,
+                'tournament_label': tournament_labels.get(tw.tournament_type, tw.tournament_type),
             })
 
     tournament_total = sum(item['amount'] for item in tournament_items)
@@ -176,7 +179,36 @@ def _calculate_payout(season_id, config):
         })
         rec['total'] += config.ytd_prize_rate
 
+    # individual_total = waterfall figure — weekly + YTD + MI only,
+    # NOT tournament prizes (which have their own waterfall line).
     individual_total = sum(p['total'] for p in ind_map.values())
+
+    # ---- 4b. ATTACH TOURNAMENT PRIZES TO ROSTERED BOWLERS ----
+    # Guests (no bowler record) stay only in tournament_items — they don't get
+    # an individual payout row or award certificate. Rostered tournament winners
+    # also need their tournament prize on their certificate and in the cash total,
+    # so we fold those into ind_map here. ind['total'] now reflects the full
+    # cash payout to the bowler; individual_total (above) stays unchanged so the
+    # waterfall doesn't double-count tournament prizes.
+    for item in tournament_items:
+        bowler = item['bowler']
+        if bowler is None:
+            continue
+        roster = Roster.query.filter_by(
+            bowler_id=bowler.id, season_id=season_id).first()
+        team = roster.team if roster else None
+        rec = _get_ind(bowler, team)
+        rec['prizes'].append({
+            'type':             'tournament',
+            'week_num':         item['week_num'],
+            'tournament_type':  item['tournament_type'],
+            'tournament_label': item['tournament_label'],
+            'place':            item['place'],
+            'label':            f"{item['tournament_label']} — {item['place']}",
+            'score':            item['score'],
+            'amount':           item['amount'],
+        })
+        rec['total'] += item['amount']
 
     # ---- 5. TEAM AWARDS ----
     remainder = (config.total_available
@@ -474,25 +506,24 @@ def payout_summary(season_id):
     for tt in payout['team_payouts']:
         team_breakdowns[tt['team'].id] = _currency_breakdown(tt['total'])
 
-    # Tournament payees (only league members, not guests)
+    # Tournament guests only — rostered tournament winners are folded into
+    # ind['total'] (and therefore into `breakdowns` above), so they must not
+    # appear here or the bank inventory would double-count.
     tourney_breakdowns = {}
-    for item in payout['tournament_items']:
-        if item['bowler']:
-            bid = item['bowler'].id
-            existing = tourney_breakdowns.get(bid, {})
-            bd = _currency_breakdown(item['amount'])
-            for denom, count in bd.items():
-                existing[denom] = existing.get(denom, 0) + count
-            tourney_breakdowns[bid] = existing
+    for idx, item in enumerate(payout['tournament_items']):
+        if item['bowler'] is None:
+            tourney_breakdowns[idx] = _currency_breakdown(item['amount'])
 
     # Aggregate bank inventory (all payees combined)
     agg = {d: 0 for d in [100, 50, 20, 10, 5, 1]}
-    for bd in list(breakdowns.values()) + list(team_breakdowns.values()):
+    for bd in list(breakdowns.values()) + list(team_breakdowns.values()) + list(tourney_breakdowns.values()):
         for d, cnt in bd.items():
             agg[d] += cnt
-    for bd in tourney_breakdowns.values():
-        for d, cnt in bd.items():
-            agg[d] += cnt
+
+    # Grand total of cash going out (excludes trophies). Computed from the
+    # whole-dollar amounts that drive the bill breakdown, so sum(agg[d]*d)
+    # reconciles exactly to grand_total regardless of cents in team awards.
+    grand_total = sum(agg[d] * d for d in agg)
 
     return render_template('payout/summary.html',
                            season=season,
@@ -501,6 +532,7 @@ def payout_summary(season_id):
                            team_breakdowns=team_breakdowns,
                            tourney_breakdowns=tourney_breakdowns,
                            agg=agg,
+                           grand_total=grand_total,
                            denoms=[100, 50, 20, 10, 5, 1])
 
 

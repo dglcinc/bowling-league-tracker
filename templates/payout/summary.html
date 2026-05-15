@@ -20,6 +20,18 @@
     h4, h5, h6 { font-size: 8pt !important; margin-bottom: 2px !important; }
     a { color: inherit !important; text-decoration: none !important; }
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
+
+    /* Repeat headers on each page; keep tfoot at the bottom of the table. */
+    table thead { display: table-header-group; }
+    table tfoot { display: table-footer-group; }
+    /* Don't split a row across pages. The individual-payout table uses
+       rowspan on the bowler/team cells, so the entire bowler block (one tr
+       per prize) needs to stay together — wrap each bowler in tbody. */
+    tr, tbody { page-break-inside: avoid; break-inside: avoid; }
+    /* Keep section heads with their following content. */
+    .section-head { page-break-after: avoid; break-after: avoid; }
+    /* Stack the two-column layout so wide tables aren't cramped. */
+    .col-12.col-xl-6 { width: 100% !important; max-width: 100% !important; flex: 0 0 100% !important; }
   }
 </style>
 {% endblock %}
@@ -84,8 +96,9 @@
           <th class="text-end">Amt</th>
         </tr>
       </thead>
-      <tbody>
       {% for ind in payout.individual_payouts %}
+      {# One tbody per bowler so print can keep each bowler block together. #}
+      <tbody>
         {% for item in ind.prizes %}
         <tr>
           {% if loop.first %}
@@ -99,7 +112,7 @@
           {% endif %}
           <td>
             {% if item.type == 'weekly' %}Wk {{ item.week_num }} — {{ item.label }}
-            {% elif item.type == 'tournament' %}Tournament Wk {{ item.week_num }} — {{ item.place }}
+            {% elif item.type == 'tournament' %}{{ item.tournament_label }} — {{ item.place }}
             {% elif item.type == 'most_improved' %}Most Improved
             {% else %}{{ item.label }}
             {% endif %}
@@ -120,10 +133,12 @@
           </td>
           <td class="text-end fw-bold">${{ ind.total | int }}</td>
         </tr>
-      {% else %}
-        <tr><td colspan="5" class="text-muted text-center">No individual payouts.</td></tr>
-      {% endfor %}
       </tbody>
+      {% else %}
+      <tbody>
+        <tr><td colspan="5" class="text-muted text-center">No individual payouts.</td></tr>
+      </tbody>
+      {% endfor %}
     </table>
 
     {% if payout.tournament_items %}
@@ -136,7 +151,7 @@
       <tbody>
       {% for item in payout.tournament_items %}
       <tr>
-        <td>Wk {{ item.week_num }} — {{ item.tournament_type }}</td>
+        <td>Wk {{ item.week_num }} — {{ item.tournament_label }}</td>
         <td>{{ item.place }}</td>
         <td>{% if item.bowler %}<a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=item.bowler.id) }}" class="text-decoration-none text-body">{{ item.display_name }}</a>{% else %}{{ item.display_name }}{% endif %}</td>
         <td class="text-end">{{ item.score }}</td>
@@ -225,15 +240,17 @@
       </tr>
       {% endfor %}
       {# Tournament guest payees (guests don't have individual payouts above) #}
-      {% for item in payout.tournament_items if item.bowler is none %}
+      {% for idx, item in enumerate(payout.tournament_items) %}
+      {% if item.bowler is none %}
+      {% set bd = tourney_breakdowns[idx] %}
       <tr>
         <td>{{ item.display_name }} <span class="text-muted small">(guest)</span></td>
         <td class="text-end fw-bold">${{ item.amount | int }}</td>
-        {% set bd = item.amount | int %}
         {% for d in denoms %}
-        <td class="text-end text-muted">—</td>
+        <td class="text-end {{ 'text-muted' if bd[d] == 0 else '' }}">{{ bd[d] if bd[d] else '—' }}</td>
         {% endfor %}
       </tr>
+      {% endif %}
       {% endfor %}
       {# Team payees #}
       {% for tt in payout.team_payouts %}
@@ -246,16 +263,30 @@
         {% endfor %}
       </tr>
       {% endfor %}
-      {# Aggregate bank inventory #}
+      </tbody>
+      <tfoot>
+      {# Bills required per denomination — the bank inventory #}
       <tr class="table-warning fw-bold">
-        <td colspan="2">Bank Inventory (total bills to withdraw)</td>
+        <td class="text-end">Bills to withdraw</td>
+        <td class="text-end">${{ "%.0f"|format(grand_total) }}</td>
         {% for d in denoms %}
         <td class="text-end">{{ agg[d] if agg[d] else '—' }}</td>
         {% endfor %}
       </tr>
-      </tbody>
+      {# Dollar value of each denomination column (count × face value) #}
+      <tr class="table-secondary">
+        <td class="text-end fst-italic small">Value of bills</td>
+        <td class="text-end fw-bold">${{ "%.0f"|format(grand_total) }}</td>
+        {% for d in denoms %}
+        <td class="text-end small">${{ (agg[d] * d) if agg[d] else '—' }}</td>
+        {% endfor %}
+      </tr>
+      </tfoot>
     </table>
-    <div class="small text-muted">Greedy breakdown: largest bills first, whole dollars only.</div>
+    <div class="small text-muted">
+      Greedy breakdown: largest bills first, whole dollars only.
+      Bills-to-withdraw row sums to ${{ "%.0f"|format(grand_total) }} across the denomination columns.
+    </div>
   </div>
 
 </div>

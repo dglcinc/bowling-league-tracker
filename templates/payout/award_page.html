@@ -326,7 +326,7 @@
       <tr>
         <td class="col-label">
           {% if item.type == 'weekly' %}Week {{ item.week_num }} &nbsp;&middot;&nbsp; {{ item.label }}
-          {% elif item.type == 'tournament' %}{{ item.tournament_type }} &nbsp;&middot;&nbsp; {{ item.place }} Place
+          {% elif item.type == 'tournament' %}{{ item.tournament_label or item.tournament_type }} &nbsp;&middot;&nbsp; {{ item.place }} Place
           {% elif item.type == 'most_improved' %}Most Improved
           {% elif item.type == 'team_finish' %}{{ item.label }}
           {% else %}{{ item.label }}{% endif %}
