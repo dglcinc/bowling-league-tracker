@@ -14,7 +14,7 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
 - No open PRs.
-- PRs #37–#154 merged to main; #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138); #145 superseded by #146 (CC-me checkbox replaced by BCC-all-recipients).
+- PRs #37–#155 merged to main; #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138); #145 superseded by #146 (CC-me checkbox replaced by BCC-all-recipients).
 
 ## League Structure
 
@@ -163,6 +163,8 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 - `award_page` — Per-recipient printable award certificate (guilloche SVG border, Playfair Display/Lato fonts, navy/gold); one page per individual or team
 - `PayoutConfig` model: one row per season; waterfall: tournament prizes → weekly wins → YTD prizes → trophy deduction → team remainder by place %
 - **Tournament prizes for rostered bowlers** (PR #154): `_calculate_payout` folds each rostered tournament winner's prize into their `ind_map` entry (so the certificate, per-bowler total, and bill breakdown all reflect it). `individual_total` is captured *before* this fold so the waterfall stays accurate — the "Less: Tournament Awards" waterfall line still covers tournament money, no double-count. Guests (no `bowler` record) stay only in `tournament_items`. Tournament labels in summary + certificate come from `season.tournament_labels` (e.g. "Harry E. Russell Championship"), not the internal key. `grand_total` in the summary is derived from `sum(agg[d]*d)` so it ties exactly to the displayed bills regardless of cents in team awards.
+- **Whole-dollar team payouts** (PR #155): `_split_whole_dollars(total, pcts)` is the canonical allocator — used for both the outer pool split (remainder → 3 award pools) and each inner place split (pool → places). Returns ints whose sum equals `int(round(total))`. Leftover dollars from rounding go to lower-index (higher-ranked) positions first, so when a tie/fractional cent forces a round-up it favors the better-ranked team. `tt['total']` is therefore an int; templates render team totals as `{{ tt.total | int }}`.
+- **Long-list award certificate** (PR #155): `.prize-table` gets a `compact` class at ≥9 prizes (9pt, 3pt padding) and `compact-xl` at ≥14 (8pt, 2pt padding). Short-list certificates are untouched — only the overflowing certificates tighten up.
 
 ### Print batch groups
 - **Group 1 (4 pages)**: 4 copies of Weekly Alpha — the physical hand-in score sheets
