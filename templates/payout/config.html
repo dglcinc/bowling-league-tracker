@@ -40,6 +40,21 @@
   </div>
   {% endfor %}
 
+  <h6 class="mt-3 mb-2 text-uppercase text-secondary" style="font-size:0.72rem;letter-spacing:.07em">High Average Prize (fixed dollar amounts)</h6>
+  <p class="small text-muted mb-2">Awarded to the top 3 season averages among rostered bowlers meeting the league minimum-games threshold. Defaults match the tournament amounts.</p>
+  {% for n, default_val in [('1', config.high_avg_prize_1), ('2', config.high_avg_prize_2), ('3', config.high_avg_prize_3)] %}
+  <div class="mb-2 row align-items-center">
+    <label class="col-sm-5 col-form-label">{{ loop.index }}{{ ['st','nd','rd'][loop.index0] }} place</label>
+    <div class="col-sm-3">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">$</span>
+        <input type="number" name="high_avg_prize_{{ n }}" class="form-control"
+               value="{{ default_val | int }}" min="0" step="1">
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
   <h6 class="mt-3 mb-2 text-uppercase text-secondary" style="font-size:0.72rem;letter-spacing:.07em">Individual Prize Rates</h6>
   <div class="mb-2 row align-items-center">
     <label class="col-sm-5 col-form-label">Weekly prize win rate ($ per win)</label>

@@ -4,9 +4,10 @@ Payout routes: weekly prize overview, season payout config, summary, and award p
 
 import json
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from models import db, Season, Week, Roster, Bowler, Team, TournamentEntry, PayoutConfig, TeamPoints
+from models import (db, Season, Week, Roster, Bowler, Team, TournamentEntry,
+                    PayoutConfig, TeamPoints, LeagueSettings)
 from calculations import (get_iron_man_status, get_most_improved, get_bowler_stats,
-                          get_weekly_prizes, get_team_standings)
+                          get_weekly_prizes, get_team_standings, build_leaders_list)
 
 payout_bp = Blueprint('payout', __name__)
 
@@ -236,10 +237,52 @@ def _calculate_payout(season_id, config):
         })
         rec['total'] += item['amount']
 
+    # ---- 4c. HIGH AVERAGE PRIZE ----
+    # Top-3 season averages among rostered bowlers meeting the league's
+    # minimum-games threshold (same filter the weekly prizes page uses).
+    # Pays its own fixed amounts (defaults match the tournament prizes) and,
+    # like tournament prizes, gets its own waterfall line — folded into
+    # ind_map *after* individual_total so the waterfall doesn't double-count.
+    settings = db.session.get(LeagueSettings, 1)
+    min_games = (settings.prizes_min_games
+                 if settings and settings.prizes_min_games is not None else 9)
+    _, avg_rows = build_leaders_list(season_id, final_week, min_games=min_games)
+
+    high_avg_prizes = [config.high_avg_prize_1,
+                       config.high_avg_prize_2,
+                       config.high_avg_prize_3]
+    high_avg_items = []  # one dict per place, for the summary page
+    for i, (row, amt) in enumerate(zip(avg_rows[:3], high_avg_prizes)):
+        if amt <= 0:
+            continue
+        bowler = row['bowler']
+        team = row['team']
+        high_avg_items.append({
+            'bowler':     bowler,
+            'team':       team,
+            'place':      PLACE_LABELS[i],
+            'place_num':  i + 1,
+            'average':    row['average'],
+            'games':      row['games'],
+            'amount':     amt,
+        })
+        rec = _get_ind(bowler, team)
+        rec['prizes'].append({
+            'type':   'high_avg',
+            'place':  PLACE_LABELS[i],
+            'label':  f"High Average — {PLACE_LABELS[i]} Place",
+            'score':  row['average'],
+            'amount': amt,
+        })
+        rec['total'] += amt
+
+    high_avg_total = sum(item['amount'] for item in high_avg_items)
+
     # ---- 5. TEAM AWARDS ----
     remainder = (config.total_available
                  - tournament_total
                  - individual_total
+                 - high_avg_total
                  - config.trophy_cost)
 
     try:
@@ -344,6 +387,8 @@ def _calculate_payout(season_id, config):
         'total_available':    config.total_available,
         'tournament_items':   tournament_items,
         'tournament_total':   tournament_total,
+        'high_avg_items':     high_avg_items,
+        'high_avg_total':     high_avg_total,
         'individual_payouts': individual_payouts,
         'individual_total':   individual_total,
         'trophy_cost':        config.trophy_cost,
@@ -470,6 +515,9 @@ def payout_config(season_id):
         config.tournament_prize_1 = float(request.form.get('tournament_prize_1', 125))
         config.tournament_prize_2 = float(request.form.get('tournament_prize_2', 100))
         config.tournament_prize_3 = float(request.form.get('tournament_prize_3', 75))
+        config.high_avg_prize_1   = float(request.form.get('high_avg_prize_1', 125))
+        config.high_avg_prize_2   = float(request.form.get('high_avg_prize_2', 100))
+        config.high_avg_prize_3   = float(request.form.get('high_avg_prize_3', 75))
         config.weekly_win_rate    = float(request.form.get('weekly_win_rate', 10))
         config.ytd_prize_rate     = float(request.form.get('ytd_prize_rate', 75))
         config.trophy_cost        = float(request.form.get('trophy_cost', 125))

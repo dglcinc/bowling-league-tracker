@@ -339,6 +339,10 @@ class PayoutConfig(db.Model):
     tournament_prize_1 = db.Column(db.Float, default=125.0)
     tournament_prize_2 = db.Column(db.Float, default=100.0)
     tournament_prize_3 = db.Column(db.Float, default=75.0)
+    # High-average season prize (1st/2nd/3rd) — defaults match the tournament amounts
+    high_avg_prize_1 = db.Column(db.Float, default=125.0)
+    high_avg_prize_2 = db.Column(db.Float, default=100.0)
+    high_avg_prize_3 = db.Column(db.Float, default=75.0)
     weekly_win_rate = db.Column(db.Float, default=10.0)
     ytd_prize_rate = db.Column(db.Float, default=75.0)
     trophy_cost = db.Column(db.Float, default=125.0)
