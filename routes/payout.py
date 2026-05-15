@@ -42,6 +42,32 @@ def _currency_breakdown(amount):
     return result
 
 
+def _split_whole_dollars(total_amount, pcts):
+    """
+    Split `total_amount` across `pcts` (a list of percentages) as whole-dollar
+    integers. Sum of the result equals int(round(total_amount)). Any leftover
+    dollars from rounding go to higher-ranked (lower-index) positions first,
+    so a tie or fractional cent rounds up for the better-ranked team.
+
+    Example: split $487 by [35, 25, 20, 20] →
+      exact: 170.45, 121.75, 97.40, 97.40
+      floor: 170,    121,    97,    97  (sum=485, leftover=2)
+      result: 171,   122,    97,    97  (sum=487)
+    """
+    total = int(round(float(total_amount or 0)))
+    if total <= 0 or not pcts:
+        return [0] * len(pcts)
+    exacts = [total * float(pct) / 100.0 for pct in pcts]
+    result = [int(e) for e in exacts]  # floor
+    leftover = total - sum(result)
+    i = 0
+    while leftover > 0:
+        result[i % len(result)] += 1
+        leftover -= 1
+        i += 1
+    return result
+
+
 def _calculate_payout(season_id, config):
     """
     Build the full payout waterfall for a season.
@@ -250,6 +276,11 @@ def _calculate_payout(season_id, config):
         ('Championship', champ_standings,       award_pcts[2] if len(award_pcts) > 2 else 20),
     ]
 
+    # Split the remainder into the three award pools as whole dollars,
+    # leftover going to First Half first, then Second, then Championship.
+    pool_pcts = [d[2] for d in award_defs]
+    pool_amounts = _split_whole_dollars(remainder, pool_pcts)
+
     # Accumulate per-team totals across all three awards
     team_totals = {}  # team_id -> {team, captain, prizes, total}
 
@@ -265,16 +296,21 @@ def _calculate_payout(season_id, config):
         return team_totals[tid]
 
     team_awards = []  # for summary page: [{name, pool_amount, pool_pct, rows}]
-    for (award_name, standings, pool_pct), place_pcts in zip(award_defs, place_pcts_all):
-        pool_amount = round(remainder * pool_pct / 100, 2)
+    for (award_def, place_pcts, pool_amount) in zip(award_defs, place_pcts_all, pool_amounts):
+        award_name, standings, pool_pct = award_def
+        # Only as many place buckets as there are standings, and only positive pcts.
+        effective_pcts = [(i, place_pcts[i] if i < len(place_pcts) else 0)
+                          for i in range(len(standings))]
+        effective_pcts = [(i, p) for i, p in effective_pcts if p > 0]
+        active_pcts = [p for _, p in effective_pcts]
+        # Split the pool into whole-dollar place amounts; leftover to top rank.
+        place_amounts = _split_whole_dollars(pool_amount, active_pcts)
+
         award_rows = []
-        for i, standing in enumerate(standings):
-            pct = place_pcts[i] if i < len(place_pcts) else 0
-            if pct <= 0:
-                continue
-            amount = round(pool_amount * pct / 100, 2)
+        for (i, _pct), amount in zip(effective_pcts, place_amounts):
             if amount <= 0:
                 continue
+            standing = standings[i]
             place_label = PLACE_LABELS[i] if i < len(PLACE_LABELS) else f'{i+1}th'
             tt = _get_tt(standing['team'])
             tt['prizes'].append({

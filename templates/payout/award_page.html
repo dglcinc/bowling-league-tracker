@@ -117,6 +117,21 @@
       font-family: 'Playfair Display', Georgia, serif; font-size: 15pt; color: #1b3a6b;
     }
 
+    /* ── Auto-compact for long prize lists ─────────────────
+       Only certificates with many prizes get tighter spacing.
+       Short-list certificates are unaffected. The .compact and
+       .compact-xl classes are applied on .prize-table based on
+       row count in the Jinja template. */
+    .prize-table.compact td        { font-size: 9pt;  padding: 3pt 8pt; }
+    .prize-table.compact .col-detail { font-size: 8pt; }
+    .prize-table.compact .total-row td      { padding-top: 6pt; font-size: 12pt; }
+    .prize-table.compact .total-row .col-amount { font-size: 14pt; }
+
+    .prize-table.compact-xl td        { font-size: 8pt;  padding: 2pt 6pt; }
+    .prize-table.compact-xl .col-detail { font-size: 7.5pt; }
+    .prize-table.compact-xl .total-row td      { padding-top: 4pt; font-size: 11pt; }
+    .prize-table.compact-xl .total-row .col-amount { font-size: 13pt; }
+
     /* ── Most improved narrative ─────────────────────────── */
     .mi-description {
       font-family: 'Lato', sans-serif; font-size: 9.5pt; font-style: italic;
@@ -318,7 +333,9 @@
 
     <hr class="orange-rule">
 
-    <table class="prize-table">
+    {% set _prize_count = rec.prizes | length %}
+    {% set _compact_cls = 'compact-xl' if _prize_count >= 14 else ('compact' if _prize_count >= 9 else '') %}
+    <table class="prize-table {{ _compact_cls }}">
       <colgroup>
         <col style="width:52%"><col style="width:30%"><col style="width:18%">
       </colgroup>

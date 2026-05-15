@@ -207,12 +207,12 @@
           </a>
           {% if tt.captain %}<span class="text-muted small"> ({{ tt.captain }})</span>{% endif %}
         </td>
-        <td class="text-end fw-bold">${{ "%.2f"|format(tt.total) }}</td>
+        <td class="text-end fw-bold">${{ tt.total | int }}</td>
       </tr>
       {% endfor %}
       <tr class="table-light">
         <td class="text-end fst-italic small">Total</td>
-        <td class="text-end fw-bold">${{ "%.2f"|format(payout.team_total) }}</td>
+        <td class="text-end fw-bold">${{ payout.team_total | int }}</td>
       </tr>
       </tbody>
     </table>
@@ -257,7 +257,7 @@
       {% set bd = team_breakdowns[tt.team.id] %}
       <tr>
         <td>{{ tt.team.name }}</td>
-        <td class="text-end fw-bold">${{ "%.2f"|format(tt.total) }}</td>
+        <td class="text-end fw-bold">${{ tt.total | int }}</td>
         {% for d in denoms %}
         <td class="text-end {{ 'text-muted' if bd[d] == 0 else '' }}">{{ bd[d] if bd[d] else '—' }}</td>
         {% endfor %}
