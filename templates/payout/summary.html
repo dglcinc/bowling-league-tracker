@@ -47,6 +47,17 @@
        the header stays on top and the denom footer at the bottom in every
        browser. Only an unusually large season would overflow this. */
     .currency-section { page-break-before: always; break-before: page; }
+
+    /* The bank inventory is read at the teller window — bump it ~50%
+       larger than the rest of the report (7pt → ~10.5pt). It still fits
+       one landscape page for a realistic payee list. */
+    .currency-section .table,
+    .currency-section .table th,
+    .currency-section .table td { font-size: 10.5pt !important;
+                                  padding: 1px 5px !important; }
+    .currency-section .denom-header { font-size: 10pt !important; }
+    .currency-section .section-head { font-size: 9.5pt !important; }
+    .currency-section .small { font-size: 9pt !important; }
   }
 </style>
 {% endblock %}
