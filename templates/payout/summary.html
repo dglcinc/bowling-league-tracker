@@ -39,6 +39,14 @@
     .section-head { page-break-after: avoid; break-after: avoid; }
     /* Repeated denomination row in the currency tfoot reads as a header. */
     .denom-foot th { background:#343a40 !important; color:#fff !important; }
+
+    /* Safari/WebKit never repeats <thead>/<tfoot> across printed page
+       breaks (no header-group pagination support). Rather than fight the
+       print engine, give the bank inventory its own fresh page so a
+       realistic payee list (~25-40 rows) fits without breaking at all —
+       the header stays on top and the denom footer at the bottom in every
+       browser. Only an unusually large season would overflow this. */
+    .currency-section { page-break-before: always; break-before: page; }
   }
 </style>
 {% endblock %}
@@ -250,6 +258,7 @@
       </tbody>
     </table>
 
+    <div class="currency-section">
     <div class="section-head">Currency Breakdown</div>
     <table class="table table-sm table-bordered mb-1">
       <thead class="table-dark">
@@ -329,6 +338,7 @@
       Greedy breakdown: largest bills first, whole dollars only.
       Bills-to-withdraw row sums to ${{ "%.0f"|format(grand_total) }} across the denomination columns.
     </div>
+    </div>{# /.currency-section #}
   </div>
 
 </div>
