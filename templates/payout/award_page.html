@@ -190,9 +190,16 @@
       @page { size: letter; margin: 0; }
       body { background: white; }
       .nav-bar { display: none !important; }
-      .certificate-wrap { padding: 0; }
-      .certificate { width: 8.5in; height: 11in; }
-      .money-page { width: 8.5in; height: 11in; padding: 0.6in 0.75in; }
+      /* Block flow, NOT flex: break-after / page-break-after are ignored
+         on flex items, so a flex wrap makes the print engine fall back to
+         natural flow and certificates drift / split mid-page. (Same root
+         cause as the payout-summary thead issue.) */
+      .certificate-wrap { padding: 0; display: block; }
+      .certificate, .money-page {
+        width: 8.5in; height: 11in;
+        break-inside: avoid; page-break-inside: avoid;
+      }
+      .money-page { padding: 0.6in 0.75in; }
     }
   </style>
 </head>
