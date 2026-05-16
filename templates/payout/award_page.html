@@ -169,7 +169,11 @@
       margin-bottom: 2pt;
     }
     .money-sub { font-size: 8pt; color: #666; font-style: italic; margin-bottom: 8pt; }
-    .money-list { column-count: 2; column-gap: 0.5in; }
+    /* Explicit two-column flex split (NOT CSS column-count: Chrome's
+       print path silently collapses multicol to one column with flex
+       row children in a paged context). The list is halved in Jinja. */
+    .money-list { display: flex; gap: 0.5in; align-items: flex-start; }
+    .money-col { flex: 1 1 0; min-width: 0; }
     .money-row {
       display: flex; justify-content: space-between; gap: 8pt;
       font-family: 'Lato', sans-serif; font-size: 8.5pt; color: #222;
@@ -453,13 +457,25 @@
     {%- endif -%}
     &nbsp;&middot;&nbsp; {{ season.name }} payout
   </div>
+  {% set _n = rec.prizes | length %}
+  {% set _half = (_n + 1) // 2 %}
   <div class="money-list">
-    {% for item in rec.prizes %}
-    <div class="money-row">
-      <span class="ml-label">{{ prize_label(item) }}</span>
-      <span class="ml-amt">${{ item.amount | int }}</span>
+    <div class="money-col">
+      {% for item in rec.prizes[:_half] %}
+      <div class="money-row">
+        <span class="ml-label">{{ prize_label(item) }}</span>
+        <span class="ml-amt">${{ item.amount | int }}</span>
+      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
+    <div class="money-col">
+      {% for item in rec.prizes[_half:] %}
+      <div class="money-row">
+        <span class="ml-label">{{ prize_label(item) }}</span>
+        <span class="ml-amt">${{ item.amount | int }}</span>
+      </div>
+      {% endfor %}
+    </div>
   </div>
   <div class="money-total">
     <span>Total Award</span><span>${{ rec.total | int }}</span>
