@@ -790,9 +790,17 @@ def get_lifetime_achievements(bowler_id):
         return None
 
     names = [r['season'].name for r in career]
-    start_year = names[0].split('-')[0]
+    first_played_year = int(names[0].split('-')[0])
     end_year = names[-1].split('-')[-1]
     total_games = sum(r['games'] for r in career)
+
+    # If records start at the very beginning of our DB, they likely bowled
+    # earlier — display one year prior and flag "that we know of".
+    earliest_db = Season.query.order_by(Season.name).first()
+    earliest_db_year = int(earliest_db.name.split('-')[0]) if earliest_db else None
+    at_limit = (earliest_db_year is not None and first_played_year == earliest_db_year)
+    display_start_year = first_played_year - 1 if at_limit else first_played_year
+    span_suffix = ' (that we know of)' if at_limit else ''
 
     def _best(key):
         mx = max(r[key] for r in career)
@@ -800,7 +808,6 @@ def get_lifetime_achievements(bowler_id):
         return mx, seasons
 
     def _yrs(season_names):
-        # "2004-2005 & 2024-2025" → "2004-2005 & 2024-2025"; single → as-is
         return ' & '.join(season_names)
 
     best_avg = max(career, key=lambda r: r['avg'])
@@ -828,9 +835,9 @@ def get_lifetime_achievements(bowler_id):
                         grand[k] += 1
     weekly_total = sum(grand.values())
 
-    # Tournament placements
-    titles = {}      # label -> count of 1st places
-    seconds = thirds = 0
+    # Individual tournament placements — one entry per placement, sorted
+    # 1st before 2nd/3rd, then chronologically within each place.
+    placements = []
     tes = (TournamentEntry.query
            .filter_by(bowler_id=bowler_id)
            .filter(TournamentEntry.place.isnot(None))
@@ -841,12 +848,27 @@ def get_lifetime_achievements(bowler_id):
                                  week_num=te.week_num).first()
         tt = w.tournament_type if w else None
         label = ((s.tournament_labels or {}).get(tt, tt) if s else tt) or 'Tournament'
-        if te.place == 1:
-            titles[label] = titles.get(label, 0) + 1
-        elif te.place == 2:
-            seconds += 1
-        elif te.place == 3:
-            thirds += 1
+        placements.append({
+            'place': te.place,
+            'label': label,
+            'season': s.name if s else '?',
+        })
+    placements.sort(key=lambda x: (x['place'], x['season']))
+
+    # Harry E. Russell career best — best 5-game scratch series
+    russell_best = None
+    all_te_scratch = (TournamentEntry.query
+                      .filter_by(bowler_id=bowler_id)
+                      .filter(TournamentEntry.game1.isnot(None))
+                      .all())
+    for te in all_te_scratch:
+        w = Week.query.filter_by(season_id=te.season_id,
+                                 week_num=te.week_num).first()
+        if w and w.tournament_type == 'indiv_scratch':
+            total = sum(g for g in [te.game1, te.game2, te.game3,
+                                    te.game4, te.game5] if g)
+            if total > 0 and (russell_best is None or total > russell_best):
+                russell_best = total
 
     # Distinct venues in chronological order
     venues = []
@@ -854,6 +876,8 @@ def get_lifetime_achievements(bowler_id):
         v = _LIFETIME_VENUE_LABELS.get(r['venue'], r['venue'])
         if v not in venues:
             venues.append(v)
+
+    _PLACE_LABELS = {1: '1st Place', 2: '2nd Place', 3: '3rd Place'}
 
     prizes = [
         {'label': 'Career-Best Average',
@@ -866,29 +890,32 @@ def get_lifetime_achievements(bowler_id):
          'score': f"{hgh} · {_yrs(hgh_s)}"},
         {'label': 'Career High Series — Handicap',
          'score': f"{hsh} · {_yrs(hsh_s)}"},
-        {'label': 'Weekly Prizes Won',
-         'score': (f"{weekly_total} · {grand['hg_scratch']} HG-S, "
-                   f"{grand['hs_scratch']} HS-S, {grand['hg_hcp']} HG-H, "
-                   f"{grand['hs_hcp']} HS-H")},
+        # Weekly prizes: total headline + one row per category
+        {'label': 'Weekly Prizes Won', 'score': f"{weekly_total} total"},
+        {'label': 'High Game Scratch',   'score': str(grand['hg_scratch'])},
+        {'label': 'High Series Scratch', 'score': str(grand['hs_scratch'])},
+        {'label': 'High Game Handicap',  'score': str(grand['hg_hcp'])},
+        {'label': 'High Series Handicap','score': str(grand['hs_hcp'])},
     ]
-    if titles:
-        tcount = sum(titles.values())
-        tdetail = ' · '.join(f"{lbl} ×{n}" for lbl, n in
-                                  sorted(titles.items(), key=lambda x: -x[1]))
-        prizes.append({'label': 'Tournament Titles (1st)',
-                       'score': f"{tcount} · {tdetail}"})
-    if seconds or thirds:
-        parts = []
-        if seconds:
-            parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
-        if thirds:
-            parts.append(f"{thirds} third{'s' if thirds != 1 else ''}")
-        prizes.append({'label': 'Tournament Podiums (2nd/3rd)',
-                       'score': f"{seconds + thirds} · {', '.join(parts)}"})
+
+    # Individual tournament placement rows
+    for p in placements:
+        prizes.append({
+            'label': f"{p['label']} — {_PLACE_LABELS.get(p['place'], str(p['place'])+'th')}",
+            'score': p['season'],
+        })
+
+    # Harry E. Russell career best
+    if russell_best is not None:
+        avg5 = round(russell_best / 5)
+        prizes.append({
+            'label': 'Career Best — Harry E. Russell',
+            'score': f"5 games · {russell_best} · {avg5} avg",
+        })
+
     if len(venues) > 1:
         prizes.append({'label': 'Longevity',
-                       'score': f"{len(venues)} venues · "
-                                + ' → '.join(venues)})
+                       'score': ' → '.join(venues)})
 
     result = {
         'bowler':     bowler,
@@ -896,8 +923,8 @@ def get_lifetime_achievements(bowler_id):
         'name':       bowler.last_name,
         'nickname':   bowler.nickname or '',
         'subtitle':   'Lifetime Achievement Award — "so far"',
-        'span':       (f"{len(career)} Seasons · {start_year}–{end_year} "
-                       f"· {total_games:,} Games"),
+        'span':       (f"{len(career)} Seasons{span_suffix} · "
+                       f"{display_start_year}–{end_year} · {total_games:,} Games"),
         'prizes':     prizes,
     }
     cache.set(ck, result, timeout=900)
