@@ -83,6 +83,7 @@ def _migrate_db(db):
         "ALTER TABLE payout_configs ADD COLUMN team_award_pcts_json TEXT DEFAULT '[40, 40, 20]'",
         "ALTER TABLE payout_configs ADD COLUMN team_place_pcts_json TEXT DEFAULT '[[35,25,20,20],[35,25,20,20],[60,40]]'",
         "ALTER TABLE payout_configs ADD COLUMN championship_start_week INTEGER DEFAULT 20",
+        "ALTER TABLE bowlers ADD COLUMN career_notes TEXT",
         "ALTER TABLE payout_configs ADD COLUMN high_avg_prize_1 FLOAT DEFAULT 125.0",
         "ALTER TABLE payout_configs ADD COLUMN high_avg_prize_2 FLOAT DEFAULT 100.0",
         "ALTER TABLE payout_configs ADD COLUMN high_avg_prize_3 FLOAT DEFAULT 75.0",

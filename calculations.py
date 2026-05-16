@@ -855,11 +855,13 @@ def get_lifetime_achievements(bowler_id):
         })
     placements.sort(key=lambda x: (x['place'], x['season']))
 
-    # Harry E. Russell career best — best 5-game scratch series
+    # Harry E. Russell career best — best 5-game scratch series.
+    # Historical imports use dummy scores (game1=300/200/100, games 2-5 NULL)
+    # for placement ordering only; skip those by requiring game5 to be set.
     russell_best = None
     all_te_scratch = (TournamentEntry.query
                       .filter_by(bowler_id=bowler_id)
-                      .filter(TournamentEntry.game1.isnot(None))
+                      .filter(TournamentEntry.game5.isnot(None))
                       .all())
     for te in all_te_scratch:
         w = Week.query.filter_by(season_id=te.season_id,
@@ -912,6 +914,19 @@ def get_lifetime_achievements(bowler_id):
             'label': 'Career Best — Harry E. Russell',
             'score': f"5 games · {russell_best} · {avg5} avg",
         })
+
+    # Per-bowler extra lines entered via admin Edit Bowler (career_notes).
+    # Format: one line per row; "Label | Score" or just "Label".
+    if bowler.career_notes:
+        for line in bowler.career_notes.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if '|' in line:
+                lbl, score = line.split('|', 1)
+                prizes.append({'label': lbl.strip(), 'score': score.strip()})
+            else:
+                prizes.append({'label': line, 'score': ''})
 
     if len(venues) > 1:
         prizes.append({'label': 'Longevity',

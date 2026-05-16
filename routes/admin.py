@@ -481,6 +481,7 @@ def edit_bowler(bowler_id):
         bowler.first_name = request.form.get('first_name', '').strip() or None
         bowler.nickname = request.form.get('nickname', '').strip() or None
         bowler.email = request.form.get('email', '').strip() or None
+        bowler.career_notes = request.form.get('career_notes', '').strip() or None
 
         new_is_editor = 'is_editor' in request.form
         if bowler.is_editor and not new_is_editor:
