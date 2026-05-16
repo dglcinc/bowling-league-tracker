@@ -888,43 +888,11 @@ def get_lifetime_achievements(bowler_id):
             venues.append(v)
 
     _PLACE_LABELS = {1: '1st Place', 2: '2nd Place', 3: '3rd Place'}
+    _INDENT = '   '  # non-breaking spaces — preserved in HTML
 
-    prizes = [
-        {'label': 'Career-Best Average',
-         'score': f"{best_avg['avg']} · {best_avg['season'].name}"},
-        {'label': 'Career High Game — Scratch',
-         'score': f"{hgs} · {_yrs(hgs_s)}"},
-        {'label': 'Career High Series — Scratch',
-         'score': f"{hss} · {_yrs(hss_s)}"},
-        {'label': 'Career High Game — Handicap',
-         'score': f"{hgh} · {_yrs(hgh_s)}"},
-        {'label': 'Career High Series — Handicap',
-         'score': f"{hsh} · {_yrs(hsh_s)}"},
-        # Weekly prizes: total headline + one row per category
-        {'label': 'Weekly Prizes Won', 'score': f"{weekly_total} total"},
-        {'label': 'High Game Scratch',   'score': str(grand['hg_scratch'])},
-        {'label': 'High Series Scratch', 'score': str(grand['hs_scratch'])},
-        {'label': 'High Game Handicap',  'score': str(grand['hg_hcp'])},
-        {'label': 'High Series Handicap','score': str(grand['hs_hcp'])},
-    ]
-
-    # Individual tournament placement rows
-    for p in placements:
-        prizes.append({
-            'label': f"{p['label']} — {_PLACE_LABELS.get(p['place'], str(p['place'])+'th')}",
-            'score': p['season'],
-        })
-
-    # Harry E. Russell career best
-    if russell_best is not None:
-        avg5 = round(russell_best / 5)
-        prizes.append({
-            'label': 'Career Best — Harry E. Russell',
-            'score': f"5 games · {russell_best} · {avg5} avg",
-        })
-
-    # Per-bowler extra lines entered via admin Edit Bowler (career_notes).
-    # Format: one line per row; "Label | Score" or just "Label".
+    # Per-bowler extra lines (admin Edit Bowler → career_notes) come FIRST.
+    # Format: "Label | Score detail" or "Label" only, one per line.
+    prizes = []
     if bowler.career_notes:
         for line in bowler.career_notes.splitlines():
             line = line.strip()
@@ -935,6 +903,63 @@ def get_lifetime_achievements(bowler_id):
                 prizes.append({'label': lbl.strip(), 'score': score.strip()})
             else:
                 prizes.append({'label': line, 'score': ''})
+
+    # Career bests
+    prizes += [
+        {'label': 'Career-Best Average',
+         'score': f"{best_avg['avg']} · {best_avg['season'].name}"},
+        {'label': 'Career High Game — Scratch',
+         'score': f"{hgs} · {_yrs(hgs_s)}"},
+        {'label': 'Career High Series — Scratch',
+         'score': f"{hss} · {_yrs(hss_s)}"},
+        {'label': 'Career High Game — Handicap',
+         'score': f"{hgh} · {_yrs(hgh_s)}"},
+        {'label': 'Career High Series — Handicap',
+         'score': f"{hsh} · {_yrs(hsh_s)}"},
+    ]
+
+    # Weekly prizes: total headline + 4 indented per-category rows
+    prizes.append({'label': 'Weekly Prizes Won', 'score': f"{weekly_total} wins"})
+    prizes.append({'label': f"{_INDENT}High Game Scratch",
+                   'score': f"{grand['hg_scratch']} wins"})
+    prizes.append({'label': f"{_INDENT}High Series Scratch",
+                   'score': f"{grand['hs_scratch']} wins"})
+    prizes.append({'label': f"{_INDENT}High Game Handicap",
+                   'score': f"{grand['hg_hcp']} wins"})
+    prizes.append({'label': f"{_INDENT}High Series Handicap",
+                   'score': f"{grand['hs_hcp']} wins"})
+
+    # Tournament placements — grouped by tournament name.
+    # Group order: best place achieved first, then most 1st-place wins, then alpha.
+    # Within each group: place asc, season asc.
+    from collections import defaultdict
+    _groups = defaultdict(list)
+    for p in placements:
+        _groups[p['label']].append(p)
+    for g in _groups.values():
+        g.sort(key=lambda x: (x['place'], x['season']))
+
+    def _group_sort_key(item):
+        lbl, entries = item
+        best = min(e['place'] for e in entries)
+        firsts = sum(1 for e in entries if e['place'] == 1)
+        return (best, -firsts, lbl)
+
+    for lbl, entries in sorted(_groups.items(), key=_group_sort_key):
+        prizes.append({'label': lbl, 'score': ''})  # tournament name header
+        for e in entries:
+            place_str = _PLACE_LABELS.get(e['place'], f"{e['place']}th Place")
+            prizes.append({'label': f"{_INDENT}{place_str}",
+                           'score': e['season']})
+
+    # Harry E. Russell career best from real DB entries (game5 not NULL).
+    # Historical imports use dummy scores (game1=300/200/100, game5=NULL).
+    if russell_best is not None:
+        avg5 = round(russell_best / 5)
+        prizes.append({
+            'label': 'Career Best — Harry E. Russell',
+            'score': f"5 games · {russell_best} · {avg5} avg",
+        })
 
     if len(venues) > 1:
         prizes.append({'label': 'Longevity',
