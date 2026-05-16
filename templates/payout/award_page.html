@@ -152,6 +152,39 @@
       font-style: italic; color: #888; letter-spacing: 0.03em;
     }
 
+    /* ── Money insert (page 2, folds inside the certificate) ──
+       Compact two-column list confined to the top third of the
+       page so a tri-fold tucks the cash detail out of sight. */
+    .money-page {
+      position: relative;
+      width: 7.5in; height: 9.71in;
+      background: #fff;
+      padding: 0.55in 0.7in;
+      page-break-after: always; break-after: page;
+      overflow: hidden;
+    }
+    .money-header {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 12pt; font-weight: 700; color: #1b3a6b;
+      margin-bottom: 2pt;
+    }
+    .money-sub { font-size: 8pt; color: #666; font-style: italic; margin-bottom: 8pt; }
+    .money-list { column-count: 2; column-gap: 0.5in; }
+    .money-row {
+      display: flex; justify-content: space-between; gap: 8pt;
+      font-family: 'Lato', sans-serif; font-size: 8.5pt; color: #222;
+      padding: 1.5pt 0; border-bottom: 1px dotted #d8d2c6;
+      break-inside: avoid;
+    }
+    .money-row .ml-amt { font-weight: 700; color: #1b3a6b; white-space: nowrap; }
+    .money-total {
+      display: flex; justify-content: space-between;
+      margin-top: 9pt; padding-top: 5pt;
+      border-top: 2px solid #f47920;
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 11.5pt; font-weight: 700; color: #1b3a6b;
+    }
+
     /* ── Print ───────────────────────────────────────────── */
     @media print {
       @page { size: letter; margin: 0; }
@@ -159,6 +192,7 @@
       .nav-bar { display: none !important; }
       .certificate-wrap { padding: 0; }
       .certificate { width: 8.5in; height: 11in; }
+      .money-page { width: 8.5in; height: 11in; padding: 0.6in 0.75in; }
     }
   </style>
 </head>
@@ -176,6 +210,24 @@
   </button>
 </div>
 {% endif %}
+
+{# ── Shared prize render logic (used by the certificate front AND
+      the money insert, so the two can never drift) ───────────── #}
+{% macro prize_label(item) -%}
+  {%- if item.type == 'weekly' -%}Week {{ item.week_num }} &middot; {{ item.label }}
+  {%- elif item.type == 'tournament' -%}{{ item.tournament_label or item.tournament_type }} &middot; {{ item.place }} Place
+  {%- elif item.type == 'most_improved' -%}Most Improved
+  {%- elif item.type == 'team_finish' -%}{{ item.label }}
+  {%- else -%}{{ item.label }}{%- endif -%}
+{%- endmacro %}
+{% macro prize_detail(item) -%}
+  {%- if item.type == 'weekly' -%}{{ item.score }}
+  {%- elif item.type == 'tournament' -%}{{ item.score }} (w/hcp)
+  {%- elif item.type == 'most_improved' -%}{{ item.description }}
+  {%- elif item.type == 'team_finish' -%}{{ item.detail }}
+  {%- elif item.score is defined -%}{{ item.score }}
+  {%- else -%}&mdash;{%- endif -%}
+{%- endmacro %}
 
 {# ────────────────────────────────────────────────────────────
    SVG coordinate system: 850 × 1100 units (100 units = 1 inch
@@ -335,35 +387,18 @@
 
     {% set _prize_count = rec.prizes | length %}
     {% set _compact_cls = 'compact-xl' if _prize_count >= 14 else ('compact' if _prize_count >= 9 else '') %}
+    {# Front of the certificate: the award list only — NO money.
+       Dollar amounts + total live on the page-2 money insert. #}
     <table class="prize-table {{ _compact_cls }}">
       <colgroup>
-        <col style="width:52%"><col style="width:30%"><col style="width:18%">
+        <col style="width:62%"><col style="width:38%">
       </colgroup>
       {% for item in rec.prizes %}
       <tr>
-        <td class="col-label">
-          {% if item.type == 'weekly' %}Week {{ item.week_num }} &nbsp;&middot;&nbsp; {{ item.label }}
-          {% elif item.type == 'tournament' %}{{ item.tournament_label or item.tournament_type }} &nbsp;&middot;&nbsp; {{ item.place }} Place
-          {% elif item.type == 'most_improved' %}Most Improved
-          {% elif item.type == 'team_finish' %}{{ item.label }}
-          {% else %}{{ item.label }}{% endif %}
-        </td>
-        <td class="col-detail">
-          {% if item.type == 'weekly' %}{{ item.score }}
-          {% elif item.type == 'tournament' %}{{ item.score }} (w/hcp)
-          {% elif item.type == 'most_improved' %}{{ item.description }}
-          {% elif item.type == 'team_finish' %}{{ item.detail }}
-          {% elif item.score is defined %}{{ item.score }}
-          {% else %}—{% endif %}
-        </td>
-        <td class="col-amount">${{ item.amount | int }}</td>
+        <td class="col-label">{{ prize_label(item) }}</td>
+        <td class="col-detail">{{ prize_detail(item) }}</td>
       </tr>
       {% endfor %}
-      <tr class="total-row">
-        <td class="col-label">Total Award</td>
-        <td class="col-detail"></td>
-        <td class="col-amount">${{ rec.total | int }}</td>
-      </tr>
     </table>
 
     {% for item in rec.prizes if item.type == 'most_improved' %}
@@ -379,6 +414,40 @@
       Presented by the {{ league_settings.league_name if league_settings else 'Bowling League' }} &nbsp;&mdash;&nbsp; {{ season.name }}
     </div>
 
+  </div>
+</div>
+</div>
+
+{# ── Page 2: money insert — prints on the back when two-sided,
+      folds inside so the cash detail never shows on the front #}
+<div class="certificate-wrap">
+<div class="money-page">
+  <div class="money-header">
+    {%- if rec.type == 'individual' -%}
+      {{ (rec.first_name ~ ' ' ~ rec.name) if rec.first_name else rec.name }}
+      {%- if rec.nickname %} &ldquo;{{ rec.nickname }}&rdquo;{% endif -%}
+    {%- else -%}
+      {{ rec.name }}
+    {%- endif -%}
+  </div>
+  <div class="money-sub">
+    {%- if rec.type == 'individual' -%}
+      {{ rec.team_label }}
+    {%- elif rec.captain -%}
+      Captain: {{ rec.captain }}
+    {%- endif -%}
+    &nbsp;&middot;&nbsp; {{ season.name }} payout
+  </div>
+  <div class="money-list">
+    {% for item in rec.prizes %}
+    <div class="money-row">
+      <span class="ml-label">{{ prize_label(item) }}</span>
+      <span class="ml-amt">${{ item.amount | int }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="money-total">
+    <span>Total Award</span><span>${{ rec.total | int }}</span>
   </div>
 </div>
 </div>
