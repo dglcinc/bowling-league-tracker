@@ -909,7 +909,7 @@ def get_lifetime_achievements(bowler_id):
 
     # Career bests
     prizes += [
-        {'label': 'Career-Best Average',
+        {'label': 'Career Best — Average',
          'score': f"{best_avg['avg']} · {best_avg['season'].name}",
          'heading': True},
         {'label': 'Career High Game — Scratch',
