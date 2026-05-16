@@ -202,7 +202,8 @@
          on flex items, so a flex wrap makes the print engine fall back to
          natural flow and certificates drift / split mid-page. (Same root
          cause as the payout-summary thead issue.) */
-      .certificate-wrap { padding: 0; display: block; }
+      .certificate-wrap { padding: 0 !important; display: block;
+                          height: 11in; overflow: hidden; }
       /* Each box is exactly one sheet (8.5×11). Do NOT also force a
          page-break-after: a full-page box + forced break makes the
          engine emit a redundant blank page after every box (Cmd-P
