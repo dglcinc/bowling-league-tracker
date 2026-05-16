@@ -195,16 +195,19 @@
 
     /* ── Print ───────────────────────────────────────────── */
     @media print {
-      /* 3/8" margin on each side so the border clears a 10 3/8" × 8"
-         frame mat on 8.5 × 11 paper.
-         Content area: 8.5 − 0.75 = 7.75" wide, 11 − 0.75 = 10.25" tall. */
-      @page { size: letter; margin: 0.375in; }
+      /* @page margin stays 0 — non-zero @page margins cause a blank-page
+         bug in the Safari/WebKit print path (preview looks fine, printer
+         outputs nothing). The 3/8" inset for the 10 3/8" × 8" frame mat
+         is achieved via padding on the wrapper instead: wrapper = 8.5×11
+         (fills the page), certificate = 7.75×10.25 (the artwork), padding
+         = 0.375in all sides provides the white border the frame needs. */
+      @page { size: letter; margin: 0; }
       body { background: white; }
       .nav-bar { display: none !important; }
-      /* Block flow keeps page breaks honored (flex items ignore break-after). */
-      .certificate-wrap { padding: 0; display: block; }
-      /* Size matches the page content area. No forced break — two consecutive
-         10.25in boxes in block flow paginate cleanly with no blanks. */
+      /* Block flow keeps page breaks honored (flex items ignore break-after).
+         Padding: 0.375in creates the 3/8" white border around the artwork. */
+      .certificate-wrap { padding: 0.375in; display: block; }
+      /* Artwork fills the inner 7.75×10.25 content area. No forced break. */
       .certificate, .money-page {
         width: 7.75in; height: 10.25in;
         page-break-after: auto; break-after: auto;
