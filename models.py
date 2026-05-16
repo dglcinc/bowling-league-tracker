@@ -20,6 +20,9 @@ class Bowler(UserMixin, db.Model):
     nickname = db.Column(db.String(64))
     email = db.Column(db.String(128))
     is_editor = db.Column(db.Boolean, default=False)
+    # Extra prize rows for the Lifetime Achievement certificate, one per line.
+    # Format: "Label | Score detail" or just "Label" for a no-score row.
+    career_notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     roster_entries = db.relationship('Roster', back_populates='bowler', lazy='dynamic')
