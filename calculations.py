@@ -794,10 +794,18 @@ def get_lifetime_achievements(bowler_id):
     end_year = names[-1].split('-')[-1]
     total_games = sum(r['games'] for r in career)
 
-    # If records start at the very beginning of our DB, they likely bowled
-    # earlier — display one year prior and flag "that we know of".
-    earliest_db = Season.query.order_by(Season.name).first()
-    earliest_db_year = int(earliest_db.name.split('-')[0]) if earliest_db else None
+    # If records start at the very beginning of our regular-season data,
+    # they likely bowled earlier — display one year prior and flag "that we know of".
+    # Use the earliest season with actual entered regular weeks (not tournament-only
+    # seasons, which exist in the DB but have no regular-play data).
+    earliest_regular = (Season.query
+                        .join(Week, (Week.season_id == Season.id) &
+                              (Week.is_entered == True) &
+                              (Week.is_cancelled == False) &
+                              Week.tournament_type.is_(None))
+                        .order_by(Season.name)
+                        .first())
+    earliest_db_year = int(earliest_regular.name.split('-')[0]) if earliest_regular else None
     at_limit = (earliest_db_year is not None and first_played_year == earliest_db_year)
     display_start_year = first_played_year - 1 if at_limit else first_played_year
     span_suffix = ' (that we know of)' if at_limit else ''
