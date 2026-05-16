@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Award{% if recipients|length == 1 %} — {{ recipients[0].name }}{% endif %} — {{ season.name }}</title>
+  <title>{% if lifetime %}Lifetime Award — {{ recipients[0].name }}{% else %}Award{% if recipients|length == 1 %} — {{ recipients[0].name }}{% endif %} — {{ season.name }}{% endif %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:ital,wght@0,300;0,400;0,700;1,300;1,400&display=swap" rel="stylesheet">
@@ -220,8 +220,10 @@
 {% if single %}
 <div class="nav-bar">
   <a href="javascript:history.back()">← Back</a>
+  {% if not lifetime %}
   <span style="color:#6c757d">|</span>
   <a href="{{ url_for('payout.award_all', season_id=season.id) }}" target="_blank">Print All Awards</a>
+  {% endif %}
   <span style="flex:1"></span>
   <button onclick="window.print()"
           style="background:#495057;border:1px solid #6c757d;color:#fff;padding:3px 12px;border-radius:3px;cursor:pointer">
@@ -386,14 +388,22 @@
   <div class="cert-content">
 
     <div class="cert-league">{{ league_settings.league_name if league_settings else 'Bowling League' }}</div>
+    {% if lifetime %}
+    <div class="cert-season">{{ lifetime.subtitle }}</div>
+    {% else %}
     <div class="cert-season">{{ season.name }} Season</div>
+    {% endif %}
 
     <hr class="orange-rule">
 
     {% if rec.type == 'individual' %}
       <div class="cert-name">{{ (rec.first_name ~ ' ' ~ rec.name) if rec.first_name else rec.name }}</div>
       {% if rec.nickname %}<div class="cert-nickname">"{{ rec.nickname }}"</div>{% endif %}
+      {% if lifetime %}
+      <div class="cert-team">{{ lifetime.span }}</div>
+      {% else %}
       <div class="cert-team">{{ rec.team_label }}</div>
+      {% endif %}
     {% else %}
       <div class="cert-name">{{ rec.name }}</div>
       {% if rec.captain %}<div class="cert-captain">Captain: {{ rec.captain }}</div>{% endif %}
@@ -430,13 +440,14 @@
     {% endfor %}
 
     <div class="cert-footer">
-      Presented by the {{ league_settings.league_name if league_settings else 'Bowling League' }} &nbsp;&mdash;&nbsp; {{ season.name }}
+      Presented by the {{ league_settings.league_name if league_settings else 'Bowling League' }}{% if not lifetime %} &nbsp;&mdash;&nbsp; {{ season.name }}{% endif %}
     </div>
 
   </div>
 </div>
 </div>
 
+{% if not lifetime %}
 {# ── Page 2: money insert — prints on the back when two-sided,
       folds inside so the cash detail never shows on the front #}
 <div class="certificate-wrap">
@@ -482,6 +493,7 @@
   </div>
 </div>
 </div>
+{% endif %}{# /not lifetime #}
 {% endfor %}
 
 </body>
