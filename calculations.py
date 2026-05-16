@@ -759,6 +759,151 @@ def get_career_stats(bowler_id):
     return results
 
 
+_LIFETIME_VENUE_LABELS = {
+    'mountain_lakes_club': 'Mountain Lakes Club',
+    'boonton_lanes':       'Boonton Lanes',
+}
+
+
+def get_lifetime_achievements(bowler_id):
+    """
+    Build a 'Lifetime Achievement (so far)' summary for one bowler:
+    career bests, weekly-prize totals, tournament titles/podiums, longevity.
+    Returns None if the bowler has no regular-season play. The weekly-prize
+    scan walks every entered week of every played season, so the result is
+    cached (cleared on every score post via cache.clear()).
+    """
+    from models import Bowler, Season, Week, TournamentEntry
+    from extensions import cache
+
+    ck = f'lifetime:{bowler_id}'
+    cached = cache.get(ck)
+    if cached is not None:
+        return cached
+
+    bowler = db.session.get(Bowler, bowler_id)
+    if bowler is None:
+        return None
+
+    career = [r for r in get_career_stats(bowler_id) if r['has_data']]
+    if not career:
+        return None
+
+    names = [r['season'].name for r in career]
+    start_year = names[0].split('-')[0]
+    end_year = names[-1].split('-')[-1]
+    total_games = sum(r['games'] for r in career)
+
+    def _best(key):
+        mx = max(r[key] for r in career)
+        seasons = [r['season'].name for r in career if r[key] == mx]
+        return mx, seasons
+
+    def _yrs(season_names):
+        # "2004-2005 & 2024-2025" → "2004-2005 & 2024-2025"; single → as-is
+        return ' & '.join(season_names)
+
+    best_avg = max(career, key=lambda r: r['avg'])
+    hgs, hgs_s = _best('high_game_scratch')
+    hss, hss_s = _best('high_series_scratch')
+    hgh, hgh_s = _best('high_game_hcp')
+    hsh, hsh_s = _best('high_series_hcp')
+
+    # Weekly prizes across every played season
+    PK = ['hg_scratch', 'hg_hcp', 'hs_scratch', 'hs_hcp']
+    grand = {k: 0 for k in PK}
+    for r in career:
+        sid = r['season'].id
+        wks = (Week.query
+               .filter_by(season_id=sid, is_entered=True, is_cancelled=False)
+               .filter(Week.tournament_type.is_(None))
+               .all())
+        for wk in wks:
+            pr = get_weekly_prizes(sid, wk.week_num)
+            if not pr:
+                continue
+            for k in PK:
+                for win in pr[k]['winners']:
+                    if win['bowler'].id == bowler_id:
+                        grand[k] += 1
+    weekly_total = sum(grand.values())
+
+    # Tournament placements
+    titles = {}      # label -> count of 1st places
+    seconds = thirds = 0
+    tes = (TournamentEntry.query
+           .filter_by(bowler_id=bowler_id)
+           .filter(TournamentEntry.place.isnot(None))
+           .all())
+    for te in tes:
+        s = db.session.get(Season, te.season_id)
+        w = Week.query.filter_by(season_id=te.season_id,
+                                 week_num=te.week_num).first()
+        tt = w.tournament_type if w else None
+        label = ((s.tournament_labels or {}).get(tt, tt) if s else tt) or 'Tournament'
+        if te.place == 1:
+            titles[label] = titles.get(label, 0) + 1
+        elif te.place == 2:
+            seconds += 1
+        elif te.place == 3:
+            thirds += 1
+
+    # Distinct venues in chronological order
+    venues = []
+    for r in career:
+        v = _LIFETIME_VENUE_LABELS.get(r['venue'], r['venue'])
+        if v not in venues:
+            venues.append(v)
+
+    prizes = [
+        {'label': 'Career-Best Average',
+         'score': f"{best_avg['avg']} · {best_avg['season'].name}"},
+        {'label': 'Career High Game — Scratch',
+         'score': f"{hgs} · {_yrs(hgs_s)}"},
+        {'label': 'Career High Series — Scratch',
+         'score': f"{hss} · {_yrs(hss_s)}"},
+        {'label': 'Career High Game — Handicap',
+         'score': f"{hgh} · {_yrs(hgh_s)}"},
+        {'label': 'Career High Series — Handicap',
+         'score': f"{hsh} · {_yrs(hsh_s)}"},
+        {'label': 'Weekly Prizes Won',
+         'score': (f"{weekly_total} · {grand['hg_scratch']} HG-S, "
+                   f"{grand['hs_scratch']} HS-S, {grand['hg_hcp']} HG-H, "
+                   f"{grand['hs_hcp']} HS-H")},
+    ]
+    if titles:
+        tcount = sum(titles.values())
+        tdetail = ' · '.join(f"{lbl} ×{n}" for lbl, n in
+                                  sorted(titles.items(), key=lambda x: -x[1]))
+        prizes.append({'label': 'Tournament Titles (1st)',
+                       'score': f"{tcount} · {tdetail}"})
+    if seconds or thirds:
+        parts = []
+        if seconds:
+            parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
+        if thirds:
+            parts.append(f"{thirds} third{'s' if thirds != 1 else ''}")
+        prizes.append({'label': 'Tournament Podiums (2nd/3rd)',
+                       'score': f"{seconds + thirds} · {', '.join(parts)}"})
+    if len(venues) > 1:
+        prizes.append({'label': 'Longevity',
+                       'score': f"{len(venues)} venues · "
+                                + ' → '.join(venues)})
+
+    result = {
+        'bowler':     bowler,
+        'first_name': bowler.first_name or '',
+        'name':       bowler.last_name,
+        'nickname':   bowler.nickname or '',
+        'subtitle':   'Lifetime Achievement Award — "so far"',
+        'span':       (f"{len(career)} Seasons · {start_year}–{end_year} "
+                       f"· {total_games:,} Games"),
+        'prizes':     prizes,
+    }
+    cache.set(ck, result, timeout=900)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Most Improved calculation
 # ---------------------------------------------------------------------------

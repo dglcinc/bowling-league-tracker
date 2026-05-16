@@ -15,6 +15,7 @@
 <div class="d-flex align-items-center gap-3 mb-1">
   <h4 class="mb-0">{{ bowler.display_name }}{% if bowler.nickname %} <small class="text-muted">"{{ bowler.nickname }}"</small>{% endif %}</h4>
   <a href="{{ url_for('admin.edit_bowler', bowler_id=bowler.id, season_id=season.id) }}" class="btn btn-sm btn-outline-secondary no-print">Edit Bowler</a>
+  <a href="{{ url_for('records.award_lifetime', bowler_id=bowler.id) }}" target="_blank" class="btn btn-sm btn-outline-primary no-print">&#127942; Lifetime Award</a>
 </div>
 {% if roster %}<p>{{ roster.team.name if roster.team else '(no team)' }} &nbsp;|&nbsp; Prior Hcp: {{ roster.prior_handicap or 0 }}</p>{% endif %}
 {% if career | length > 1 %}

@@ -3,9 +3,9 @@ Records route: all-time leaderboards and season comparison table.
 """
 
 from collections import defaultdict
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, abort
 from models import (db, Season, Week, Bowler, MatchupEntry, TournamentEntry, TeamPoints, Roster, Team, ClubChampionshipResult)
-from calculations import get_bowler_stats, get_team_standings
+from calculations import get_bowler_stats, get_team_standings, get_lifetime_achievements
 from extensions import cache
 
 records_bp = Blueprint('records', __name__)
@@ -588,3 +588,32 @@ def bowler_dir():
                            dir_entries=dir_entries,
                            team_filter=team_filter,
                            all_team_names=all_team_names)
+
+
+@records_bp.route('/records/lifetime/<int:bowler_id>')
+def award_lifetime(bowler_id):
+    """Printable 'Lifetime Achievement (so far)' certificate for one bowler.
+
+    Reuses the yearly award certificate (payout/award_page.html) with the
+    money insert suppressed and a career-spanning subtitle. Works for any
+    bowler with regular-season play — nothing is hardcoded.
+    """
+    life = get_lifetime_achievements(bowler_id)
+    if life is None:
+        abort(404)
+    recipient = {
+        'type':       'individual',
+        'bowler':     life['bowler'],
+        'name':       life['name'],
+        'first_name': life['first_name'],
+        'nickname':   life['nickname'],
+        'team_label': '',
+        'prizes':     life['prizes'],
+        'total':      0,
+    }
+    return render_template('payout/award_page.html',
+                           season=None,
+                           recipients=[recipient],
+                           single=True,
+                           lifetime={'subtitle': life['subtitle'],
+                                     'span':     life['span']})

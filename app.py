@@ -57,6 +57,7 @@ _VIEWER_DEFAULTS = [
     ('reports.print_batch',   'Print Batch',         False),
     ('records.records',       'Records',             True),
     ('records.bowler_dir',    'Bowler Directory',    True),
+    ('records.award_lifetime','Lifetime Award',      True),
     ('entry.week_list',       'Scores (week list)',  True),
     ('entry.week_entry',      'Scores (week view)',  True),
     ('entry.banquet_entry',   'Banquet attendance',  True),
