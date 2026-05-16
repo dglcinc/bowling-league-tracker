@@ -424,7 +424,7 @@
       </colgroup>
       {% for item in rec.prizes %}
       <tr>
-        <td class="col-label">{{ prize_label(item) }}</td>
+        <td class="col-label{% if item.heading %} fw-bold{% endif %}">{{ prize_label(item) }}</td>
         <td class="col-detail">{{ prize_detail(item) }}</td>
       </tr>
       {% endfor %}

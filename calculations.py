@@ -891,7 +891,9 @@ def get_lifetime_achievements(bowler_id):
     _INDENT = '   '  # non-breaking spaces — preserved in HTML
 
     # Per-bowler extra lines (admin Edit Bowler → career_notes) come FIRST.
-    # Format: "Label | Score detail" or "Label" only, one per line.
+    # heading=True marks top-level rows; heading=False marks indented sub-rows.
+    # The template bolds heading rows; non-lifetime prizes don't have this key
+    # (falsy in Jinja) so the yearly certificate is unaffected.
     prizes = []
     if bowler.career_notes:
         for line in bowler.career_notes.splitlines():
@@ -900,34 +902,37 @@ def get_lifetime_achievements(bowler_id):
                 continue
             if '|' in line:
                 lbl, score = line.split('|', 1)
-                prizes.append({'label': lbl.strip(), 'score': score.strip()})
+                prizes.append({'label': lbl.strip(), 'score': score.strip(),
+                               'heading': True})
             else:
-                prizes.append({'label': line, 'score': ''})
+                prizes.append({'label': line, 'score': '', 'heading': True})
 
     # Career bests
     prizes += [
         {'label': 'Career-Best Average',
-         'score': f"{best_avg['avg']} · {best_avg['season'].name}"},
+         'score': f"{best_avg['avg']} · {best_avg['season'].name}",
+         'heading': True},
         {'label': 'Career High Game — Scratch',
-         'score': f"{hgs} · {_yrs(hgs_s)}"},
+         'score': f"{hgs} · {_yrs(hgs_s)}", 'heading': True},
         {'label': 'Career High Series — Scratch',
-         'score': f"{hss} · {_yrs(hss_s)}"},
+         'score': f"{hss} · {_yrs(hss_s)}", 'heading': True},
         {'label': 'Career High Game — Handicap',
-         'score': f"{hgh} · {_yrs(hgh_s)}"},
+         'score': f"{hgh} · {_yrs(hgh_s)}", 'heading': True},
         {'label': 'Career High Series — Handicap',
-         'score': f"{hsh} · {_yrs(hsh_s)}"},
+         'score': f"{hsh} · {_yrs(hsh_s)}", 'heading': True},
     ]
 
-    # Weekly prizes: total headline + 4 indented per-category rows
-    prizes.append({'label': 'Weekly Prizes Won', 'score': f"{weekly_total} wins"})
+    # Weekly prizes: bold headline + 4 indented (not bold) per-category rows
+    prizes.append({'label': 'Weekly Prizes Won', 'score': f"{weekly_total} wins",
+                   'heading': True})
     prizes.append({'label': f"{_INDENT}High Game Scratch",
-                   'score': f"{grand['hg_scratch']} wins"})
+                   'score': f"{grand['hg_scratch']} wins", 'heading': False})
     prizes.append({'label': f"{_INDENT}High Series Scratch",
-                   'score': f"{grand['hs_scratch']} wins"})
+                   'score': f"{grand['hs_scratch']} wins", 'heading': False})
     prizes.append({'label': f"{_INDENT}High Game Handicap",
-                   'score': f"{grand['hg_hcp']} wins"})
+                   'score': f"{grand['hg_hcp']} wins", 'heading': False})
     prizes.append({'label': f"{_INDENT}High Series Handicap",
-                   'score': f"{grand['hs_hcp']} wins"})
+                   'score': f"{grand['hs_hcp']} wins", 'heading': False})
 
     # Tournament placements — grouped by tournament name.
     # Group order: best place achieved first, then most 1st-place wins, then alpha.
@@ -946,11 +951,11 @@ def get_lifetime_achievements(bowler_id):
         return (best, -firsts, lbl)
 
     for lbl, entries in sorted(_groups.items(), key=_group_sort_key):
-        prizes.append({'label': lbl, 'score': ''})  # tournament name header
+        prizes.append({'label': lbl, 'score': '', 'heading': True})
         for e in entries:
             place_str = _PLACE_LABELS.get(e['place'], f"{e['place']}th Place")
             prizes.append({'label': f"{_INDENT}{place_str}",
-                           'score': e['season']})
+                           'score': e['season'], 'heading': False})
 
     # Harry E. Russell career best from real DB entries (game5 not NULL).
     # Historical imports use dummy scores (game1=300/200/100, game5=NULL).
@@ -959,11 +964,13 @@ def get_lifetime_achievements(bowler_id):
         prizes.append({
             'label': 'Career Best — Harry E. Russell',
             'score': f"5 games · {russell_best} · {avg5} avg",
+            'heading': True,
         })
 
     if len(venues) > 1:
         prizes.append({'label': 'Longevity',
-                       'score': ' → '.join(venues)})
+                       'score': ' → '.join(venues),
+                       'heading': True})
 
     result = {
         'bowler':     bowler,
