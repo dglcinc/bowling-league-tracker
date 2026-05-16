@@ -31,6 +31,8 @@
       width: 7.5in;
       height: 9.71in;
       background: #faf8f4;
+      page-break-after: always;
+      break-after: page;
       overflow: hidden;
     }
 
@@ -162,6 +164,7 @@
       width: 7.5in; height: 9.71in;
       background: #fff;
       padding: 0.55in 0.7in;
+      page-break-after: always; break-after: page;
       overflow: hidden;
     }
     .money-header {
@@ -195,7 +198,18 @@
       @page { size: letter; margin: 0; }
       body { background: white; }
       .nav-bar { display: none !important; }
+      /* Block flow, NOT flex: break-after / page-break-after are ignored
+         on flex items, so a flex wrap makes the print engine fall back to
+         natural flow and certificates drift / split mid-page. (Same root
+         cause as the payout-summary thead issue.) */
       .certificate-wrap { padding: 0; display: block; }
+      /* Each box is exactly one sheet (8.5×11). Do NOT also force a
+         page-break-after: a full-page box + forced break makes the
+         engine emit a redundant blank page after every box (Cmd-P
+         preview doubled to 2× pages: cert, blank, money, blank...).
+         Two consecutive exactly-11in boxes in block flow paginate on
+         their own with no blanks and no drift. break-inside:avoid
+         keeps a box from splitting on any sub-pixel rounding. */
       .certificate, .money-page {
         width: 8.5in; height: 11in;
         page-break-after: auto; break-after: auto;
