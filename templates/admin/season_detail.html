@@ -29,6 +29,9 @@
   <div class="col-auto">
     <a href="{{ url_for('admin.banquet_config', season_id=season.id) }}" class="btn btn-outline-success btn-sm">🍽 Banquet Config</a>
   </div>
+  <div class="col-auto">
+    <a href="{{ url_for('admin.payments_report', season_id=season.id) }}" class="btn btn-outline-success btn-sm">💵 Payments</a>
+  </div>
 </div>
 
 <h5>Teams <small class="text-muted fw-normal" style="font-size:0.75rem">Click a team to edit name &amp; captain</small></h5>
@@ -60,7 +63,8 @@
             {{ 'selected' if team_filter == t.id }}>{{ t.name }}{% if t.captain_name %} ({{ t.captain_name }}){% endif %}</option>
     {% endfor %}
   </select>
-  <small class="text-muted">{{ roster|length }} bowler{{ 's' if roster|length != 1 else '' }}</small>
+  <small class="text-muted">{{ roster|length }} bowler{{ 's' if roster|length != 1 else '' }}
+    &middot; <a href="{{ url_for('admin.payments_report', season_id=season.id) }}" class="text-decoration-none">{{ dues_paid }} of {{ dues_active }} active paid</a></small>
 </div>
 
 <form method="post" action="{{ url_for('admin.send_magic_links', season_id=season.id) }}" id="rosterForm">
@@ -90,6 +94,7 @@
       <th class="text-end">Prior Hcp</th>
       <th class="text-end">Joined Wk</th>
       <th>Status</th>
+      <th>Paid</th>
       <th></th>
     </tr>
   </thead>
@@ -139,19 +144,41 @@
         <span class="badge bg-secondary">Inactive</span>
         {% endif %}
       </td>
+      <td style="white-space:nowrap">
+        {% if r.id and r.dues_paid %}
+        <span class="badge bg-success">Paid</span>
+        <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" style="font-size:0.7rem"
+                data-mode="unpay"
+                data-action="{{ url_for('admin.mark_dues', season_id=season.id, roster_id=r.id) }}"
+                data-name="{{ r.bowler.last_name }}{% if r.bowler.first_name %}, {{ r.bowler.first_name }}{% endif %}"
+                data-detail="{{ r.dues_method | capitalize }}{% if r.dues_date %} · {{ r.dues_date.strftime('%b %d, %Y') }}{% endif %}{% if r.dues_note %} · {{ r.dues_note }}{% endif %}"
+                onclick="openDuesModal(this)">undo</button>
+        <span class="text-muted d-block" style="font-size:0.7rem">{{ r.dues_method | capitalize }}{% if r.dues_date %} &middot; {{ r.dues_date.strftime('%b %d') }}{% endif %}{% if r.dues_note %} &middot; {{ r.dues_note }}{% endif %}</span>
+        {% elif r.id and r.active %}
+        <span class="badge bg-warning text-dark">Unpaid</span>
+        <button type="button" class="btn btn-sm btn-outline-success py-0 ms-1" style="font-size:0.75rem"
+                data-mode="pay"
+                data-action="{{ url_for('admin.mark_dues', season_id=season.id, roster_id=r.id) }}"
+                data-name="{{ r.bowler.last_name }}{% if r.bowler.first_name %}, {{ r.bowler.first_name }}{% endif %}"
+                onclick="openDuesModal(this)">Pay</button>
+        {% else %}
+        <span class="text-muted">&mdash;</span>
+        {% endif %}
+      </td>
       <td>
         <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id, season_id=season.id) }}"
            class="btn btn-sm btn-outline-secondary">Edit Bowler</a>
         {% if r.id %}
         <a href="{{ url_for('admin.edit_roster', season_id=season.id, roster_id=r.id) }}"
            class="btn btn-sm btn-outline-secondary">Edit Roster</a>
-        <form method="post"
-              action="{{ url_for('admin.toggle_active', season_id=season.id, roster_id=r.id) }}"
-              class="d-inline">
-          <button type="submit" class="btn btn-sm btn-outline-{{ 'warning' if r.active else 'success' }}">
-            {{ 'Deactivate' if r.active else 'Activate' }}
-          </button>
-        </form>
+        {# formaction, not a nested <form>: the table sits inside #rosterForm and
+           browsers drop a nested form tag, which sent this row's toggle to the
+           invite endpoint instead. #}
+        <button type="submit" formmethod="post"
+                formaction="{{ url_for('admin.toggle_active', season_id=season.id, roster_id=r.id) }}"
+                class="btn btn-sm btn-outline-{{ 'warning' if r.active else 'success' }}">
+          {{ 'Deactivate' if r.active else 'Activate' }}
+        </button>
         {% else %}
         <a href="{{ url_for('admin.add_bowler', season_id=season.id, bowler_id=r.bowler_id) }}"
            class="btn btn-sm btn-outline-primary">Add to Roster</a>
@@ -163,6 +190,7 @@
 </table>
 <div id="inviteHiddenIds"></div>
 </form>
+{% include 'admin/_dues_modal.html' %}
 
 <div class="modal fade" id="inviteConfirmModal" tabindex="-1" aria-labelledby="inviteConfirmLabel" aria-hidden="true">
   <div class="modal-dialog">

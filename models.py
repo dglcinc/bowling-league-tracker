@@ -139,6 +139,9 @@ class Team(db.Model):
         return f'<Team {self.number} {self.name}>'
 
 
+DUES_METHODS = ('cash', 'check', 'venmo', 'zelle')
+
+
 class Roster(db.Model):
     """A bowler's participation record for one season."""
     __tablename__ = 'roster'
@@ -153,6 +156,12 @@ class Roster(db.Model):
     active = db.Column(db.Boolean, default=True)
     prior_handicap = db.Column(db.Integer, default=0)  # carried from prior season end
     joined_week = db.Column(db.Integer, default=1)      # for mid-season additions
+
+    # Season dues (Admin → season manage page / Payments report)
+    dues_paid = db.Column(db.Boolean, default=False)
+    dues_method = db.Column(db.String(16), nullable=True)   # one of DUES_METHODS
+    dues_date = db.Column(db.Date, nullable=True)
+    dues_note = db.Column(db.String(128), nullable=True)    # check number, etc.
 
     bowler = db.relationship('Bowler', back_populates='roster_entries')
     season = db.relationship('Season', back_populates='roster')

@@ -1,19 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Review Email — {{ season.name }}{% endblock %}
+{% block title %}{{ page_title | default('Review Email') }} — {{ season.name }}{% endblock %}
 
 {% block content %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="{{ url_for('admin.seasons') }}">Seasons</a></li>
     <li class="breadcrumb-item"><a href="{{ url_for('admin.season_detail', season_id=season.id) }}">{{ season.name }}</a></li>
-    <li class="breadcrumb-item active">Review Email</li>
+    <li class="breadcrumb-item active">{{ page_title | default('Review Email') }}</li>
   </ol>
 </nav>
 
-<h2>Review Email Before Sending</h2>
+<h2>{{ page_title | default('Review Email Before Sending') }}</h2>
 <p class="text-muted mb-3">
   Edit any field below, then click <strong>Send Now</strong>.
-  Default routing: <strong>TO</strong> = team captains, <strong>BCC</strong> = recipients.
+  Default routing: <strong>TO</strong> = team captains, <strong>BCC</strong> = {{ (bcc_label | default('Recipients')) | lower }}.
 </p>
 
 {% if missing_captains %}
@@ -31,7 +31,7 @@
 </div>
 {% endif %}
 
-<form method="post" action="{{ url_for('admin.send_email', season_id=season.id) }}">
+<form method="post" action="{{ action_url | default(url_for('admin.send_email', season_id=season.id)) }}">
   <input type="hidden" name="send_confirmed" value="1">
   <input type="hidden" name="recipient_mode" value="{{ recipient_mode }}">
 
@@ -62,7 +62,7 @@
 
   <div class="mb-3">
     <label class="form-label fw-semibold">
-      BCC — Recipients (<span id="bccCount">{{ bcc_emails | length }}</span>)
+      BCC — {{ bcc_label | default('Recipients') }} (<span id="bccCount">{{ bcc_emails | length }}</span>)
     </label>
     <textarea class="form-control font-monospace" name="bcc_emails" rows="6" id="bccEmails"
               style="font-size:0.85rem"
@@ -76,7 +76,7 @@
   </div>
 
   <div class="d-flex gap-2">
-    <a href="{{ url_for('admin.season_detail', season_id=season.id) }}"
+    <a href="{{ cancel_url | default(url_for('admin.season_detail', season_id=season.id)) }}"
        class="btn btn-secondary">Cancel</a>
     <button type="submit" class="btn btn-primary">Send Now</button>
   </div>

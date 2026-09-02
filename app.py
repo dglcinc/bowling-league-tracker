@@ -178,6 +178,11 @@ def _migrate_db(db):
             notes VARCHAR(256),
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )""",
+        # Season dues tracking on roster rows
+        "ALTER TABLE roster ADD COLUMN dues_paid BOOLEAN DEFAULT 0",
+        "ALTER TABLE roster ADD COLUMN dues_method VARCHAR(16)",
+        "ALTER TABLE roster ADD COLUMN dues_date DATE",
+        "ALTER TABLE roster ADD COLUMN dues_note VARCHAR(128)",
     ]
     with db.engine.connect() as conn:
         for sql in migrations:

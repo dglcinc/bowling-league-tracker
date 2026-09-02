@@ -9,8 +9,13 @@ from pathlib import Path
 
 
 def get_db_path():
-    """Use ~/bowling-data/ as the canonical DB location."""
-    candidates = [
+    """Use ~/bowling-data/ as the canonical DB location.
+
+    BOWLING_DB_DIR overrides it so a preview instance (see
+    ~/bin/preview-bowling.sh) can run a branch against a copy of the DB.
+    """
+    override = os.environ.get("BOWLING_DB_DIR")
+    candidates = ([Path(override).expanduser()] if override else []) + [
         Path.home() / "bowling-data",
         Path(__file__).parent / "data",
     ]
