@@ -115,6 +115,9 @@ def season_detail(season_id):
     season = Season.query.get_or_404(season_id)
     teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
     roster_filter = request.args.get('roster_filter', 'active')
+    team_filter = request.args.get('team', type=int)
+    if team_filter not in {t.id for t in teams}:
+        team_filter = None
     roster_q = (Roster.query
                 .filter_by(season_id=season_id)
                 .join(Bowler)
@@ -141,6 +144,19 @@ def season_detail(season_id):
                 ))
             roster.sort(key=lambda r: r.bowler.last_name.lower())
 
+    # The invite modal resolves "invite team N" client-side, so give it the
+    # whole Active/All set before the team filter narrows the table.
+    import json as _json
+    roster_map_json = _json.dumps({
+        str(r.bowler_id): {
+            'last': r.bowler.last_name,
+            'first': r.bowler.first_name or '',
+            'teamId': str(r.team.id) if r.team else '',
+        } for r in roster
+    })
+    if team_filter is not None:
+        roster = [r for r in roster if r.team and r.team.id == team_filter]
+
     # Build access map: bowler_id → most recent LinkedAccount (for Access column)
     accounts = LinkedAccount.query.filter(
         LinkedAccount.bowler_id.in_([r.bowler_id for r in roster])
@@ -154,7 +170,6 @@ def season_detail(season_id):
     graph_configured = bool(current_app.config.get('GRAPH_CLIENT_ID'))
 
     # Avg leaders for High Averages email option — use latest entered week
-    import json as _json
     from calculations import get_bowler_stats, get_latest_entered_week
     latest_week = get_latest_entered_week(season_id)
     avg_leaders_json = '[]'
@@ -179,7 +194,8 @@ def season_detail(season_id):
     _db_settings = db.session.get(LeagueSettings, 1) or LeagueSettings(id=1)
     return render_template('admin/season_detail.html',
                            season=season, teams=teams, roster=roster,
-                           roster_filter=roster_filter, access_map=access_map,
+                           roster_filter=roster_filter, team_filter=team_filter,
+                           roster_map_json=roster_map_json, access_map=access_map,
                            sender_email=sender_email,
                            graph_configured=graph_configured,
                            avg_leaders_json=avg_leaders_json,
