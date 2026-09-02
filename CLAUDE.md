@@ -317,4 +317,4 @@ These are all distinct people with separate DB records and non-overlapping or di
 
 CLAUDE.md pushes directly to main. All other code and documentation changes use feature branches + PRs. See global CLAUDE.md for full workflow.
 
-For `gh` CLI: use the stored keyring credential as-is (`gh auth status` shows account `dglcinc`, git protocol SSH). The remote is an SSH URL with no embedded token, so do not extract one from it — that yields a bad token and a 401.
+For `gh` CLI: use the stored keyring credential as-is (`gh auth status` shows account `dglcinc`). The `origin` remote is HTTPS (`https://github.com/dglcinc/bowling-league-tracker.git`) with `gh auth setup-git` as the credential helper, switched from SSH on 2026-09-01 after GitHub port-22 timeouts aborted a deploy mid-script. Do not extract a token from the remote URL — there is none.
