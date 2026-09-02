@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Payments — {{ season.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="no-print">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.seasons') }}">Seasons</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.season_detail', season_id=season.id) }}">{{ season.name }}</a></li>
+    <li class="breadcrumb-item active">Payments</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+  <h4 class="mb-0">Season Dues &mdash; {{ season.name }}</h4>
+  <div class="no-print d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('admin.payment_email', season_id=season.id) }}" class="btn btn-sm btn-outline-info">&#9993; Email report to captains &amp; unpaid</a>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()">Print</button>
+    <a href="{{ url_for('admin.season_detail', season_id=season.id) }}" class="btn btn-sm btn-outline-secondary">Back to Season</a>
+  </div>
+</div>
+<p class="text-muted small mb-3">As of {{ today_display }}. Active rostered bowlers only.</p>
+
+<div class="row g-2 mb-3" style="max-width:720px">
+  <div class="col-4">
+    <div class="card text-center h-100"><div class="card-body py-2">
+      <div class="fs-3 fw-semibold text-success">{{ paid|length }}</div>
+      <div class="small text-muted">Paid of {{ rows|length }}</div>
+    </div></div>
+  </div>
+  <div class="col-4">
+    <div class="card text-center h-100"><div class="card-body py-2">
+      <div class="fs-3 fw-semibold {{ 'text-warning' if unpaid else 'text-success' }}">{{ unpaid|length }}</div>
+      <div class="small text-muted">Unpaid</div>
+    </div></div>
+  </div>
+  <div class="col-4">
+    <div class="card h-100"><div class="card-body py-2 small">
+      {% for m in dues_methods %}
+      <div class="d-flex justify-content-between"><span>{{ m | capitalize }}</span><span>{{ method_counts.get(m, 0) }}</span></div>
+      {% endfor %}
+      {% if method_counts.get('unspecified') %}
+      <div class="d-flex justify-content-between"><span>Unspecified</span><span>{{ method_counts['unspecified'] }}</span></div>
+      {% endif %}
+    </div></div>
+  </div>
+</div>
+
+{% if unpaid %}
+<div class="alert alert-warning py-2">
+  <strong>Unpaid ({{ unpaid|length }}):</strong>
+  {% for g in by_team if g.unpaid %}
+  <div class="ms-3"><strong>{{ g.team.name }}{% if g.team.captain_name %} ({{ g.team.captain_name }}){% endif %}:</strong>
+    {% for r in g.unpaid %}{{ short_name(r) }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-success py-2">Everyone on the active roster has paid.</div>
+{% endif %}
+
+{% for g in by_team %}
+<h6 class="mt-3">
+  {{ g.team.name }}{% if g.team.captain_name %} <span class="text-muted fw-normal">(Captain: {{ g.team.captain_name }})</span>{% endif %}
+  <span class="badge {{ 'bg-success' if not g.unpaid else 'bg-warning text-dark' }} ms-2">{{ g.paid|length }} / {{ g.rows|length }} paid</span>
+</h6>
+<table class="table table-sm table-bordered mb-3" style="max-width:860px">
+  <thead class="table-dark">
+    <tr>
+      <th>Name</th>
+      <th>Status</th>
+      <th>Method</th>
+      <th>Date</th>
+      <th>Note</th>
+      <th class="no-print" style="width:70px"></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for r in g.rows %}
+  <tr class="{{ '' if r.dues_paid else 'table-warning' }}">
+    <td>
+      <a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=r.bowler_id) }}"
+         class="text-decoration-none text-body">{{ r.bowler.last_name }}{% if r.bowler.first_name %}, {{ r.bowler.first_name }}{% endif %}</a>
+    </td>
+    <td>
+      {% if r.dues_paid %}<span class="badge bg-success">Paid</span>
+      {% else %}<span class="badge bg-warning text-dark">Unpaid</span>{% endif %}
+    </td>
+    <td>{{ r.dues_method | capitalize if r.dues_method else '' }}</td>
+    <td>{{ r.dues_date.strftime('%b %d, %Y') if r.dues_date else '' }}</td>
+    <td>{{ r.dues_note or '' }}</td>
+    <td class="no-print">
+      {% if r.dues_paid %}
+      <button type="button" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.75rem"
+              data-mode="unpay"
+              data-action="{{ url_for('admin.mark_dues', season_id=season.id, roster_id=r.id) }}"
+              data-name="{{ r.bowler.last_name }}{% if r.bowler.first_name %}, {{ r.bowler.first_name }}{% endif %}"
+              data-detail="{{ r.dues_method | capitalize }}{% if r.dues_date %} · {{ r.dues_date.strftime('%b %d, %Y') }}{% endif %}{% if r.dues_note %} · {{ r.dues_note }}{% endif %}"
+              onclick="openDuesModal(this)">Undo</button>
+      {% else %}
+      <button type="button" class="btn btn-sm btn-outline-success py-0" style="font-size:0.75rem"
+              data-mode="pay"
+              data-action="{{ url_for('admin.mark_dues', season_id=season.id, roster_id=r.id) }}"
+              data-name="{{ r.bowler.last_name }}{% if r.bowler.first_name %}, {{ r.bowler.first_name }}{% endif %}"
+              onclick="openDuesModal(this)">Pay</button>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+
+{% include 'admin/_dues_modal.html' %}
+{% endblock %}

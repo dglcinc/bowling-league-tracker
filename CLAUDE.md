@@ -97,7 +97,7 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 - **bowlers**: id, last_name, first_name, nickname, email, career_notes (TEXT, nullable). Never deleted. `career_notes` holds extra prize rows for the Lifetime Achievement certificate — one per line, "Label | Score detail" or "Label" only; edited via Admin → Edit Bowler → "Lifetime Award — Extra Lines" textarea; rows appear FIRST in the lifetime prize list.
 - **seasons**: id, name, start_date, num_weeks, half_boundary_week (default 11), handicap_base (200), handicap_factor (0.9), blind_scratch (125), blind_handicap (60), is_active, bowling_format ('single'/'double'), venue ('mountain_lakes_club' pre-2024-2025, 'boonton_lanes' 2024-2025+), tournament_labels (JSON dict mapping internal key → display name)
 - **teams**: id, season_id, number (1–4), name
-- **roster**: bowler_id, season_id, team_id, active, prior_handicap, joined_week
+- **roster**: bowler_id, season_id, team_id, active, prior_handicap, joined_week, dues_paid, dues_method (`DUES_METHODS` = cash/check/venmo/zelle), dues_date, dues_note — season dues tracking, active bowlers only
 - **schedule**: season_id, week_num, matchup_num (1–4), team1_id, team2_id, lane_pair
 - **weeks**: season_id, week_num, date, is_position_night, is_cancelled, is_entered, notes, tournament_type
 - **matchup_entries**: season_id, week_num, matchup_num, team_id, bowler_id, is_blind, lane_side (A/B), game1–game6
@@ -154,6 +154,9 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 - `import_season` — web UI to upload XLS and seed a full historical season
 - `assign_matchups_list` / `assign_matchups` — per-week tool to assign bowlers to lane pair A or B
 - `edit_team` — edit team name and captain name (`Team.captain_name` column); team badges on season_detail are clickable links to this page
+- **Season dues**: `mark_dues` (POST `/roster/<id>/dues`, `action=pay|unpay` + method/date/note, redirects to the `next` form field when it is a same-site path), `payments_report` (`/seasons/<id>/payments` — per-team tables with captain, paid/unpaid cards, method counts, unpaid summary, print-friendly), `payment_email` (GET renders `email_review.html` pre-filled: TO captains via `_resolve_captain_emails`, BCC unpaid bowlers with email, body = intro + `_dues_block_text`; POST with `send_confirmed=1` sends through `_send_via_graph`). `_dues_summary(season_id)` is the shared builder. The manage page has a Paid column (badge + Pay/undo) and a "N of M active paid" link; Pay/undo open the one shared modal in `templates/admin/_dues_modal.html` (needs `dues_methods` + `today` in context) — it lives outside the table so it never nests inside the roster invite form.
+- **No nested forms inside `#rosterForm`** on season_detail: browsers drop a nested `<form>` start tag, and the parser quirk meant only the first row's Activate/Deactivate button posted to the invite endpoint. The toggle is now a `formaction`/`formmethod` submit button on the outer form; do the same for any new per-row action.
+- `email_review.html` is parametrized: `action_url`, `cancel_url`, `page_title`, `bcc_label` (all optional, defaults = the ad-hoc `send_email` flow).
 - Edit Bowler and Edit Roster are separate buttons on the roster list; edit_bowler no longer includes roster fields
 - Season detail All filter: rostered (active or inactive) and unrostered bowlers appear in one unified alphabetical list; unrostered entries show as Inactive with Add to Roster button (no separate section)
 - Season detail team filter (`?team=<team_id>`): a select beside the Active/All toggle narrows the roster table to one team, and the Active/All links carry the selection. Unknown or non-numeric ids fall back to all teams. The invite modal's "team" mode resolves from `roster_map_json` — the full Active/All set built before the team filter — so inviting team B works while the table shows team A.
@@ -246,6 +249,8 @@ Production is live at **https://mlb.dglc.com** on Mac Mini M4 (`utilityserver@10
 - **wsgi.py**: gunicorn entrypoint (`from app import create_app; app = create_app()`). Must exist in repo root — plist uses `wsgi:app`. Was lost in a rebase on 2026-04-26 causing a production outage; now tracked in git.
 
 Claude Code runs directly on the production server — do not SSH to `10.0.0.84`, run commands locally.
+
+**Preview a branch before merging**: `~/bin/preview-bowling.sh <branch>` checks the branch out in the `~/github/bowling-preview` worktree, copies production's DB to `~/bowling-data-preview/league.db` (fresh on every start), and runs gunicorn on port 5002 with `BOWLING_DB_DIR` pointing at the copy (`config.get_db_path()` honours that override). It prints the LAN URL and a magic-link sign-in for the editor. No `.env` is loaded there, so email, Turnstile, passkeys and the Ask tab are off. `preview-bowling.sh stop` ends it. Production on 5001 is untouched; note that `pkill -f "gunicorn.*wsgi"` would also kill the preview. Test scripts that write should also set `BOWLING_DB_DIR` to a scratch copy — never POST against `~/bowling-data/league.db`.
 
 To reload the launchd plist after editing it directly: `launchctl unload ~/Library/LaunchAgents/com.dglc.bowling-app.plist && launchctl load ~/Library/LaunchAgents/com.dglc.bowling-app.plist`. Needed when plist changes don't take effect on a simple gunicorn restart.
 

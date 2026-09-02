@@ -192,8 +192,13 @@ def season_detail(season_id):
         avg_leaders_json = _json.dumps(_leaders)
 
     _db_settings = db.session.get(LeagueSettings, 1) or LeagueSettings(id=1)
+    from models import DUES_METHODS
+    dues_active = Roster.query.filter_by(season_id=season_id, active=True).count()
+    dues_paid = Roster.query.filter_by(season_id=season_id, active=True, dues_paid=True).count()
     return render_template('admin/season_detail.html',
                            season=season, teams=teams, roster=roster,
+                           dues_active=dues_active, dues_paid=dues_paid,
+                           dues_methods=DUES_METHODS, today=date.today().isoformat(),
                            roster_filter=roster_filter, team_filter=team_filter,
                            roster_map_json=roster_map_json, access_map=access_map,
                            sender_email=sender_email,
@@ -562,6 +567,191 @@ def toggle_active(season_id, roster_id):
     r.active = not r.active
     db.session.commit()
     return redirect(url_for('admin.season_detail', season_id=season_id))
+
+
+# ---------------------------------------------------------------------------
+# Season dues
+# ---------------------------------------------------------------------------
+
+def _dues_summary(season_id):
+    """Active roster grouped by team with paid/unpaid splits.
+
+    Feeds the payments report page and the dues email. `short_name(r)` gives
+    last name only, or "F. Last" when two active bowlers share a last name.
+    """
+    season = Season.query.get_or_404(season_id)
+    teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
+    rows = (Roster.query.filter_by(season_id=season_id, active=True)
+            .join(Bowler).order_by(Bowler.last_name, Bowler.first_name).all())
+    last_counts = {}
+    for r in rows:
+        last_counts[r.bowler.last_name] = last_counts.get(r.bowler.last_name, 0) + 1
+
+    def short_name(r):
+        b = r.bowler
+        if last_counts.get(b.last_name, 0) > 1 and b.first_name:
+            return f'{b.first_name[:1]}. {b.last_name}'
+        return b.last_name or b.first_name or '(unknown)'
+
+    by_team = []
+    for t in teams:
+        t_rows = [r for r in rows if r.team_id == t.id]
+        by_team.append({
+            'team': t,
+            'rows': t_rows,
+            'paid': [r for r in t_rows if r.dues_paid],
+            'unpaid': [r for r in t_rows if not r.dues_paid],
+        })
+    paid = [r for r in rows if r.dues_paid]
+    unpaid = [r for r in rows if not r.dues_paid]
+    method_counts = {}
+    for r in paid:
+        key = r.dues_method or 'unspecified'
+        method_counts[key] = method_counts.get(key, 0) + 1
+    return {
+        'season': season, 'teams': teams, 'by_team': by_team,
+        'rows': rows, 'paid': paid, 'unpaid': unpaid,
+        'method_counts': method_counts, 'short_name': short_name,
+    }
+
+
+def _dues_block_text(summary):
+    """Plain-text payment status block appended to the dues email body."""
+    name = summary['short_name']
+    lines = [
+        '', '----',
+        f"{summary['season'].name} season dues — payment status "
+        f"(as of {date.today().strftime('%b %d, %Y')})",
+        f"Paid: {len(summary['paid'])} of {len(summary['rows'])} active bowlers · "
+        f"Unpaid: {len(summary['unpaid'])}",
+        '',
+    ]
+    for g in summary['by_team']:
+        t = g['team']
+        label = t.name + (f' ({t.captain_name})' if t.captain_name else '')
+        lines.append(f"{label}: {len(g['paid'])} of {len(g['rows'])} paid")
+        lines.append('  Unpaid: ' + (', '.join(name(r) for r in g['unpaid']) or '(none — all paid)'))
+        lines.append('  Paid: ' + (', '.join(name(r) for r in g['paid']) or '(none)'))
+        lines.append('')
+    return '\n'.join(lines).rstrip()
+
+
+def _safe_next(season_id):
+    """Redirect target after a dues change: the page the button was on."""
+    nxt = request.form.get('next', '')
+    if nxt.startswith('/') and not nxt.startswith('//'):
+        return nxt
+    return url_for('admin.season_detail', season_id=season_id)
+
+
+@admin_bp.route('/seasons/<int:season_id>/roster/<int:roster_id>/dues', methods=['POST'])
+def mark_dues(season_id, roster_id):
+    """Mark a roster row's season dues paid (with method/date/note) or unpaid."""
+    from models import DUES_METHODS
+    r = Roster.query.get_or_404(roster_id)
+    if r.season_id != season_id:
+        flash('Roster entry does not belong to this season.', 'danger')
+        return redirect(url_for('admin.season_detail', season_id=season_id))
+
+    if request.form.get('action') == 'unpay':
+        r.dues_paid = False
+        r.dues_method = None
+        r.dues_date = None
+        r.dues_note = None
+        flash(f'{r.bowler.last_name} marked unpaid.', 'secondary')
+    else:
+        method = request.form.get('method', '')
+        if method not in DUES_METHODS:
+            flash('Pick a payment method.', 'warning')
+            return redirect(_safe_next(season_id))
+        raw_date = request.form.get('date', '').strip()
+        try:
+            paid_date = date.fromisoformat(raw_date) if raw_date else date.today()
+        except ValueError:
+            paid_date = date.today()
+        r.dues_paid = True
+        r.dues_method = method
+        r.dues_date = paid_date
+        r.dues_note = request.form.get('note', '').strip()[:128] or None
+        flash(f'{r.bowler.last_name} marked paid ({method}).', 'success')
+    db.session.commit()
+    return redirect(_safe_next(season_id))
+
+
+@admin_bp.route('/seasons/<int:season_id>/payments')
+def payments_report(season_id):
+    from models import DUES_METHODS
+    summary = _dues_summary(season_id)
+    return render_template('admin/payments_report.html',
+                           dues_methods=DUES_METHODS,
+                           today=date.today().isoformat(),
+                           today_display=date.today().strftime('%B %d, %Y'),
+                           **summary)
+
+
+@admin_bp.route('/seasons/<int:season_id>/payments/email', methods=['GET', 'POST'])
+def payment_email(season_id):
+    """Dues email: TO captains, BCC unpaid bowlers, report block in the body.
+
+    GET renders the review page pre-filled; POST with send_confirmed=1 sends
+    whatever the editor left in the fields (same shape as `send_email`).
+    """
+    import html as _html
+    season = Season.query.get_or_404(season_id)
+
+    if request.method == 'POST' and request.form.get('send_confirmed') == '1':
+        subject = request.form.get('subject', '').strip()
+        body_text = request.form.get('body', '').strip()
+        to_list  = [e.strip() for e in request.form.get('to_emails', '').splitlines() if e.strip()]
+        cc_list  = [e.strip() for e in request.form.get('cc_emails', '').splitlines() if e.strip()]
+        bcc_list = [e.strip() for e in request.form.get('bcc_emails', '').splitlines() if e.strip()]
+        if not subject or not body_text:
+            flash('Subject and body are required.', 'warning')
+            return redirect(url_for('admin.payment_email', season_id=season_id))
+        if not to_list and not bcc_list:
+            flash('No recipients — set at least one TO or BCC address.', 'warning')
+            return redirect(url_for('admin.payment_email', season_id=season_id))
+        html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
+        try:
+            _send_via_graph(current_app.config, subject, html_body,
+                            to_list, bcc_list, cc_list=cc_list)
+            total = len(to_list) + len(cc_list) + len(bcc_list)
+            flash(f'Payment report sent ({len(to_list)} TO, {len(cc_list)} CC, '
+                  f'{len(bcc_list)} BCC — {total} total).', 'success')
+        except Exception as exc:
+            flash(f'Email failed: {exc}', 'danger')
+        return redirect(url_for('admin.payments_report', season_id=season_id))
+
+    summary = _dues_summary(season_id)
+    settings = db.session.get(LeagueSettings, 1)
+    league_name = settings.league_name if settings else 'League'
+    subject = f'{league_name} — {season.name} dues: payment status'
+    intro = ('Captains,\n\n'
+             'Here is where we stand on season dues. If you are listed as unpaid, '
+             'please settle up with your captain or me at the next session. '
+             'Reply to this email with any corrections.\n\nThanks!')
+    body_text = intro + '\n' + _dues_block_text(summary)
+
+    captain_info = _resolve_captain_emails(summary['teams'], season_id)
+    to_emails = [e for _t, _b, e in captain_info if e]
+    missing_captains = [t for t, _b, e in captain_info if not e]
+    bcc_emails = [r.bowler.email for r in summary['unpaid'] if r.bowler.email]
+    no_email_bowlers = [r.bowler for r in summary['unpaid'] if not r.bowler.email]
+
+    return render_template('admin/email_review.html',
+                           season=season,
+                           subject=subject,
+                           body_text=body_text,
+                           to_emails=to_emails,
+                           cc_emails=[],
+                           bcc_emails=bcc_emails,
+                           missing_captains=missing_captains,
+                           no_email_bowlers=no_email_bowlers,
+                           recipient_mode='dues_unpaid',
+                           action_url=url_for('admin.payment_email', season_id=season_id),
+                           cancel_url=url_for('admin.payments_report', season_id=season_id),
+                           page_title='Payment Report Email',
+                           bcc_label='Unpaid bowlers')
 
 
 @admin_bp.route('/seasons/<int:season_id>/roster/<int:roster_id>/edit', methods=['GET', 'POST'])
