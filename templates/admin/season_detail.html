@@ -46,11 +46,20 @@
 <div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
   <h5 class="mb-0">Roster</h5>
   <div class="btn-group btn-group-sm" role="group">
-    <a href="{{ url_for('admin.season_detail', season_id=season.id, roster_filter='active') }}"
+    <a href="{{ url_for('admin.season_detail', season_id=season.id, roster_filter='active', team=team_filter) }}"
        class="btn btn-outline-secondary {{ 'active' if roster_filter == 'active' else '' }}">Active</a>
-    <a href="{{ url_for('admin.season_detail', season_id=season.id, roster_filter='all') }}"
+    <a href="{{ url_for('admin.season_detail', season_id=season.id, roster_filter='all', team=team_filter) }}"
        class="btn btn-outline-secondary {{ 'active' if roster_filter == 'all' else '' }}">All</a>
   </div>
+  <select class="form-select form-select-sm" style="width:auto" aria-label="Filter roster by team"
+          onchange="window.location = this.value">
+    <option value="{{ url_for('admin.season_detail', season_id=season.id, roster_filter=roster_filter) }}"
+            {{ 'selected' if not team_filter }}>All teams</option>
+    {% for t in teams %}
+    <option value="{{ url_for('admin.season_detail', season_id=season.id, roster_filter=roster_filter, team=t.id) }}"
+            {{ 'selected' if team_filter == t.id }}>{{ t.name }}{% if t.captain_name %} ({{ t.captain_name }}){% endif %}</option>
+    {% endfor %}
+  </select>
   <small class="text-muted">{{ roster|length }} bowler{{ 's' if roster|length != 1 else '' }}</small>
 </div>
 
@@ -220,10 +229,15 @@
 <script>
 (function() {
   var AVG_DATA = {{ avg_leaders_json | safe }};
+  var ROSTER_MAP = {{ roster_map_json | safe }};
 
-  // Build roster map from table rows: bowler_id → {last, first, teamId}
+  // Roster map for invite resolution: bowler_id → {last, first, teamId}.
+  // Seeded from the server's full Active/All set so "invite team N" still
+  // finds every bowler while the table is filtered to one team; rendered
+  // rows overlay it.
   function buildRosterMap() {
     var map = {};
+    Object.keys(ROSTER_MAP).forEach(function(bid) { map[bid] = ROSTER_MAP[bid]; });
     document.querySelectorAll('#rosterForm tbody tr[data-bowler-id]').forEach(function(row) {
       var bid = row.dataset.bowlerId;
       map[bid] = {

@@ -156,6 +156,7 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 - `edit_team` — edit team name and captain name (`Team.captain_name` column); team badges on season_detail are clickable links to this page
 - Edit Bowler and Edit Roster are separate buttons on the roster list; edit_bowler no longer includes roster fields
 - Season detail All filter: rostered (active or inactive) and unrostered bowlers appear in one unified alphabetical list; unrostered entries show as Inactive with Add to Roster button (no separate section)
+- Season detail team filter (`?team=<team_id>`): a select beside the Active/All toggle narrows the roster table to one team, and the Active/All links carry the selection. Unknown or non-numeric ids fall back to all teams. The invite modal's "team" mode resolves from `roster_map_json` — the full Active/All set built before the team filter — so inviting team B works while the table shows team A.
 
 **`payout_bp`** (`/payout/season/<id>`)
 - `payout_overview` — YTD prize counts per bowler, weekly prize history, Most Improved
