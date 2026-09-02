@@ -9,12 +9,12 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 **Important:** Never put player names, team names (which are player surnames), or any other personal information in the repository, code, comments, or documentation.
 
-## Repo / Branch State (as of 2026-05-14)
+## Repo / Branch State (as of 2026-09-01)
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
-- No open PRs.
-- PRs #37–#155 merged to main; #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138); #145 superseded by #146 (CC-me checkbox replaced by BCC-all-recipients).
+- Open PR: #179 (`fix/remove-one-shot-team-name-migrations`) — drops three one-time team-name UPDATEs from `_migrate_db` that re-ran on every start. Deploy after merge.
+- PRs #37–#178 merged to main; #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138); #145 superseded by #146 (CC-me checkbox replaced by BCC-all-recipients).
 
 ## League Structure
 
@@ -182,10 +182,10 @@ Written automatically after each week is fully entered. Stored as JSON at OneDri
 - **2004-2005 through 2016-2017** (historical, venue=mountain_lakes_club): imported via `seed_historical_seasons.py`; seasons id=10–22; regular scores + tournament 1st/2nd/3rd place entries with `place` field set
 - **2017-2018 through 2023-2024** (historical, venue=mountain_lakes_club): imported via `seed_historical_seasons.py`; regular scores + tournament 1st/2nd/3rd place entries
 - **2024-2025** (historical, venue=boonton_lanes): imported via `seed_historical_seasons.py`
-- **2025-2026** (active, venue=boonton_lanes): all 22 regular weeks entered; 4 post-season tournament weeks (23–26) added; TeamPoints from spreadsheet
-- **2026-2027** (inactive, venue=boonton_lanes): roster seeded from `seed_from_xls.py`; schedule seeded from `seed_schedule.py`; 4 post-season tournament weeks (23–26) added
+- **2025-2026** (archived, venue=boonton_lanes): complete — 22 regular weeks and the 4 tournament weeks (23–26) entered; week 27 banquet is unscored by design; TeamPoints from spreadsheet
+- **2026-2027** (active since 2026-09-01, venue=boonton_lanes): 54 roster rows (41 active) seeded from `seed_from_xls.py` mid-2025-2026, so `prior_handicap` holds that mid-season snapshot and has not been refreshed from the 2025-2026 final averages; schedule seeded from `seed_schedule.py` for weeks 1–10 and 12–21 (position nights 11 and 22 auto-assign); all 27 week dates set — week 27 banquet is a +7-day placeholder (2027-05-10) until Admin → Week Dates sets the real one
 
-All seasons have 26 weeks: 22 regular + Club Championship (23), Harry Russell/indiv_scratch (24), indiv_hcp_1 (25), indiv_hcp_2 (26). 2019-2020 is a COVID season with no tournament weeks.
+All seasons have 26 weeks: 22 regular + Club Championship (23), Harry Russell/indiv_scratch (24), indiv_hcp_1 (25), indiv_hcp_2 (26). 2025-2026 and 2026-2027 also have a week 27 `banquet` row (the startup backfill in `_migrate_db` adds one to the active season). 2019-2020 is a COVID season with no tournament weeks.
 
 ### Seed scripts (run on Mac, Flask app stopped)
 XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
@@ -202,6 +202,8 @@ XLS path: `~/OneDrive - DGLC/Claude/Historic Scoresheets/`
 | `crawl_routes.py` | BFS route tester: crawls all GET routes as editor (all 200) and viewer (checks ALLOW/DENY); run after significant changes |
 
 ### Known technical notes
+- **Season activation**: no admin route activates an existing season; `new_season` flips `is_active` only when it creates one. Activate by hand after a backup (`~/bin/backup-bowling.sh`): `UPDATE seasons SET is_active = CASE WHEN name='2026-2027' THEN 1 ELSE 0 END;`. Nothing caches `is_active` — every request re-reads it — so no restart is needed.
+- **`_migrate_db` runs on every gunicorn start** and must hold only idempotent schema statements (`ALTER`/`CREATE`/`INSERT OR IGNORE`) or key renames. Never add a data fix-up scoped to the active season; it re-applies to whichever season is active at the next restart (PR #179 removed three such team-name UPDATEs).
 - SQLite writes must run natively on Mac (not from VM) — VirtioFS file locking doesn't support SQLite
 - `TeamPoints.points_earned` is Float to support 0.5-pt ties from tied games
 - Historical data uses `matchup_num = team_number` as a simplification; corrected per-week via Assign Matchups admin tool
@@ -309,7 +311,4 @@ These are all distinct people with separate DB records and non-overlapping or di
 
 CLAUDE.md pushes directly to main. All other code and documentation changes use feature branches + PRs. See global CLAUDE.md for full workflow.
 
-For `gh` CLI: token is embedded in the remote URL — prefix commands with:
-```bash
-GITHUB_TOKEN=$(git remote get-url origin | sed 's/.*:\(.*\)@.*/\1/')
-```
+For `gh` CLI: use the stored keyring credential as-is (`gh auth status` shows account `dglcinc`, git protocol SSH). The remote is an SSH URL with no embedded token, so do not extract one from it — that yields a bad token and a 401.
