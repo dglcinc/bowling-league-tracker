@@ -34,6 +34,7 @@
 <form method="post" action="{{ action_url | default(url_for('admin.send_email', season_id=season.id)) }}">
   <input type="hidden" name="send_confirmed" value="1">
   <input type="hidden" name="recipient_mode" value="{{ recipient_mode }}">
+  {% if attach_roster %}<input type="hidden" name="attach_roster" value="1">{% endif %}
 
   <div class="mb-3">
     <label class="form-label fw-semibold">Subject</label>
@@ -74,6 +75,14 @@
     <label class="form-label fw-semibold">Body</label>
     <textarea class="form-control" name="body" rows="10" required>{{ body_text }}</textarea>
   </div>
+
+  {% if attach_roster %}
+  <div class="mb-3">
+    <label class="form-label fw-semibold">Attachment</label>
+    <div>&#128206; {{ season.name }} Roster.pdf &mdash; active bowlers by team, alphabetical, with emails
+      (<a href="{{ url_for('admin.roster_report', season_id=season.id, format='pdf') }}" target="_blank">preview PDF</a>)</div>
+  </div>
+  {% endif %}
 
   <div class="d-flex gap-2">
     <a href="{{ cancel_url | default(url_for('admin.season_detail', season_id=season.id)) }}"

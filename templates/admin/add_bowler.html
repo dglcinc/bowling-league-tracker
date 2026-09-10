@@ -18,6 +18,7 @@
     {% if available %}
     <form method="post" class="col-md-6">
       <input type="hidden" name="action" value="existing">
+      {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
       <div class="mb-3">
         <label class="form-label">Bowler</label>
         <select name="bowler_id" class="form-select" required>
@@ -38,6 +39,7 @@
   <div class="tab-pane fade" id="newbowler">
     <form method="post" class="col-md-6">
       <input type="hidden" name="action" value="new">
+      {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
       <div class="mb-3">
         <label class="form-label">Last Name</label>
         <input type="text" name="last_name" class="form-control" required>
@@ -60,5 +62,5 @@
   </div>
 </div>
 
-<a href="{{ url_for('admin.season_detail', season_id=season.id) }}" class="btn btn-outline-secondary mt-3">Cancel</a>
+<a href="{{ next_url or url_for('admin.season_detail', season_id=season.id) }}" class="btn btn-outline-secondary mt-3">Cancel</a>
 {% endblock %}

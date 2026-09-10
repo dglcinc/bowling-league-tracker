@@ -1,0 +1,82 @@
+{# Standalone (no base.html) so WeasyPrint renders it without fetching
+   Bootstrap: this page is both the on-screen preview and the PDF the
+   Send Email flow attaches. WeasyPrint uses print media, so anything under
+   .no-print is dropped from the PDF as well as from a browser print. #}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ season.name }} Roster — {{ league_name }}</title>
+<style>
+  @page { size: letter portrait; margin: 0.6in; }
+  body { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+         font-size: 10.5pt; color: #212529; margin: 0; padding: 1rem; }
+  h1 { font-size: 16pt; margin: 0 0 2px; }
+  .sub { color: #6c757d; font-size: 9.5pt; margin: 0 0 14px; }
+  h2 { font-size: 12pt; margin: 14px 0 4px; padding-bottom: 2px; border-bottom: 2px solid #343a40; }
+  h2 .cap { font-weight: normal; color: #6c757d; }
+  h2 .n { font-weight: normal; color: #6c757d; font-size: 9.5pt; float: right; }
+  table { border-collapse: collapse; width: 100%; page-break-inside: avoid; }
+  th, td { text-align: left; padding: 3px 6px; border-bottom: 1px solid #dee2e6; vertical-align: top; }
+  th { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.04em; color: #6c757d;
+       border-bottom: 1px solid #adb5bd; }
+  td.email { font-family: Menlo, Consolas, monospace; font-size: 9.5pt; }
+  td.muted { color: #adb5bd; }
+  .toolbar { margin-bottom: 12px; }
+  .toolbar a, .toolbar button { font: inherit; font-size: 9.5pt; padding: 4px 10px; margin-right: 6px;
+                                border: 1px solid #6c757d; border-radius: 4px; background: #fff;
+                                color: #212529; text-decoration: none; cursor: pointer; }
+  @media print { .no-print { display: none !important; } body { padding: 0; } }
+  @media screen { body { max-width: 8.5in; margin: 0 auto; } }
+</style>
+</head>
+<body>
+<div class="toolbar no-print">
+  <a href="{{ url_for('admin.season_detail', season_id=season.id) }}">&larr; Back to Season</a>
+  <button type="button" onclick="window.print()">Print</button>
+  <a href="{{ url_for('admin.roster_report', season_id=season.id, format='pdf') }}">Open as PDF</a>
+</div>
+
+<h1>{{ league_name }} &mdash; {{ season.name }} Roster</h1>
+<p class="sub">Active bowlers by team, alphabetical. {{ rows|length }} bowler{{ 's' if rows|length != 1 else '' }}. As of {{ today_display }}.</p>
+
+{% for g in by_team %}
+<h2>
+  {{ g.team.name }}{% if g.team.captain_name %} <span class="cap">(Captain: {{ g.team.captain_name }})</span>{% endif %}
+  <span class="n">{{ g.rows|length }} bowler{{ 's' if g.rows|length != 1 else '' }}</span>
+</h2>
+<table>
+  <thead>
+    <tr><th style="width:26%">Last</th><th style="width:22%">First</th><th>Email</th></tr>
+  </thead>
+  <tbody>
+  {% for r in g.rows %}
+  <tr>
+    <td>{{ r.bowler.last_name }}</td>
+    <td>{{ r.bowler.first_name or '' }}{% if r.bowler.nickname %} <span style="color:#6c757d">&ldquo;{{ r.bowler.nickname }}&rdquo;</span>{% endif %}</td>
+    {% if r.bowler.email %}<td class="email">{{ r.bowler.email }}</td>{% else %}<td class="muted">&mdash;</td>{% endif %}
+  </tr>
+  {% else %}
+  <tr><td colspan="3" class="muted">No active bowlers.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+
+{% if unassigned %}
+<h2>No team assigned <span class="n">{{ unassigned|length }}</span></h2>
+<table>
+  <thead><tr><th style="width:26%">Last</th><th style="width:22%">First</th><th>Email</th></tr></thead>
+  <tbody>
+  {% for r in unassigned %}
+  <tr>
+    <td>{{ r.bowler.last_name }}</td>
+    <td>{{ r.bowler.first_name or '' }}</td>
+    {% if r.bowler.email %}<td class="email">{{ r.bowler.email }}</td>{% else %}<td class="muted">&mdash;</td>{% endif %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+</body>
+</html>
