@@ -4,8 +4,9 @@
 {% block content %}
 <h4>Edit: {{ r.bowler.display_name }} — {{ season.name }}</h4>
 <form method="post" class="col-md-6">
+  {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
   {% include 'admin/_roster_fields.html' %}
   <button type="submit" class="btn btn-primary">Save</button>
-  <a href="{{ url_for('admin.season_detail', season_id=season.id) }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+  <a href="{{ next_url or url_for('admin.season_detail', season_id=season.id) }}" class="btn btn-outline-secondary ms-2">Cancel</a>
 </form>
 {% endblock %}

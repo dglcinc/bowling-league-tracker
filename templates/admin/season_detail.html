@@ -64,10 +64,13 @@
     {% endfor %}
   </select>
   <small class="text-muted">{{ roster|length }} bowler{{ 's' if roster|length != 1 else '' }}
-    &middot; <a href="{{ url_for('admin.payments_report', season_id=season.id) }}" class="text-decoration-none">{{ dues_paid }} of {{ dues_active }} active paid</a></small>
+    &middot; <a href="{{ url_for('admin.payments_report', season_id=season.id) }}" class="text-decoration-none">{{ dues_paid }} of {{ dues_active }} active paid</a>
+    &middot; <a href="{{ url_for('admin.roster_report', season_id=season.id) }}" class="text-decoration-none">Roster by team</a></small>
 </div>
 
 <form method="post" action="{{ url_for('admin.send_magic_links', season_id=season.id) }}" id="rosterForm">
+{# Roster actions redirect here so the Active/All and team filters survive an edit. #}
+<input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
 <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
   <button type="button" class="btn btn-sm btn-outline-primary" onclick="openInviteConfirm()">
     Send Invite to Selected
@@ -119,7 +122,7 @@
       <td>{{ r.team.name if r.team else '' }}</td>
       <td>
         {% if r.bowler.email %}
-          <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id, season_id=season.id) }}"
+          <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id, season_id=season.id, next=request.full_path.rstrip('?')) }}"
              class="text-decoration-none font-monospace" style="font-size:0.75rem">{{ r.bowler.email }}</a>
           {% set acct = access_map.get(r.bowler_id) %}
           {% if acct %}
@@ -131,7 +134,7 @@
           <br><span class="text-muted" style="font-size:0.7rem">— no access yet</span>
           {% endif %}
         {% else %}
-          <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id, season_id=season.id) }}"
+          <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id, season_id=season.id, next=request.full_path.rstrip('?')) }}"
              class="text-muted" style="font-size:0.8rem">— add email</a>
         {% endif %}
       </td>
@@ -166,10 +169,10 @@
         {% endif %}
       </td>
       <td>
-        <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id, season_id=season.id) }}"
+        <a href="{{ url_for('admin.edit_bowler', bowler_id=r.bowler_id, season_id=season.id, next=request.full_path.rstrip('?')) }}"
            class="btn btn-sm btn-outline-secondary">Edit Bowler</a>
         {% if r.id %}
-        <a href="{{ url_for('admin.edit_roster', season_id=season.id, roster_id=r.id) }}"
+        <a href="{{ url_for('admin.edit_roster', season_id=season.id, roster_id=r.id, next=request.full_path.rstrip('?')) }}"
            class="btn btn-sm btn-outline-secondary">Edit Roster</a>
         {# formaction, not a nested <form>: the table sits inside #rosterForm and
            browsers drop a nested form tag, which sent this row's toggle to the
@@ -180,7 +183,7 @@
           {{ 'Deactivate' if r.active else 'Activate' }}
         </button>
         {% else %}
-        <a href="{{ url_for('admin.add_bowler', season_id=season.id, bowler_id=r.bowler_id) }}"
+        <a href="{{ url_for('admin.add_bowler', season_id=season.id, bowler_id=r.bowler_id, next=request.full_path.rstrip('?')) }}"
            class="btn btn-sm btn-outline-primary">Add to Roster</a>
         {% endif %}
       </td>
@@ -453,6 +456,13 @@
               <input class="form-check-input" type="checkbox" name="include_banquet" id="includeBanquet" value="1">
               <label class="form-check-label" for="includeBanquet">
                 Include banquet attendance list (appended to the body for editing on the review page)
+              </label>
+            </div>
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" name="attach_roster" id="attachRoster" value="1">
+              <label class="form-check-label" for="attachRoster">
+                Attach the {{ season.name }} roster as a PDF (active bowlers by team, alphabetical, with emails
+                &mdash; <a href="{{ url_for('admin.roster_report', season_id=season.id) }}" target="_blank">preview</a>)
               </label>
             </div>
           </div>

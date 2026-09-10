@@ -249,7 +249,7 @@ def send_magic_links(season_id):
     if failed:
         parts.append(f'{failed} failed — check Graph API config')
     flash(', '.join(parts) + '.', 'success' if not failed else 'warning')
-    return redirect(url_for('admin.season_detail', season_id=season_id))
+    return redirect(_safe_next(season_id))
 
 
 @admin_bp.route('/seasons/<int:season_id>/send-email', methods=['POST'])
@@ -273,12 +273,22 @@ def send_email(season_id):
             flash('No recipients — set at least one TO or BCC address.', 'warning')
             return redirect(url_for('admin.season_detail', season_id=season_id))
         html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
+        pdf_bytes = pdf_name = None
+        if request.form.get('attach_roster') == '1':
+            try:
+                pdf_bytes = _generate_roster_pdf(season_id)
+                pdf_name = f'{season.name} Roster.pdf'
+            except Exception as pdf_err:
+                flash(f'Roster PDF failed — email not sent: {pdf_err}', 'danger')
+                return redirect(url_for('admin.season_detail', season_id=season_id))
         try:
             _send_via_graph(current_app.config, subject, html_body,
-                            to_list, bcc_list, cc_list=cc_list)
+                            to_list, bcc_list, cc_list=cc_list,
+                            pdf_attachment=pdf_bytes, pdf_filename=pdf_name)
             total = len(to_list) + len(cc_list) + len(bcc_list)
+            attached = ' with roster attached' if pdf_bytes else ''
             flash(f'Email sent ({len(to_list)} TO, {len(cc_list)} CC, '
-                  f'{len(bcc_list)} BCC — {total} total).', 'success')
+                  f'{len(bcc_list)} BCC — {total} total){attached}.', 'success')
         except Exception as exc:
             flash(f'Email failed: {exc}', 'danger')
         return redirect(url_for('admin.season_detail', season_id=season_id))
@@ -359,7 +369,8 @@ def send_email(season_id):
                            bcc_emails=bcc_emails,
                            missing_captains=missing_captains,
                            no_email_bowlers=no_email_bowlers,
-                           recipient_mode=recipient_mode)
+                           recipient_mode=recipient_mode,
+                           attach_roster=request.form.get('attach_roster') == '1')
 
 
 @admin_bp.route('/viewer-access', methods=['GET', 'POST'])
@@ -440,12 +451,12 @@ def add_bowler(season_id):
         db.session.add(roster_entry)
         db.session.commit()
         flash('Bowler added to roster.', 'success')
-        return redirect(url_for('admin.season_detail', season_id=season_id))
+        return redirect(_safe_next(season_id))
 
     preselect_id = request.args.get('bowler_id', type=int)
     return render_template('admin/add_bowler.html',
                            season=season, teams=teams, available=available,
-                           preselect_id=preselect_id)
+                           preselect_id=preselect_id, next_url=_next_arg())
 
 
 @admin_bp.route('/settings', methods=['GET', 'POST'])
@@ -509,18 +520,21 @@ def edit_bowler(bowler_id):
             editor_count = Bowler.query.filter_by(is_editor=True).count()
             if editor_count <= 1:
                 flash('Cannot remove editor status — at least one editor must always exist.', 'danger')
-                return redirect(url_for('admin.edit_bowler', bowler_id=bowler_id,
-                                        **({'season_id': season_id} if season_id else {})))
+                back = {'season_id': season_id} if season_id else {}
+                if _next_arg():
+                    back['next'] = _next_arg()
+                return redirect(url_for('admin.edit_bowler', bowler_id=bowler_id, **back))
         bowler.is_editor = new_is_editor
 
         db.session.commit()
         flash('Bowler updated.', 'success')
         if season_id:
-            return redirect(url_for('admin.season_detail', season_id=season_id))
+            return redirect(_safe_next(season_id))
         return redirect(url_for('admin.seasons'))
 
     return render_template('admin/edit_bowler.html', bowler=bowler,
-                           season=season, roster=roster, teams=teams)
+                           season=season, roster=roster, teams=teams,
+                           next_url=_next_arg())
 
 
 @admin_bp.route('/bowlers/<int:bowler_id>/test-login')
@@ -566,7 +580,7 @@ def toggle_active(season_id, roster_id):
     r = Roster.query.get_or_404(roster_id)
     r.active = not r.active
     db.session.commit()
-    return redirect(url_for('admin.season_detail', season_id=season_id))
+    return redirect(_safe_next(season_id))
 
 
 # ---------------------------------------------------------------------------
@@ -636,12 +650,18 @@ def _dues_block_text(summary):
     return '\n'.join(lines).rstrip()
 
 
-def _safe_next(season_id):
-    """Redirect target after a dues change: the page the button was on."""
-    nxt = request.form.get('next', '')
+def _next_arg():
+    """Same-site `next` path from the form or query string, else ''."""
+    nxt = request.form.get('next') or request.args.get('next') or ''
     if nxt.startswith('/') and not nxt.startswith('//'):
         return nxt
-    return url_for('admin.season_detail', season_id=season_id)
+    return ''
+
+
+def _safe_next(season_id):
+    """Redirect target after a roster action: the page the button was on,
+    so an Active/All or team filter on the season page survives the edit."""
+    return _next_arg() or url_for('admin.season_detail', season_id=season_id)
 
 
 @admin_bp.route('/seasons/<int:season_id>/roster/<int:roster_id>/dues', methods=['POST'])
@@ -687,6 +707,45 @@ def payments_report(season_id):
                            today=date.today().isoformat(),
                            today_display=date.today().strftime('%B %d, %Y'),
                            **summary)
+
+
+def _roster_report_context(season_id):
+    """Active roster grouped by team, alphabetical within each team.
+
+    Feeds the printable roster page and the roster PDF the email flow attaches.
+    """
+    season = Season.query.get_or_404(season_id)
+    teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
+    rows = (Roster.query.filter_by(season_id=season_id, active=True)
+            .join(Bowler).order_by(Bowler.last_name, Bowler.first_name).all())
+    by_team = [{'team': t, 'rows': [r for r in rows if r.team_id == t.id]} for t in teams]
+    unassigned = [r for r in rows if r.team_id not in {t.id for t in teams}]
+    settings = db.session.get(LeagueSettings, 1)
+    return {
+        'season': season, 'teams': teams, 'by_team': by_team,
+        'unassigned': unassigned, 'rows': rows,
+        'league_name': settings.league_name if settings else 'League',
+        'today_display': date.today().strftime('%B %d, %Y'),
+    }
+
+
+def _generate_roster_pdf(season_id):
+    """Render the roster-by-team page to PDF bytes via WeasyPrint."""
+    from weasyprint import HTML
+    html_str = render_template('admin/roster_report.html', **_roster_report_context(season_id))
+    return HTML(string=html_str).write_pdf()
+
+
+@admin_bp.route('/seasons/<int:season_id>/roster-report')
+def roster_report(season_id):
+    """Printable active roster by team; `?format=pdf` returns the attachment inline."""
+    if request.args.get('format') == 'pdf':
+        from flask import Response
+        season = Season.query.get_or_404(season_id)
+        return Response(_generate_roster_pdf(season_id), mimetype='application/pdf',
+                        headers={'Content-Disposition':
+                                 f'inline; filename="{season.name} Roster.pdf"'})
+    return render_template('admin/roster_report.html', **_roster_report_context(season_id))
 
 
 @admin_bp.route('/seasons/<int:season_id>/payments/email', methods=['GET', 'POST'])
@@ -766,9 +825,10 @@ def edit_roster(season_id, roster_id):
         r.joined_week = int(request.form.get('joined_week') or 1)
         db.session.commit()
         flash('Roster entry updated.', 'success')
-        return redirect(url_for('admin.season_detail', season_id=season_id))
+        return redirect(_safe_next(season_id))
 
-    return render_template('admin/edit_roster.html', r=r, season=season, teams=teams)
+    return render_template('admin/edit_roster.html', r=r, season=season, teams=teams,
+                           next_url=_next_arg())
 
 
 # ---------------------------------------------------------------------------
