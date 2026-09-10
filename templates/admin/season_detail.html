@@ -388,7 +388,8 @@
 <div class="modal fade" id="emailModal" tabindex="-1" aria-labelledby="emailModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
-      <form method="post" action="{{ url_for('admin.send_email', season_id=season.id) }}" id="emailForm">
+      <form method="post" action="{{ url_for('admin.send_email', season_id=season.id) }}" id="emailForm"
+            enctype="multipart/form-data">
         <div class="modal-header">
           <h5 class="modal-title" id="emailModalLabel">Send Email</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -475,6 +476,11 @@
           <div class="mb-3">
             <label for="emailBody" class="form-label fw-semibold">Message</label>
             <textarea class="form-control" id="emailBody" name="body" rows="8" required></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="emailAttachments" class="form-label fw-semibold">Attachments</label>
+            <input type="file" class="form-control form-control-sm" id="emailAttachments" name="attachments" multiple>
+            <div class="form-text">Optional. One or more files, {{ attach_limit }} total per email. You can add more on the review page.</div>
           </div>
           <div id="emailHiddenBowlers"></div>
         </div>

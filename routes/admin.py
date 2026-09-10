@@ -273,28 +273,50 @@ def send_email(season_id):
             flash('No recipients — set at least one TO or BCC address.', 'warning')
             return redirect(url_for('admin.season_detail', season_id=season_id))
         html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
-        pdf_bytes = pdf_name = None
+        attach_token = request.form.get('attach_token', '')
+        attachments = []
         if request.form.get('attach_roster') == '1':
             try:
-                pdf_bytes = _generate_roster_pdf(season_id)
-                pdf_name = f'{season.name} Roster.pdf'
+                attachments.append((f'{season.name} Roster.pdf', 'application/pdf',
+                                    _generate_roster_pdf(season_id)))
             except Exception as pdf_err:
                 flash(f'Roster PDF failed — email not sent: {pdf_err}', 'danger')
                 return redirect(url_for('admin.season_detail', season_id=season_id))
+        attachments += [(it['name'], it['ctype'], it['data'])
+                        for it in _stashed_attachments(attach_token)]
+        attachments += _read_uploads(request.files.getlist('attachments'))
+        total_bytes = sum(len(d) for _n, _c, d in attachments)
+        if total_bytes > ATTACH_MAX_TOTAL:
+            _discard_attachments(attach_token)
+            flash(f'Attachments total {_fmt_size(total_bytes)}; the limit is '
+                  f'{_fmt_size(ATTACH_MAX_TOTAL)} per email. Email not sent.', 'danger')
+            return redirect(url_for('admin.season_detail', season_id=season_id))
         try:
             _send_via_graph(current_app.config, subject, html_body,
                             to_list, bcc_list, cc_list=cc_list,
-                            pdf_attachment=pdf_bytes, pdf_filename=pdf_name)
+                            attachments=attachments)
             total = len(to_list) + len(cc_list) + len(bcc_list)
-            attached = ' with roster attached' if pdf_bytes else ''
+            attached = (f' with {len(attachments)} attachment'
+                        f'{"s" if len(attachments) != 1 else ""}') if attachments else ''
             flash(f'Email sent ({len(to_list)} TO, {len(cc_list)} CC, '
                   f'{len(bcc_list)} BCC — {total} total){attached}.', 'success')
         except Exception as exc:
             flash(f'Email failed: {exc}', 'danger')
+        _discard_attachments(attach_token)
         return redirect(url_for('admin.season_detail', season_id=season_id))
 
     # First POST — resolve recipients based on mode, then render review page.
     recipient_mode = request.form.get('recipient_mode', 'selected')
+
+    # Uploaded attachments are held on disk until the confirmed send.
+    uploads = _read_uploads(request.files.getlist('attachments'))
+    upload_bytes = sum(len(d) for _n, _c, d in uploads)
+    if upload_bytes > ATTACH_MAX_TOTAL:
+        flash(f'Attachments total {_fmt_size(upload_bytes)}; the limit is '
+              f'{_fmt_size(ATTACH_MAX_TOTAL)} per email.', 'danger')
+        return redirect(url_for('admin.season_detail', season_id=season_id))
+    attach_token = _stash_attachments(uploads) if uploads else ''
+    attach_files = [{'name': n, 'size': _fmt_size(len(d))} for n, _c, d in uploads]
 
     # Optionally append banquet attendance block to the body before review.
     if request.form.get('include_banquet') == '1':
@@ -370,7 +392,9 @@ def send_email(season_id):
                            missing_captains=missing_captains,
                            no_email_bowlers=no_email_bowlers,
                            recipient_mode=recipient_mode,
-                           attach_roster=request.form.get('attach_roster') == '1')
+                           attach_roster=request.form.get('attach_roster') == '1',
+                           attach_token=attach_token, attach_files=attach_files,
+                           allow_attachments=True)
 
 
 @admin_bp.route('/viewer-access', methods=['GET', 'POST'])
@@ -648,6 +672,97 @@ def _dues_block_text(summary):
         lines.append('  Paid: ' + (', '.join(name(r) for r in g['paid']) or '(none)'))
         lines.append('')
     return '\n'.join(lines).rstrip()
+
+
+# ---------------------------------------------------------------------------
+# Email attachments (uploaded in the Send Email modal, held between the
+# compose POST and the confirmed send POST)
+# ---------------------------------------------------------------------------
+
+ATTACH_MAX_TOTAL = 3 * 1024 * 1024   # Graph inline fileAttachment ceiling
+_ATTACH_TOKEN_RE = __import__('re').compile(r'^[0-9a-f]{32}$')
+_ATTACH_STALE_SECS = 6 * 3600
+
+
+def _attach_root():
+    from config import get_db_path
+    root = get_db_path().parent / 'tmp' / 'email-attachments'
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _purge_stale_attachments():
+    import shutil, time
+    cutoff = time.time() - _ATTACH_STALE_SECS
+    for d in _attach_root().iterdir():
+        try:
+            if d.is_dir() and d.stat().st_mtime < cutoff:
+                shutil.rmtree(d, ignore_errors=True)
+        except OSError:
+            pass
+
+
+def _clean_attachment_name(name):
+    name = (name or '').replace('\\', '/').split('/')[-1]
+    name = ''.join(ch for ch in name if ch.isprintable() and ch not in '"<>').strip()
+    return name[:120] or 'attachment'
+
+
+def _read_uploads(files):
+    """(name, content_type, bytes) for each non-empty upload in `files`."""
+    import mimetypes
+    out = []
+    for f in files or []:
+        if not f or not f.filename:
+            continue
+        data = f.read()
+        if not data:
+            continue
+        name = _clean_attachment_name(f.filename)
+        ctype = f.mimetype or mimetypes.guess_type(name)[0] or 'application/octet-stream'
+        out.append((name, ctype, data))
+    return out
+
+
+def _stash_attachments(items):
+    """Write (name, ctype, bytes) items to a token dir; returns the token."""
+    import json, uuid
+    _purge_stale_attachments()
+    token = uuid.uuid4().hex
+    d = _attach_root() / token
+    d.mkdir()
+    manifest = []
+    for i, (name, ctype, data) in enumerate(items):
+        (d / f'{i}.bin').write_bytes(data)
+        manifest.append({'name': name, 'ctype': ctype, 'size': len(data)})
+    (d / 'manifest.json').write_text(json.dumps(manifest))
+    return token
+
+
+def _stashed_attachments(token, with_data=True):
+    """Manifest entries for a token (plus bytes when with_data); [] if unknown."""
+    import json
+    if not token or not _ATTACH_TOKEN_RE.match(token):
+        return []
+    d = _attach_root() / token
+    mf = d / 'manifest.json'
+    if not mf.exists():
+        return []
+    items = json.loads(mf.read_text())
+    if with_data:
+        for i, it in enumerate(items):
+            it['data'] = (d / f'{i}.bin').read_bytes()
+    return items
+
+
+def _discard_attachments(token):
+    import shutil
+    if token and _ATTACH_TOKEN_RE.match(token):
+        shutil.rmtree(_attach_root() / token, ignore_errors=True)
+
+
+def _fmt_size(n):
+    return f'{n / 1024:.0f} KB' if n < 1024 * 1024 else f'{n / 1024 / 1024:.1f} MB'
 
 
 def _next_arg():
@@ -1710,8 +1825,15 @@ def _get_msal_app(tenant_id, client_id, client_secret):
 
 def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
                     cc_list=None,
-                    pdf_attachment=None, pdf_filename=None):
-    """Send email via Microsoft Graph API using client-credentials OAuth2."""
+                    pdf_attachment=None, pdf_filename=None,
+                    attachments=None):
+    """Send email via Microsoft Graph API using client-credentials OAuth2.
+
+    `attachments` is a list of (filename, content_type, bytes). The older
+    `pdf_attachment`/`pdf_filename` pair is kept for the weekly-standings
+    path and is folded into the same list. Graph accepts inline
+    fileAttachment bodies up to ~3 MB per message (see ATTACH_MAX_TOTAL).
+    """
     import base64
     import json
     import urllib.request
@@ -1751,13 +1873,16 @@ def _send_via_graph(app_config, subject, html_body, to_list, bcc_list,
         'bccRecipients': bcc_recipients,
     }
 
+    all_attachments = list(attachments or [])
     if pdf_attachment and pdf_filename:
+        all_attachments.insert(0, (pdf_filename, 'application/pdf', pdf_attachment))
+    if all_attachments:
         message['attachments'] = [{
             '@odata.type': '#microsoft.graph.fileAttachment',
-            'name': pdf_filename,
-            'contentType': 'application/pdf',
-            'contentBytes': base64.b64encode(pdf_attachment).decode('utf-8'),
-        }]
+            'name': name,
+            'contentType': ctype or 'application/octet-stream',
+            'contentBytes': base64.b64encode(data).decode('utf-8'),
+        } for name, ctype, data in all_attachments]
 
     payload = json.dumps({'message': message, 'saveToSentItems': True}).encode('utf-8')
 

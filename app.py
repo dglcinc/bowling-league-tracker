@@ -9,7 +9,7 @@ import time
 from dotenv import load_dotenv
 load_dotenv()  # loads .env from project root before Config reads os.environ
 
-from flask import Flask, redirect, request, url_for, abort, render_template
+from flask import Flask, redirect, request, url_for, abort, render_template, flash
 from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config
 from models import db
@@ -285,6 +285,8 @@ def create_app():
     cache.init_app(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 600})
 
     app.jinja_env.globals['enumerate'] = enumerate
+    from routes.admin import ATTACH_MAX_TOTAL, _fmt_size
+    app.jinja_env.globals['attach_limit'] = _fmt_size(ATTACH_MAX_TOTAL)
 
     @login_manager.user_loader
     def load_user(user_id):
@@ -396,6 +398,12 @@ def create_app():
     @app.errorhandler(403)
     def forbidden(e):
         return render_template('errors/403.html'), 403
+
+    @app.errorhandler(413)
+    def too_large(e):
+        limit_mb = app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
+        flash(f'Upload too large — the request limit is {limit_mb} MB.', 'danger')
+        return redirect(request.referrer or url_for('index'))
 
     # Request logging — written after every response except static files
     from sqlalchemy import text as _text

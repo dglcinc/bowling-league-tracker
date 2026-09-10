@@ -51,6 +51,10 @@ class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "bowling-dev-key-change-in-prod")
     SNAPSHOT_DIR = get_snapshot_dir()
     BACKUP_DIR = get_backup_dir()
+    # Request body cap: email attachments (3 MB Graph limit) plus form
+    # overhead, and the XLS season import. nginx on the Pi must allow at
+    # least this much (client_max_body_size).
+    MAX_CONTENT_LENGTH = 8 * 1024 * 1024
 
     # Outbound email via Microsoft Graph API (OAuth2 — replaces SMTP)
     GRAPH_TENANT_ID      = os.environ.get("GRAPH_TENANT_ID", "")
