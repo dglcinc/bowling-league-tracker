@@ -46,6 +46,27 @@
   {% endfor %}
 </div>
 
+<form method="post" action="{{ url_for('admin.mobile_payment_display', season_id=season.id) }}"
+      class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+  <input type="hidden" name="next" value="{{ request.full_path }}">
+  <span class="fw-semibold small">Mobile home page shows payment status for:</span>
+  <div class="form-check form-check-inline mb-0">
+    <input class="form-check-input" type="checkbox" name="mobile_show_dues" id="mobileShowDues" value="1"
+           {{ 'checked' if season.mobile_show_dues }}>
+    <label class="form-check-label small" for="mobileShowDues">Season dues</label>
+  </div>
+  <div class="form-check form-check-inline mb-0">
+    <input class="form-check-input" type="checkbox" name="mobile_show_banquet" id="mobileShowBanquet" value="1"
+           {{ 'checked' if season.mobile_show_banquet }}>
+    <label class="form-check-label small" for="mobileShowBanquet">Banquet RSVP &amp; payment</label>
+  </div>
+  <button type="submit" class="btn btn-outline-secondary btn-sm">Save</button>
+  <small class="text-muted">Reports:
+    <a href="{{ url_for('admin.payment_status_report', season_id=season.id, kind='dues') }}" class="text-decoration-none">Dues status</a>
+    &middot; <a href="{{ url_for('admin.payment_status_report', season_id=season.id, kind='banquet') }}" class="text-decoration-none">Banquet status</a>
+  </small>
+</form>
+
 <div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
   <h5 class="mb-0">Roster</h5>
   <div class="btn-group btn-group-sm" role="group">
@@ -458,6 +479,14 @@
               <label class="form-check-label" for="includeBanquet">
                 Include banquet attendance list (appended to the body for editing on the review page)
               </label>
+            </div>
+            <div class="d-flex align-items-center gap-2 mt-2">
+              <label class="form-check-label small" for="includePaymentStatus">Append payment status list (team, name, paid):</label>
+              <select class="form-select form-select-sm" style="width:auto" name="include_payment_status" id="includePaymentStatus">
+                <option value="">None</option>
+                <option value="dues">Season dues</option>
+                <option value="banquet">Banquet RSVP &amp; payment</option>
+              </select>
             </div>
             <div class="form-check mt-2">
               <input class="form-check-input" type="checkbox" name="attach_roster" id="attachRoster" value="1">

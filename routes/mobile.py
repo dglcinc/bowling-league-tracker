@@ -284,8 +284,20 @@ def home():
                     'label': season.tournament_labels.get('banquet', 'End of Season Banquet'),
                 }
 
+    # Payment status boxes (season dues / banquet), enabled per season by the admin
+    payment_boxes = []
+    if season:
+        from routes.admin import _payment_status_context
+        for kind, flag in (('dues', season.mobile_show_dues),
+                           ('banquet', season.mobile_show_banquet)):
+            if flag:
+                ctx = _payment_status_context(season.id, kind)
+                if ctx:
+                    payment_boxes.append(ctx)
+
     return render_template('mobile/home.html',
                            season=season,
+                           payment_boxes=payment_boxes,
                            my_team=my_team,
                            upcoming_week=upcoming_week,
                            all_matchups=all_matchups,
