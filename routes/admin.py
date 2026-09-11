@@ -323,6 +323,11 @@ def send_email(season_id):
         block = _banquet_block_text(season_id)
         if block:
             body_text = (body_text.rstrip() + '\n' + block).strip()
+    ps_kind = request.form.get('include_payment_status', '')
+    if ps_kind in PAYMENT_STATUS_KINDS:
+        block = _payment_status_text(_payment_status_context(season_id, ps_kind))
+        if block:
+            body_text = (body_text.rstrip() + '\n' + block).strip()
 
     if recipient_mode == 'selected':
         bowler_ids = request.form.getlist('bowler_ids', type=int)
@@ -672,6 +677,217 @@ def _dues_block_text(summary):
         lines.append('  Paid: ' + (', '.join(name(r) for r in g['paid']) or '(none)'))
         lines.append('')
     return '\n'.join(lines).rstrip()
+
+
+# ---------------------------------------------------------------------------
+# Payment status list (team → name → paid, plus banquet RSVP)
+# Feeds the mobile home box, the per-kind report page, and the email block.
+# ---------------------------------------------------------------------------
+
+PAYMENT_STATUS_KINDS = ('dues', 'banquet')
+
+
+def _full_name(b):
+    if b.first_name:
+        return f'{b.last_name}, {b.first_name}'
+    return b.last_name or '(unknown)'
+
+
+def _payment_status_context(season_id, kind):
+    """Active roster grouped by team with per-bowler paid status.
+
+    kind='dues'    → Roster.dues_paid
+    kind='banquet' → BanquetAttendee.paid + attending (rsvp), write-ins last
+    Returns None when kind is unknown or the banquet is not configured.
+    Rows: {'name', 'paid', 'rsvp'} (rsvp is 'yes'/'no'/'unknown', dues → None).
+    """
+    if kind not in PAYMENT_STATUS_KINDS:
+        return None
+    season = Season.query.get_or_404(season_id)
+    teams = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
+    rosters = (Roster.query.filter_by(season_id=season_id, active=True)
+               .join(Bowler).order_by(Bowler.last_name, Bowler.first_name).all())
+
+    writeins = []
+    if kind == 'dues':
+        label = f'{season.name} season dues'
+        status_of = {r.bowler_id: (bool(r.dues_paid), None) for r in rosters}
+    else:
+        from routes.entry import _ensure_banquet_rows
+        config = BanquetConfig.query.filter_by(season_id=season_id).first()
+        banquet_week = Week.query.filter_by(season_id=season_id, tournament_type='banquet').first()
+        if not banquet_week and not config:
+            return None
+        _ensure_banquet_rows(season_id)
+        label = season.tournament_labels.get('banquet', 'End of Season Banquet')
+        attendees = BanquetAttendee.query.filter_by(season_id=season_id).all()
+        status_of = {a.bowler_id: (bool(a.paid), a.attending or 'unknown')
+                     for a in attendees if a.bowler_id}
+        writeins = [{'name': a.guest_name or '(unknown)', 'paid': bool(a.paid),
+                     'rsvp': a.attending or 'unknown'}
+                    for a in sorted((a for a in attendees if not a.bowler_id),
+                                    key=lambda a: (a.guest_name or '').lower())]
+
+    by_team = []
+    for t in teams:
+        rows = []
+        for r in rosters:
+            if r.team_id != t.id:
+                continue
+            paid, rsvp = status_of.get(r.bowler_id, (False, 'unknown' if kind == 'banquet' else None))
+            rows.append({'name': _full_name(r.bowler), 'paid': paid, 'rsvp': rsvp})
+        by_team.append({'team': t, 'rows': rows,
+                        'paid_count': sum(1 for x in rows if x['paid'])})
+    all_rows = [x for g in by_team for x in g['rows']] + writeins
+    return {
+        'season': season, 'kind': kind, 'label': label,
+        'by_team': by_team, 'writeins': writeins,
+        'total': len(all_rows),
+        'paid_count': sum(1 for x in all_rows if x['paid']),
+        'rsvp_yes': sum(1 for x in all_rows if x['rsvp'] == 'yes'),
+        'rsvp_unknown': sum(1 for x in all_rows if x['rsvp'] == 'unknown'),
+    }
+
+
+def _payment_status_line(row):
+    bits = []
+    if row['rsvp'] is not None:
+        bits.append({'yes': 'RSVP yes', 'no': 'RSVP no'}.get(row['rsvp'], 'no RSVP'))
+    bits.append('paid' if row['paid'] else 'unpaid')
+    return f"  {row['name']} — " + ', '.join(bits)
+
+
+def _payment_status_text(ctx):
+    """Plain-text block: team, then one line per bowler with status."""
+    if not ctx:
+        return ''
+    lines = ['', '----',
+             f"{ctx['label']} — payment status (as of {date.today().strftime('%b %d, %Y')})"]
+    summary = f"Paid: {ctx['paid_count']} of {ctx['total']}"
+    if ctx['kind'] == 'banquet':
+        summary += f" · RSVP yes: {ctx['rsvp_yes']} · No response: {ctx['rsvp_unknown']}"
+    lines += [summary, '']
+    for g in ctx['by_team']:
+        t = g['team']
+        lines.append(t.name + (f' ({t.captain_name})' if t.captain_name else '')
+                     + f" — {g['paid_count']} of {len(g['rows'])} paid")
+        lines += [_payment_status_line(x) for x in g['rows']] or ['  (no active bowlers)']
+        lines.append('')
+    if ctx['writeins']:
+        lines.append('Write-ins')
+        lines += [_payment_status_line(x) for x in ctx['writeins']]
+        lines.append('')
+    return '\n'.join(lines).rstrip()
+
+
+@admin_bp.route('/seasons/<int:season_id>/mobile-payment-display', methods=['POST'])
+def mobile_payment_display(season_id):
+    """Which payment-status boxes the mobile home page shows for this season."""
+    season = Season.query.get_or_404(season_id)
+    season.mobile_show_dues = request.form.get('mobile_show_dues') == '1'
+    season.mobile_show_banquet = request.form.get('mobile_show_banquet') == '1'
+    db.session.commit()
+    flash('Mobile home page payment display updated.', 'success')
+    return redirect(_safe_next(season_id))
+
+
+@admin_bp.route('/seasons/<int:season_id>/payment-status/<kind>')
+def payment_status_report(season_id, kind):
+    ctx = _payment_status_context(season_id, kind)
+    if ctx is None:
+        flash('No banquet configured for this season.' if kind == 'banquet'
+              else 'Unknown payment status report.', 'warning')
+        return redirect(url_for('admin.season_detail', season_id=season_id))
+    return render_template('admin/payment_status_report.html',
+                           today_display=date.today().strftime('%B %d, %Y'), **ctx)
+
+
+@admin_bp.route('/seasons/<int:season_id>/payment-status/<kind>/email', methods=['GET', 'POST'])
+def payment_status_email(season_id, kind):
+    """Payment status email: TO captains, BCC bowlers still owing, list in the body.
+
+    Same two-step shape as `payment_email`: GET pre-fills the review page,
+    POST with send_confirmed=1 sends what the editor left in the fields.
+    """
+    import html as _html
+    season = Season.query.get_or_404(season_id)
+    report_url = url_for('admin.payment_status_report', season_id=season_id, kind=kind)
+
+    if request.method == 'POST' and request.form.get('send_confirmed') == '1':
+        subject = request.form.get('subject', '').strip()
+        body_text = request.form.get('body', '').strip()
+        to_list  = [e.strip() for e in request.form.get('to_emails', '').splitlines() if e.strip()]
+        cc_list  = [e.strip() for e in request.form.get('cc_emails', '').splitlines() if e.strip()]
+        bcc_list = [e.strip() for e in request.form.get('bcc_emails', '').splitlines() if e.strip()]
+        if not subject or not body_text:
+            flash('Subject and body are required.', 'warning')
+            return redirect(url_for('admin.payment_status_email', season_id=season_id, kind=kind))
+        if not to_list and not bcc_list:
+            flash('No recipients — set at least one TO or BCC address.', 'warning')
+            return redirect(url_for('admin.payment_status_email', season_id=season_id, kind=kind))
+        html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
+        try:
+            _send_via_graph(current_app.config, subject, html_body,
+                            to_list, bcc_list, cc_list=cc_list)
+            total = len(to_list) + len(cc_list) + len(bcc_list)
+            flash(f'Payment status sent ({len(to_list)} TO, {len(cc_list)} CC, '
+                  f'{len(bcc_list)} BCC — {total} total).', 'success')
+        except Exception as exc:
+            flash(f'Email failed: {exc}', 'danger')
+        return redirect(report_url)
+
+    ctx = _payment_status_context(season_id, kind)
+    if ctx is None:
+        flash('No banquet configured for this season.' if kind == 'banquet'
+              else 'Unknown payment status report.', 'warning')
+        return redirect(url_for('admin.season_detail', season_id=season_id))
+    settings = db.session.get(LeagueSettings, 1)
+    league_name = settings.league_name if settings else 'League'
+    subject = f"{league_name} — {ctx['label']}: payment status"
+    if kind == 'banquet':
+        intro = ('Captains,\n\n'
+                 'Here is where we stand on banquet RSVPs and payments. If you have not '
+                 'responded or paid yet, please let your captain or me know at the next '
+                 'session. Reply to this email with any corrections.\n\nThanks!')
+    else:
+        intro = ('Captains,\n\n'
+                 'Here is where we stand on season dues. If you are listed as unpaid, '
+                 'please settle up with your captain or me at the next session. '
+                 'Reply to this email with any corrections.\n\nThanks!')
+    body_text = intro + '\n' + _payment_status_text(ctx)
+
+    captain_info = _resolve_captain_emails([g['team'] for g in ctx['by_team']], season_id)
+    to_emails = [e for _t, _b, e in captain_info if e]
+    missing_captains = [t for t, _b, e in captain_info if not e]
+    # BCC: bowlers still owing (dues) or not yet paid / no response (banquet).
+    owing_ids = set()
+    if kind == 'dues':
+        owing_ids = {r.bowler_id for r in Roster.query.filter_by(season_id=season_id, active=True)
+                     if not r.dues_paid}
+    else:
+        active_ids = {r.bowler_id for r in Roster.query.filter_by(season_id=season_id, active=True)}
+        for a in BanquetAttendee.query.filter_by(season_id=season_id).all():
+            if a.bowler_id in active_ids and (not a.paid) and a.attending != 'no':
+                owing_ids.add(a.bowler_id)
+    owing = (Bowler.query.filter(Bowler.id.in_(owing_ids)).order_by(Bowler.last_name).all()
+             if owing_ids else [])
+    bcc_emails = [b.email for b in owing if b.email]
+    no_email_bowlers = [b for b in owing if not b.email]
+
+    return render_template('admin/email_review.html',
+                           season=season,
+                           subject=subject,
+                           body_text=body_text,
+                           to_emails=to_emails,
+                           cc_emails=[],
+                           bcc_emails=bcc_emails,
+                           missing_captains=missing_captains,
+                           no_email_bowlers=no_email_bowlers,
+                           recipient_mode=f'payment_status_{kind}',
+                           action_url=url_for('admin.payment_status_email', season_id=season_id, kind=kind),
+                           cancel_url=report_url,
+                           page_title=f"{ctx['label']} — Payment Status Email",
+                           bcc_label='Bowlers still owing' if kind == 'dues' else 'Unpaid or no response')
 
 
 # ---------------------------------------------------------------------------

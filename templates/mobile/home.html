@@ -194,6 +194,70 @@
 </div>
 {% endif %}
 
+{# ── Notes (home message) ── #}
+{% if season and season.home_message %}
+<div class="m-card">
+  <div class="m-card-title">Notes</div>
+  <div style="font-size:.9rem;line-height:1.5;color:#495057;white-space:pre-line">{{ season.home_message }}</div>
+</div>
+{% endif %}
+
+{# ── Payment status (season dues / banquet), enabled per season by the admin ── #}
+{% for box in payment_boxes %}
+<div class="m-card" style="padding-bottom:8px">
+  <div class="m-card-title">{{ box.label }} — Payment Status</div>
+  <div style="font-size:.8rem;color:#6c757d;margin-bottom:6px">
+    Paid: {{ box.paid_count }} of {{ box.total }}{% if box.kind == 'banquet' %}
+    · RSVP yes: {{ box.rsvp_yes }} · No response: {{ box.rsvp_unknown }}{% endif %}
+  </div>
+  <div style="max-height:240px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+              border:1px solid #e9ecef;border-radius:8px;padding:0 8px">
+    {% for g in box.by_team %}
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+                color:#6c757d;margin:8px 0 2px">{{ g.team.name }}
+      <span style="font-weight:400;text-transform:none;letter-spacing:0">· {{ g.paid_count }} of {{ g.rows|length }} paid</span>
+    </div>
+    {% for row in g.rows %}
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #f5f5f5">
+      <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem;color:#212529">{{ row.name }}</div>
+      {% if box.kind == 'banquet' %}
+      <div style="font-size:.72rem;font-weight:600;border-radius:6px;padding:2px 7px;
+                  {% if row.rsvp == 'yes' %}background:#c3e6cb;color:#155724
+                  {% elif row.rsvp == 'no' %}background:#e2e3e5;color:#41464b
+                  {% else %}background:#f8f9fa;color:#6c757d;border:1px solid #dee2e6{% endif %}">
+        {{ 'RSVP yes' if row.rsvp == 'yes' else 'RSVP no' if row.rsvp == 'no' else 'No RSVP' }}
+      </div>
+      {% endif %}
+      <div style="font-size:.72rem;font-weight:600;border-radius:6px;padding:2px 7px;min-width:48px;text-align:center;
+                  {% if row.paid %}background:#c3e6cb;color:#155724{% else %}background:#fff3cd;color:#664d03{% endif %}">
+        {{ 'Paid' if row.paid else 'Unpaid' }}
+      </div>
+    </div>
+    {% endfor %}
+    {% endfor %}
+    {% if box.writeins %}
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+                color:#6c757d;margin:8px 0 2px">Write-ins</div>
+    {% for row in box.writeins %}
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #f5f5f5">
+      <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem;color:#212529">{{ row.name }}</div>
+      <div style="font-size:.72rem;font-weight:600;border-radius:6px;padding:2px 7px;
+                  {% if row.rsvp == 'yes' %}background:#c3e6cb;color:#155724
+                  {% elif row.rsvp == 'no' %}background:#e2e3e5;color:#41464b
+                  {% else %}background:#f8f9fa;color:#6c757d;border:1px solid #dee2e6{% endif %}">
+        {{ 'RSVP yes' if row.rsvp == 'yes' else 'RSVP no' if row.rsvp == 'no' else 'No RSVP' }}
+      </div>
+      <div style="font-size:.72rem;font-weight:600;border-radius:6px;padding:2px 7px;min-width:48px;text-align:center;
+                  {% if row.paid %}background:#c3e6cb;color:#155724{% else %}background:#fff3cd;color:#664d03{% endif %}">
+        {{ 'Paid' if row.paid else 'Unpaid' }}
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
 {# ── Handicap roster ── #}
 {% if roster_by_team %}
 <div class="m-card" style="padding-bottom:8px">

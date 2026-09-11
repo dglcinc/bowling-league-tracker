@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Payment Status — {{ season.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="no-print">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.seasons') }}">Seasons</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.season_detail', season_id=season.id) }}">{{ season.name }}</a></li>
+    <li class="breadcrumb-item active">Payment Status</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+  <h4 class="mb-0">{{ label }} &mdash; Payment Status</h4>
+  <div class="no-print d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('admin.payment_status_email', season_id=season.id, kind=kind) }}" class="btn btn-sm btn-outline-info">&#9993; Send as email</a>
+    {% if kind == 'dues' %}
+    <a href="{{ url_for('admin.payments_report', season_id=season.id) }}" class="btn btn-sm btn-outline-secondary">Dues details</a>
+    {% else %}
+    <a href="{{ url_for('entry.banquet_entry', season_id=season.id) }}" class="btn btn-sm btn-outline-secondary">Track attendance</a>
+    {% endif %}
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()">Print</button>
+    <a href="{{ url_for('admin.season_detail', season_id=season.id) }}" class="btn btn-sm btn-outline-secondary">Back to Season</a>
+  </div>
+</div>
+<p class="text-muted small mb-3">
+  As of {{ today_display }}. Paid: {{ paid_count }} of {{ total }}{% if kind == 'banquet' %}
+  &middot; RSVP yes: {{ rsvp_yes }} &middot; No response: {{ rsvp_unknown }}{% endif %}.
+</p>
+
+<table class="table table-sm table-bordered mb-3" style="max-width:720px">
+  <thead class="table-dark">
+    <tr>
+      <th>Team</th>
+      <th>Name</th>
+      {% if kind == 'banquet' %}<th>RSVP</th>{% endif %}
+      <th>Paid</th>
+    </tr>
+  </thead>
+  {% macro status_cells(row) %}
+    {% if kind == 'banquet' %}
+    <td>
+      {% if row.rsvp == 'yes' %}<span class="badge bg-success">Yes</span>
+      {% elif row.rsvp == 'no' %}<span class="badge bg-secondary">No</span>
+      {% else %}<span class="badge bg-light text-dark border">No response</span>{% endif %}
+    </td>
+    {% endif %}
+    <td>
+      {% if row.paid %}<span class="badge bg-success">Paid</span>
+      {% else %}<span class="badge bg-warning text-dark">Unpaid</span>{% endif %}
+    </td>
+  {% endmacro %}
+  {% for g in by_team %}
+  <tbody>
+    {% for row in g.rows %}
+    <tr class="{{ '' if row.paid else 'table-warning' }}">
+      {% if loop.first %}
+      <td rowspan="{{ g.rows|length }}" class="align-top">
+        <strong>{{ g.team.name }}</strong>{% if g.team.captain_name %}<br><span class="text-muted small">Captain: {{ g.team.captain_name }}</span>{% endif %}
+        <br><span class="small">{{ g.paid_count }} of {{ g.rows|length }} paid</span>
+      </td>
+      {% endif %}
+      <td>{{ row.name }}</td>
+      {{ status_cells(row) }}
+    </tr>
+    {% else %}
+    <tr><td><strong>{{ g.team.name }}</strong></td><td colspan="{{ 3 if kind == 'banquet' else 2 }}" class="text-muted">No active bowlers</td></tr>
+    {% endfor %}
+  </tbody>
+  {% endfor %}
+  {% if writeins %}
+  <tbody>
+    {% for row in writeins %}
+    <tr class="{{ '' if row.paid else 'table-warning' }}">
+      {% if loop.first %}<td rowspan="{{ writeins|length }}" class="align-top"><strong>Write-ins</strong></td>{% endif %}
+      <td>{{ row.name }}</td>
+      {{ status_cells(row) }}
+    </tr>
+    {% endfor %}
+  </tbody>
+  {% endif %}
+</table>
+{% endblock %}

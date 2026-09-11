@@ -85,6 +85,9 @@ class Season(db.Model):
     arrival_time = db.Column(db.String(16), default='7:45 PM')
     start_time = db.Column(db.String(16), default='8:00 PM')
     home_message = db.Column(db.Text, nullable=True)
+    # Mobile home page: show a scrollable payment-status box (per kind)
+    mobile_show_dues = db.Column(db.Boolean, default=False)
+    mobile_show_banquet = db.Column(db.Boolean, default=False)
 
     # Configurable display names for the 4 post-season tournament weeks.
     # These are stored in the DB so personal names never appear in the repo.

@@ -159,6 +159,9 @@ def _migrate_db(db):
         # Banquet — display name + description on Season
         "ALTER TABLE seasons ADD COLUMN name_banquet VARCHAR(128) DEFAULT 'End of Season Banquet'",
         "ALTER TABLE seasons ADD COLUMN desc_banquet TEXT DEFAULT ''",
+        # Mobile home page payment-status boxes (season dues / banquet)
+        "ALTER TABLE seasons ADD COLUMN mobile_show_dues BOOLEAN DEFAULT 0",
+        "ALTER TABLE seasons ADD COLUMN mobile_show_banquet BOOLEAN DEFAULT 0",
         # Banquet config — date lives on weeks.date for the banquet week
         """CREATE TABLE IF NOT EXISTS banquet_configs (
             season_id INTEGER PRIMARY KEY REFERENCES seasons(id),
