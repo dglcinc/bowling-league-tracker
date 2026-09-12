@@ -274,6 +274,10 @@ def send_email(season_id):
             return redirect(url_for('admin.season_detail', season_id=season_id))
         html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
         attach_token = request.form.get('attach_token', '')
+        stashed = _claim_attachments(attach_token)
+        if stashed is None:
+            flash(DUPLICATE_SEND_MSG, 'info')
+            return redirect(url_for('admin.season_detail', season_id=season_id))
         attachments = []
         if request.form.get('attach_roster') == '1':
             try:
@@ -282,8 +286,7 @@ def send_email(season_id):
             except Exception as pdf_err:
                 flash(f'Roster PDF failed — email not sent: {pdf_err}', 'danger')
                 return redirect(url_for('admin.season_detail', season_id=season_id))
-        attachments += [(it['name'], it['ctype'], it['data'])
-                        for it in _stashed_attachments(attach_token)]
+        attachments += [(it['name'], it['ctype'], it['data']) for it in stashed]
         attachments += _read_uploads(request.files.getlist('attachments'))
         total_bytes = sum(len(d) for _n, _c, d in attachments)
         if total_bytes > ATTACH_MAX_TOTAL:
@@ -315,7 +318,9 @@ def send_email(season_id):
         flash(f'Attachments total {_fmt_size(upload_bytes)}; the limit is '
               f'{_fmt_size(ATTACH_MAX_TOTAL)} per email.', 'danger')
         return redirect(url_for('admin.season_detail', season_id=season_id))
-    attach_token = _stash_attachments(uploads) if uploads else ''
+    # Always issued, even with no uploads: the token makes the confirmed
+    # send one-shot, so a double-clicked Send Now cannot send twice.
+    attach_token = _stash_attachments(uploads)
     attach_files = [{'name': n, 'size': _fmt_size(len(d))} for n, _c, d in uploads]
 
     # Optionally append banquet attendance block to the body before review.
@@ -826,6 +831,9 @@ def payment_status_email(season_id, kind):
             flash('No recipients — set at least one TO or BCC address.', 'warning')
             return redirect(url_for('admin.payment_status_email', season_id=season_id, kind=kind))
         html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
+        if _claim_attachments(request.form.get('attach_token', '')) is None:
+            flash(DUPLICATE_SEND_MSG, 'info')
+            return redirect(report_url)
         try:
             _send_via_graph(current_app.config, subject, html_body,
                             to_list, bcc_list, cc_list=cc_list)
@@ -884,6 +892,7 @@ def payment_status_email(season_id, kind):
                            missing_captains=missing_captains,
                            no_email_bowlers=no_email_bowlers,
                            recipient_mode=f'payment_status_{kind}',
+                           attach_token=_stash_attachments([]),
                            action_url=url_for('admin.payment_status_email', season_id=season_id, kind=kind),
                            cancel_url=report_url,
                            page_title=f"{ctx['label']} — Payment Status Email",
@@ -897,6 +906,8 @@ def payment_status_email(season_id, kind):
 
 ATTACH_MAX_TOTAL = 3 * 1024 * 1024   # Graph inline fileAttachment ceiling
 _ATTACH_TOKEN_RE = __import__('re').compile(r'^[0-9a-f]{32}$')
+DUPLICATE_SEND_MSG = ('That email was already sent (or the review page had expired), '
+                      'so this submit was ignored. Compose it again if it never arrived.')
 _ATTACH_STALE_SECS = 6 * 3600
 
 
@@ -955,12 +966,12 @@ def _stash_attachments(items):
     return token
 
 
-def _stashed_attachments(token, with_data=True):
+def _stashed_attachments(token, with_data=True, claimed=False):
     """Manifest entries for a token (plus bytes when with_data); [] if unknown."""
     import json
     if not token or not _ATTACH_TOKEN_RE.match(token):
         return []
-    d = _attach_root() / token
+    d = _attach_root() / (token + '-claimed' if claimed else token)
     mf = d / 'manifest.json'
     if not mf.exists():
         return []
@@ -971,10 +982,31 @@ def _stashed_attachments(token, with_data=True):
     return items
 
 
+def _claim_attachments(token):
+    """Take one-shot ownership of a stash and return its items.
+
+    The stash dir is renamed atomically, so of two confirmed POSTs carrying
+    the same token (a double-clicked Send Now) only the first gets the items;
+    the second gets None and must not send. A missing or malformed token is
+    not guarded (returns []) so older forms still send once.
+    """
+    if not token:
+        return []
+    if not _ATTACH_TOKEN_RE.match(token):
+        return []
+    d = _attach_root() / token
+    try:
+        d.rename(d.with_name(token + '-claimed'))
+    except OSError:
+        return None
+    return _stashed_attachments(token, claimed=True)
+
+
 def _discard_attachments(token):
     import shutil
     if token and _ATTACH_TOKEN_RE.match(token):
-        shutil.rmtree(_attach_root() / token, ignore_errors=True)
+        for name in (token, token + '-claimed'):
+            shutil.rmtree(_attach_root() / name, ignore_errors=True)
 
 
 def _fmt_size(n):
@@ -1102,6 +1134,9 @@ def payment_email(season_id):
             flash('No recipients — set at least one TO or BCC address.', 'warning')
             return redirect(url_for('admin.payment_email', season_id=season_id))
         html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
+        if _claim_attachments(request.form.get('attach_token', '')) is None:
+            flash(DUPLICATE_SEND_MSG, 'info')
+            return redirect(url_for('admin.payments_report', season_id=season_id))
         try:
             _send_via_graph(current_app.config, subject, html_body,
                             to_list, bcc_list, cc_list=cc_list)
@@ -1138,6 +1173,7 @@ def payment_email(season_id):
                            missing_captains=missing_captains,
                            no_email_bowlers=no_email_bowlers,
                            recipient_mode='dues_unpaid',
+                           attach_token=_stash_attachments([]),
                            action_url=url_for('admin.payment_email', season_id=season_id),
                            cancel_url=url_for('admin.payments_report', season_id=season_id),
                            page_title='Payment Report Email',

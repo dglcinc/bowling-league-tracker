@@ -32,7 +32,7 @@
 {% endif %}
 
 <form method="post" action="{{ action_url | default(url_for('admin.send_email', season_id=season.id)) }}"
-      enctype="multipart/form-data">
+      enctype="multipart/form-data" id="emailReviewForm">
   <input type="hidden" name="send_confirmed" value="1">
   <input type="hidden" name="recipient_mode" value="{{ recipient_mode }}">
   {% if attach_roster %}<input type="hidden" name="attach_roster" value="1">{% endif %}
@@ -98,12 +98,23 @@
   <div class="d-flex gap-2">
     <a href="{{ cancel_url | default(url_for('admin.season_detail', season_id=season.id)) }}"
        class="btn btn-secondary">Cancel</a>
-    <button type="submit" class="btn btn-primary">Send Now</button>
+    <button type="submit" class="btn btn-primary" id="sendNowBtn">Send Now</button>
   </div>
 </form>
 
 <script>
 (function() {
+  // One click only: the Graph send takes a second or two, and a second click
+  // while it is in flight would post the form again.
+  var form = document.getElementById('emailReviewForm');
+  var btn = document.getElementById('sendNowBtn');
+  if (form && btn) {
+    form.addEventListener('submit', function(e) {
+      if (btn.disabled) { e.preventDefault(); return; }
+      btn.disabled = true;
+      btn.textContent = 'Sending\u2026';
+    });
+  }
   function countLines(id, badgeId) {
     var ta = document.getElementById(id);
     if (!ta) return;
