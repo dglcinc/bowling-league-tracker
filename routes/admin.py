@@ -254,7 +254,6 @@ def send_magic_links(season_id):
 
 @admin_bp.route('/seasons/<int:season_id>/send-email', methods=['POST'])
 def send_email(season_id):
-    import html as _html
     season = Season.query.get_or_404(season_id)
     subject = request.form.get('subject', '').strip()
     body_text = request.form.get('body', '').strip()
@@ -264,49 +263,14 @@ def send_email(season_id):
         flash('Subject and body are required.', 'warning')
         return redirect(url_for('admin.season_detail', season_id=season_id))
 
+    season_url = url_for('admin.season_detail', season_id=season_id)
     if send_confirmed:
-        # Second POST — read possibly-edited recipient lists and send.
-        to_list  = [e.strip() for e in request.form.get('to_emails', '').splitlines() if e.strip()]
-        cc_list  = [e.strip() for e in request.form.get('cc_emails', '').splitlines() if e.strip()]
-        bcc_list = [e.strip() for e in request.form.get('bcc_emails', '').splitlines() if e.strip()]
-        if not to_list and not bcc_list:
-            flash('No recipients — set at least one TO or BCC address.', 'warning')
-            return redirect(url_for('admin.season_detail', season_id=season_id))
-        html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
-        attach_token = request.form.get('attach_token', '')
-        stashed = _claim_attachments(attach_token)
-        if stashed is None:
-            flash(DUPLICATE_SEND_MSG, 'info')
-            return redirect(url_for('admin.season_detail', season_id=season_id))
-        attachments = []
-        if request.form.get('attach_roster') == '1':
-            try:
-                attachments.append((f'{season.name} Roster.pdf', 'application/pdf',
-                                    _generate_roster_pdf(season_id)))
-            except Exception as pdf_err:
-                flash(f'Roster PDF failed — email not sent: {pdf_err}', 'danger')
-                return redirect(url_for('admin.season_detail', season_id=season_id))
-        attachments += [(it['name'], it['ctype'], it['data']) for it in stashed]
-        attachments += _read_uploads(request.files.getlist('attachments'))
-        total_bytes = sum(len(d) for _n, _c, d in attachments)
-        if total_bytes > ATTACH_MAX_TOTAL:
-            _discard_attachments(attach_token)
-            flash(f'Attachments total {_fmt_size(total_bytes)}; the limit is '
-                  f'{_fmt_size(ATTACH_MAX_TOTAL)} per email. Email not sent.', 'danger')
-            return redirect(url_for('admin.season_detail', season_id=season_id))
-        try:
-            _send_via_graph(current_app.config, subject, html_body,
-                            to_list, bcc_list, cc_list=cc_list,
-                            attachments=attachments)
-            total = len(to_list) + len(cc_list) + len(bcc_list)
-            attached = (f' with {len(attachments)} attachment'
-                        f'{"s" if len(attachments) != 1 else ""}') if attachments else ''
-            flash(f'Email sent ({len(to_list)} TO, {len(cc_list)} CC, '
-                  f'{len(bcc_list)} BCC — {total} total){attached}.', 'success')
-        except Exception as exc:
-            flash(f'Email failed: {exc}', 'danger')
-        _discard_attachments(attach_token)
-        return redirect(url_for('admin.season_detail', season_id=season_id))
+        def build_attachments():
+            if request.form.get('attach_roster') != '1':
+                return []
+            return [(f'{season.name} Roster.pdf', 'application/pdf',
+                     _generate_roster_pdf(season_id))]
+        return _send_reviewed_email(ok_url=season_url, build_attachments=build_attachments)
 
     # First POST — resolve recipients based on mode, then render review page.
     recipient_mode = request.form.get('recipient_mode', 'selected')
@@ -318,10 +282,6 @@ def send_email(season_id):
         flash(f'Attachments total {_fmt_size(upload_bytes)}; the limit is '
               f'{_fmt_size(ATTACH_MAX_TOTAL)} per email.', 'danger')
         return redirect(url_for('admin.season_detail', season_id=season_id))
-    # Always issued, even with no uploads: the token makes the confirmed
-    # send one-shot, so a double-clicked Send Now cannot send twice.
-    attach_token = _stash_attachments(uploads)
-    attach_files = [{'name': n, 'size': _fmt_size(len(d))} for n, _c, d in uploads]
 
     # Optionally append banquet attendance block to the body before review.
     if request.form.get('include_banquet') == '1':
@@ -392,19 +352,18 @@ def send_email(season_id):
         cc_emails = bcc_emails
         bcc_emails = []
 
-    return render_template('admin/email_review.html',
-                           season=season,
-                           subject=subject,
-                           body_text=body_text,
-                           to_emails=to_emails,
-                           cc_emails=cc_emails,
-                           bcc_emails=bcc_emails,
-                           missing_captains=missing_captains,
-                           no_email_bowlers=no_email_bowlers,
-                           recipient_mode=recipient_mode,
-                           attach_roster=request.form.get('attach_roster') == '1',
-                           attach_token=attach_token, attach_files=attach_files,
-                           allow_attachments=True)
+    attach_roster = request.form.get('attach_roster') == '1'
+    return _review_email(season, subject=subject, body_text=body_text,
+                         to_emails=to_emails, cc_emails=cc_emails, bcc_emails=bcc_emails,
+                         uploads=uploads,
+                         missing_captains=missing_captains,
+                         no_email_bowlers=no_email_bowlers,
+                         hidden_fields={'attach_roster': '1'} if attach_roster else {},
+                         generated_attachments=[{
+                             'name': f'{season.name} Roster.pdf',
+                             'note': 'active bowlers by team, alphabetical, with emails',
+                             'url': url_for('admin.roster_report', season_id=season.id, format='pdf'),
+                         }] if attach_roster else [])
 
 
 @admin_bp.route('/viewer-access', methods=['GET', 'POST'])
@@ -814,35 +773,14 @@ def payment_status_email(season_id, kind):
     Same two-step shape as `payment_email`: GET pre-fills the review page,
     POST with send_confirmed=1 sends what the editor left in the fields.
     """
-    import html as _html
     season = Season.query.get_or_404(season_id)
     report_url = url_for('admin.payment_status_report', season_id=season_id, kind=kind)
 
     if request.method == 'POST' and request.form.get('send_confirmed') == '1':
-        subject = request.form.get('subject', '').strip()
-        body_text = request.form.get('body', '').strip()
-        to_list  = [e.strip() for e in request.form.get('to_emails', '').splitlines() if e.strip()]
-        cc_list  = [e.strip() for e in request.form.get('cc_emails', '').splitlines() if e.strip()]
-        bcc_list = [e.strip() for e in request.form.get('bcc_emails', '').splitlines() if e.strip()]
-        if not subject or not body_text:
-            flash('Subject and body are required.', 'warning')
-            return redirect(url_for('admin.payment_status_email', season_id=season_id, kind=kind))
-        if not to_list and not bcc_list:
-            flash('No recipients — set at least one TO or BCC address.', 'warning')
-            return redirect(url_for('admin.payment_status_email', season_id=season_id, kind=kind))
-        html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
-        if _claim_attachments(request.form.get('attach_token', '')) is None:
-            flash(DUPLICATE_SEND_MSG, 'info')
-            return redirect(report_url)
-        try:
-            _send_via_graph(current_app.config, subject, html_body,
-                            to_list, bcc_list, cc_list=cc_list)
-            total = len(to_list) + len(cc_list) + len(bcc_list)
-            flash(f'Payment status sent ({len(to_list)} TO, {len(cc_list)} CC, '
-                  f'{len(bcc_list)} BCC — {total} total).', 'success')
-        except Exception as exc:
-            flash(f'Email failed: {exc}', 'danger')
-        return redirect(report_url)
+        return _send_reviewed_email(
+            ok_url=report_url,
+            fail_url=url_for('admin.payment_status_email', season_id=season_id, kind=kind),
+            label='Payment status')
 
     ctx = _payment_status_context(season_id, kind)
     if ctx is None:
@@ -882,21 +820,14 @@ def payment_status_email(season_id, kind):
     bcc_emails = [b.email for b in owing if b.email]
     no_email_bowlers = [b for b in owing if not b.email]
 
-    return render_template('admin/email_review.html',
-                           season=season,
-                           subject=subject,
-                           body_text=body_text,
-                           to_emails=to_emails,
-                           cc_emails=[],
-                           bcc_emails=bcc_emails,
-                           missing_captains=missing_captains,
-                           no_email_bowlers=no_email_bowlers,
-                           recipient_mode=f'payment_status_{kind}',
-                           attach_token=_stash_attachments([]),
-                           action_url=url_for('admin.payment_status_email', season_id=season_id, kind=kind),
-                           cancel_url=report_url,
-                           page_title=f"{ctx['label']} — Payment Status Email",
-                           bcc_label='Bowlers still owing' if kind == 'dues' else 'Unpaid or no response')
+    return _review_email(season, subject=subject, body_text=body_text,
+                         to_emails=to_emails, bcc_emails=bcc_emails,
+                         missing_captains=missing_captains,
+                         no_email_bowlers=no_email_bowlers,
+                         action_url=url_for('admin.payment_status_email', season_id=season_id, kind=kind),
+                         cancel_url=report_url,
+                         page_title=f"{ctx['label']} — Payment Status Email",
+                         bcc_label='Bowlers still owing' if kind == 'dues' else 'Unpaid or no response')
 
 
 # ---------------------------------------------------------------------------
@@ -1013,6 +944,104 @@ def _fmt_size(n):
     return f'{n / 1024:.0f} KB' if n < 1024 * 1024 else f'{n / 1024 / 1024:.1f} MB'
 
 
+def _recipient_lists(form):
+    """TO / CC / BCC lists from the review page (one address per line or comma)."""
+    def addrs(key):
+        raw = form.get(key, '').replace(',', '\n')
+        return [e.strip() for e in raw.splitlines() if e.strip()]
+    return addrs('to_emails'), addrs('cc_emails'), addrs('bcc_emails')
+
+
+def _paragraph_html(body_text):
+    import html as _html
+    return '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
+
+
+def _review_email(season, *, subject, body_text, to_emails, bcc_emails,
+                  cc_emails=(), uploads=(), **ctx):
+    """Render the shared review page with a fresh one-shot send token.
+
+    Every email flow renders through here so the review step (editable
+    recipients and body, attachments, the token that makes Send Now
+    one-shot) is the same everywhere. `uploads` are files the editor
+    attached at compose time; they are stashed under the token until the
+    confirmed POST. Extra keyword args pass straight to the template
+    (`action_url`, `cancel_url`, `page_title`, `bcc_label`, `hidden_fields`,
+    `generated_attachments`, `body_note`, `missing_captains`, ...).
+    """
+    uploads = list(uploads)
+    ctx.setdefault('allow_attachments', True)
+    return render_template('admin/email_review.html',
+                           season=season, subject=subject, body_text=body_text,
+                           to_emails=list(to_emails), cc_emails=list(cc_emails),
+                           bcc_emails=list(bcc_emails),
+                           attach_token=_stash_attachments(uploads),
+                           attach_files=[{'name': n, 'size': _fmt_size(len(d))}
+                                         for n, _c, d in uploads],
+                           **ctx)
+
+
+def _send_reviewed_email(*, ok_url, fail_url=None, label='Email',
+                         html_body_fn=None, build_attachments=None):
+    """The confirmed step shared by every review page.
+
+    Reads what the editor left in the review form, claims the one-shot
+    token (a duplicate submit flashes and does not send), builds the
+    attachments, sends once through Graph, and redirects to `ok_url`.
+    Validation and attachment failures redirect to `fail_url`.
+
+    `html_body_fn(body_text)` renders the body (default: escaped
+    paragraphs). `build_attachments()` returns [(name, ctype, bytes)] for
+    server-generated files; if it raises, nothing is sent. Files stashed at
+    compose time and any added on the review page are merged in after it.
+    """
+    fail_url = fail_url or ok_url
+    subject = request.form.get('subject', '').strip()
+    body_text = request.form.get('body', '').strip()
+    to_list, cc_list, bcc_list = _recipient_lists(request.form)
+    if not subject or not body_text:
+        flash('Subject and body are required.', 'warning')
+        return redirect(fail_url)
+    if not to_list and not bcc_list:
+        flash('No recipients — set at least one TO or BCC address.', 'warning')
+        return redirect(fail_url)
+
+    token = request.form.get('attach_token', '')
+    stashed = _claim_attachments(token)
+    if stashed is None:
+        flash(DUPLICATE_SEND_MSG, 'info')
+        return redirect(ok_url)
+
+    try:
+        attachments = list(build_attachments()) if build_attachments else []
+    except Exception as exc:
+        _discard_attachments(token)
+        flash(f'Attachment failed — email not sent: {exc}', 'danger')
+        return redirect(fail_url)
+    attachments += [(it['name'], it['ctype'], it['data']) for it in stashed]
+    attachments += _read_uploads(request.files.getlist('attachments'))
+    total_bytes = sum(len(d) for _n, _c, d in attachments)
+    if total_bytes > ATTACH_MAX_TOTAL:
+        _discard_attachments(token)
+        flash(f'Attachments total {_fmt_size(total_bytes)}; the limit is '
+              f'{_fmt_size(ATTACH_MAX_TOTAL)} per email. Email not sent.', 'danger')
+        return redirect(fail_url)
+
+    html_body = (html_body_fn or _paragraph_html)(body_text)
+    try:
+        _send_via_graph(current_app.config, subject, html_body,
+                        to_list, bcc_list, cc_list=cc_list, attachments=attachments)
+        total = len(to_list) + len(cc_list) + len(bcc_list)
+        attached = (f' with {len(attachments)} attachment'
+                    f'{"s" if len(attachments) != 1 else ""}') if attachments else ''
+        flash(f'{label} sent ({len(to_list)} TO, {len(cc_list)} CC, '
+              f'{len(bcc_list)} BCC — {total} total){attached}.', 'success')
+    except Exception as exc:
+        flash(f'Email failed: {exc}', 'danger')
+    _discard_attachments(token)
+    return redirect(ok_url)
+
+
 def _next_arg():
     """Same-site `next` path from the form or query string, else ''."""
     nxt = request.form.get('next') or request.args.get('next') or ''
@@ -1118,34 +1147,13 @@ def payment_email(season_id):
     GET renders the review page pre-filled; POST with send_confirmed=1 sends
     whatever the editor left in the fields (same shape as `send_email`).
     """
-    import html as _html
     season = Season.query.get_or_404(season_id)
 
     if request.method == 'POST' and request.form.get('send_confirmed') == '1':
-        subject = request.form.get('subject', '').strip()
-        body_text = request.form.get('body', '').strip()
-        to_list  = [e.strip() for e in request.form.get('to_emails', '').splitlines() if e.strip()]
-        cc_list  = [e.strip() for e in request.form.get('cc_emails', '').splitlines() if e.strip()]
-        bcc_list = [e.strip() for e in request.form.get('bcc_emails', '').splitlines() if e.strip()]
-        if not subject or not body_text:
-            flash('Subject and body are required.', 'warning')
-            return redirect(url_for('admin.payment_email', season_id=season_id))
-        if not to_list and not bcc_list:
-            flash('No recipients — set at least one TO or BCC address.', 'warning')
-            return redirect(url_for('admin.payment_email', season_id=season_id))
-        html_body = '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
-        if _claim_attachments(request.form.get('attach_token', '')) is None:
-            flash(DUPLICATE_SEND_MSG, 'info')
-            return redirect(url_for('admin.payments_report', season_id=season_id))
-        try:
-            _send_via_graph(current_app.config, subject, html_body,
-                            to_list, bcc_list, cc_list=cc_list)
-            total = len(to_list) + len(cc_list) + len(bcc_list)
-            flash(f'Payment report sent ({len(to_list)} TO, {len(cc_list)} CC, '
-                  f'{len(bcc_list)} BCC — {total} total).', 'success')
-        except Exception as exc:
-            flash(f'Email failed: {exc}', 'danger')
-        return redirect(url_for('admin.payments_report', season_id=season_id))
+        return _send_reviewed_email(
+            ok_url=url_for('admin.payments_report', season_id=season_id),
+            fail_url=url_for('admin.payment_email', season_id=season_id),
+            label='Payment report')
 
     summary = _dues_summary(season_id)
     settings = db.session.get(LeagueSettings, 1)
@@ -1163,21 +1171,14 @@ def payment_email(season_id):
     bcc_emails = [r.bowler.email for r in summary['unpaid'] if r.bowler.email]
     no_email_bowlers = [r.bowler for r in summary['unpaid'] if not r.bowler.email]
 
-    return render_template('admin/email_review.html',
-                           season=season,
-                           subject=subject,
-                           body_text=body_text,
-                           to_emails=to_emails,
-                           cc_emails=[],
-                           bcc_emails=bcc_emails,
-                           missing_captains=missing_captains,
-                           no_email_bowlers=no_email_bowlers,
-                           recipient_mode='dues_unpaid',
-                           attach_token=_stash_attachments([]),
-                           action_url=url_for('admin.payment_email', season_id=season_id),
-                           cancel_url=url_for('admin.payments_report', season_id=season_id),
-                           page_title='Payment Report Email',
-                           bcc_label='Unpaid bowlers')
+    return _review_email(season, subject=subject, body_text=body_text,
+                         to_emails=to_emails, bcc_emails=bcc_emails,
+                         missing_captains=missing_captains,
+                         no_email_bowlers=no_email_bowlers,
+                         action_url=url_for('admin.payment_email', season_id=season_id),
+                         cancel_url=url_for('admin.payments_report', season_id=season_id),
+                         page_title='Payment Report Email',
+                         bcc_label='Unpaid bowlers')
 
 
 @admin_bp.route('/seasons/<int:season_id>/roster/<int:roster_id>/edit', methods=['GET', 'POST'])
@@ -1922,20 +1923,14 @@ def email_compose(season_id, week_num):
     db_min_games = db_settings.prizes_min_games if db_settings.prizes_min_games is not None else 9
     db_top10 = bool(db_settings.prizes_top10)
 
-    email_preview = None
+    compose_url = url_for('admin.email_compose', season_id=season_id, week_num=week_num)
+    week_url = url_for('entry.week_entry', season_id=season_id, week_num=week_num)
+
     if request.method == 'POST':
-        subject = request.form.get('subject', default_subject).strip()
-        body_text = request.form.get('body_text', '').strip()
-        bcc_scope = request.form.get('bcc_scope', 'all')
-        attach_pdf = request.form.get('attach_pdf') == '1'
-        to_emails_raw = request.form.get('to_emails', '').strip()
-        cc_emails_raw = request.form.get('cc_emails', '').strip()
         send_confirmed = request.form.get('send_confirmed') == '1'
         test_only = request.form.get('test_only') == '1'
-
-        # Build TO + CC lists
-        to_list = [e.strip() for e in to_emails_raw.split(',') if e.strip()]
-        cc_list = [e.strip() for e in cc_emails_raw.split(',') if e.strip()]
+        attach_pdf = request.form.get('attach_pdf') == '1'
+        include_banquet = request.form.get('include_banquet') == '1'
 
         # PDF filter settings — always save to DB for persistence
         from sqlalchemy import text as _text
@@ -1948,105 +1943,85 @@ def email_compose(season_id, week_num):
         db_min_games = pdf_min_games
         db_top10 = pdf_top10
 
-        # Build BCC list
-        bcc_list = []
-        if bcc_scope == 'all':
-            bcc_list = list({r.bowler.email for r in all_roster if r.bowler.email})
-        elif bcc_scope == 'high_avg':
-            filtered = [l for l in avg_leaders if l['games'] >= pdf_min_games]
-            if pdf_top10:
-                top10_avgs = set(sorted({l['average'] for l in filtered}, reverse=True)[:10])
-                filtered = [l for l in filtered if l['average'] in top10_avgs]
-            bcc_list = list({l['email'] for l in filtered if l['email']})
-        else:
+        def build_html(body_text):
+            html_body = _build_email_html(body_text, above_avg, season, week)
+            if include_banquet:
+                html_body += _banquet_block_html(season_id)
+            return html_body
+
+        def build_attachments():
+            if not attach_pdf:
+                return []
             try:
-                team_num = int(bcc_scope)
-                bcc_list = list({r.bowler.email for r in all_roster
-                                 if r.team.number == team_num and r.bowler.email})
-            except ValueError:
-                bcc_list = list({r.bowler.email for r in all_roster if r.bowler.email})
+                pdf_bytes = _generate_prizes_pdf(season_id, week_num,
+                                                 min_games=pdf_min_games, top10=pdf_top10)
+            except Exception as pdf_err:
+                flash(f'PDF generation failed (email sent without attachment): {pdf_err}', 'warning')
+                return []
+            return [(f'Week{week_num}_Standings.pdf', 'application/pdf', pdf_bytes)]
+
+        if send_confirmed:
+            return _send_reviewed_email(ok_url=week_url, fail_url=compose_url,
+                                        label='Weekly email', html_body_fn=build_html,
+                                        build_attachments=build_attachments)
+
+        subject = request.form.get('subject', default_subject).strip()
+        body_text = request.form.get('body_text', '').strip()
+        bcc_scope = request.form.get('bcc_scope', 'all')
+        to_list = [e.strip() for e in request.form.get('to_emails', '').split(',') if e.strip()]
+        cc_list = [e.strip() for e in request.form.get('cc_emails', '').split(',') if e.strip()]
 
         if test_only:
-            send_to = [current_app.config.get('GRAPH_SENDER_EMAIL', '')]
-            send_to = [e for e in send_to if e]
-            send_cc = []
-            send_bcc = []
-            send_subject = f'[TEST] {subject}'
+            sender = current_app.config.get('GRAPH_SENDER_EMAIL', '')
+            try:
+                _send_via_graph(current_app.config, f'[TEST] {subject}', build_html(body_text),
+                                [sender] if sender else [], [], cc_list=[],
+                                attachments=build_attachments())
+                flash(f'Test email sent to {sender or "you"}.', 'success')
+                return redirect(week_url)
+            except Exception as e:
+                flash(f'Email send failed: {e}', 'danger')
         else:
+            # Build BCC list
+            if bcc_scope == 'all':
+                bcc_list = list({r.bowler.email for r in all_roster if r.bowler.email})
+            elif bcc_scope == 'high_avg':
+                filtered = [l for l in avg_leaders if l['games'] >= pdf_min_games]
+                if pdf_top10:
+                    top10_avgs = set(sorted({l['average'] for l in filtered}, reverse=True)[:10])
+                    filtered = [l for l in filtered if l['average'] in top10_avgs]
+                bcc_list = list({l['email'] for l in filtered if l['email']})
+            else:
+                try:
+                    team_num = int(bcc_scope)
+                    bcc_list = list({r.bowler.email for r in all_roster
+                                     if r.team.number == team_num and r.bowler.email})
+                except ValueError:
+                    bcc_list = list({r.bowler.email for r in all_roster if r.bowler.email})
             thomson = Bowler.query.filter(
                 Bowler.last_name.ilike('Thomson'),
                 Bowler.first_name.ilike('Mark')
             ).first()
             if thomson and thomson.email and thomson.email not in bcc_list:
                 bcc_list.append(thomson.email)
-            send_to = to_list
-            send_cc = cc_list
-            send_bcc = bcc_list
-            send_subject = subject
 
-        if send_confirmed or test_only:
-            # One-shot: the preview modal carries a token that the confirmed
-            # POST claims, so a double-clicked Send Now cannot send twice.
-            if send_confirmed and not test_only:
-                if _claim_attachments(request.form.get('send_token', '')) is None:
-                    flash(DUPLICATE_SEND_MSG, 'info')
-                    return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
-            # Preview modal allows editing CC and BCC before final send
-            cc_override_raw = request.form.get('cc_override', '').strip()
-            if cc_override_raw and not test_only:
-                send_cc = [e.strip() for e in cc_override_raw.splitlines() if e.strip()]
-            bcc_override_raw = request.form.get('bcc_override', '').strip()
-            if bcc_override_raw and not test_only:
-                send_bcc = [e.strip() for e in bcc_override_raw.splitlines() if e.strip()]
-
-            # Confirmed — send now
-            html_body = _build_email_html(body_text, above_avg, season, week)
-            if request.form.get('include_banquet') == '1':
-                html_body += _banquet_block_html(season_id)
-
-            pdf_bytes = None
-            if attach_pdf:
-                try:
-                    pdf_bytes = _generate_prizes_pdf(season_id, week_num,
-                                                     min_games=pdf_min_games, top10=pdf_top10)
-                except Exception as pdf_err:
-                    flash(f'PDF generation failed (email sent without attachment): {pdf_err}', 'warning')
-
-            try:
-                _send_via_graph(
-                    app_config=current_app.config,
-                    subject=send_subject,
-                    html_body=html_body,
-                    to_list=send_to,
-                    cc_list=send_cc,
-                    bcc_list=send_bcc,
-                    pdf_attachment=pdf_bytes,
-                    pdf_filename=f'Week{week_num}_Standings.pdf',
-                )
-                if test_only:
-                    flash(f'Test email sent to {send_to[0] if send_to else "you"}.', 'success')
-                else:
-                    cc_note = f', {len(send_cc)} CC' if send_cc else ''
-                    flash(f'Email sent to {len(send_to)} captain(s){cc_note} with {len(send_bcc)} BCC recipients.', 'success')
-                return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
-            except Exception as e:
-                flash(f'Email send failed: {e}', 'danger')
-        else:
-            # Show preview panel for review before sending
-            email_preview = {
-                'subject':      subject,
-                'body_text':    body_text,
-                'to_list':      send_to,
-                'cc_list':      send_cc,
-                'bcc_list':     send_bcc,
-                'bcc_scope':    bcc_scope,
-                'attach_pdf':   attach_pdf,
-                'include_banquet': request.form.get('include_banquet') == '1',
-                'pdf_min_games': pdf_min_games,
-                'pdf_top10':    pdf_top10,
-                'to_emails_raw': ', '.join(send_to),
-                'send_token':   _stash_attachments([]),
-            }
+            return _review_email(
+                season, subject=subject, body_text=body_text,
+                to_emails=to_list, cc_emails=cc_list, bcc_emails=bcc_list,
+                missing_captains=[t for t, _b, _e in missing_captains],
+                action_url=compose_url, cancel_url=compose_url,
+                page_title=f'Review Weekly Email — Week {week_num}',
+                bcc_label='Players',
+                body_note='Prize winners, notable bowling, and standings are appended '
+                          'automatically below this text.',
+                hidden_fields={'attach_pdf': '1' if attach_pdf else '0',
+                               'include_banquet': '1' if include_banquet else '0',
+                               'pdf_min_games': pdf_min_games,
+                               'pdf_top10': '1' if pdf_top10 else '0'},
+                generated_attachments=[{
+                    'name': f'Week{week_num}_Standings.pdf',
+                    'note': 'prizes and standings through this week',
+                }] if attach_pdf else [])
 
     graph_configured = bool(current_app.config.get('GRAPH_CLIENT_ID'))
     return render_template('admin/email_compose.html',
@@ -2063,15 +2038,7 @@ def email_compose(season_id, week_num):
                            league_name=league_name,
                            mail_configured=graph_configured,
                            db_min_games=db_min_games,
-                           db_top10=db_top10,
-                           email_preview=email_preview)
-
-
-# Module-level MSAL app cache — reuse the same ConfidentialClientApplication
-# instance across calls so its internal token cache is preserved. This avoids
-# a separate OAuth round-trip for every email when sending bulk invites.
-_msal_app_cache: dict = {}
-
+                           db_top10=db_top10)
 
 def _get_msal_app(tenant_id, client_id, client_secret):
     import msal
