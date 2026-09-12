@@ -9,12 +9,12 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 
 **Important:** Never put player names, team names (which are player surnames), or any other personal information in the repository, code, comments, or documentation.
 
-## Repo / Branch State (as of 2026-09-10)
+## Repo / Branch State (as of 2026-09-12)
 
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
 - No open PRs.
-- PRs #37–#184 merged to main (#184 payment status list on mobile home + per-kind report + email deployed 2026-09-10); #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138); #145 superseded by #146 (CC-me checkbox replaced by BCC-all-recipients).
+- PRs #37–#185 merged to main (#185 one-shot confirmed email send deployed 2026-09-12); #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138); #145 superseded by #146 (CC-me checkbox replaced by BCC-all-recipients).
 
 ## League Structure
 
