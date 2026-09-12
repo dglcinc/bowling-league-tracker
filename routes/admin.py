@@ -1985,6 +1985,12 @@ def email_compose(season_id, week_num):
             send_subject = subject
 
         if send_confirmed or test_only:
+            # One-shot: the preview modal carries a token that the confirmed
+            # POST claims, so a double-clicked Send Now cannot send twice.
+            if send_confirmed and not test_only:
+                if _claim_attachments(request.form.get('send_token', '')) is None:
+                    flash(DUPLICATE_SEND_MSG, 'info')
+                    return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
             # Preview modal allows editing CC and BCC before final send
             cc_override_raw = request.form.get('cc_override', '').strip()
             if cc_override_raw and not test_only:
@@ -2039,6 +2045,7 @@ def email_compose(season_id, week_num):
                 'pdf_min_games': pdf_min_games,
                 'pdf_top10':    pdf_top10,
                 'to_emails_raw': ', '.join(send_to),
+                'send_token':   _stash_attachments([]),
             }
 
     graph_configured = bool(current_app.config.get('GRAPH_CLIENT_ID'))
