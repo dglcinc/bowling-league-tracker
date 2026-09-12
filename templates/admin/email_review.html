@@ -34,9 +34,10 @@
 <form method="post" action="{{ action_url | default(url_for('admin.send_email', season_id=season.id)) }}"
       enctype="multipart/form-data" id="emailReviewForm">
   <input type="hidden" name="send_confirmed" value="1">
-  <input type="hidden" name="recipient_mode" value="{{ recipient_mode }}">
-  {% if attach_roster %}<input type="hidden" name="attach_roster" value="1">{% endif %}
-  {% if attach_token %}<input type="hidden" name="attach_token" value="{{ attach_token }}">{% endif %}
+  {% for k, v in (hidden_fields or {}).items() %}
+  <input type="hidden" name="{{ k }}" value="{{ v }}">
+  {% endfor %}
+  <input type="hidden" name="attach_token" value="{{ attach_token }}">
 
   <div class="mb-3">
     <label class="form-label fw-semibold">Subject</label>
@@ -76,15 +77,16 @@
   <div class="mb-3">
     <label class="form-label fw-semibold">Body</label>
     <textarea class="form-control" name="body" rows="10" required>{{ body_text }}</textarea>
+    {% if body_note %}<div class="form-text">{{ body_note }}</div>{% endif %}
   </div>
 
-  {% if attach_roster or attach_files or allow_attachments %}
+  {% if generated_attachments or attach_files or allow_attachments %}
   <div class="mb-3">
     <label class="form-label fw-semibold">Attachments</label>
-    {% if attach_roster %}
-    <div>&#128206; {{ season.name }} Roster.pdf &mdash; active bowlers by team, alphabetical, with emails
-      (<a href="{{ url_for('admin.roster_report', season_id=season.id, format='pdf') }}" target="_blank">preview PDF</a>)</div>
-    {% endif %}
+    {% for g in generated_attachments or [] %}
+    <div>&#128206; {{ g.name }}{% if g.note %} &mdash; {{ g.note }}{% endif %}
+      {% if g.url %}(<a href="{{ g.url }}" target="_blank">preview PDF</a>){% endif %}</div>
+    {% endfor %}
     {% for f in attach_files %}
     <div>&#128206; {{ f.name }} <span class="text-muted small">({{ f.size }})</span></div>
     {% endfor %}
