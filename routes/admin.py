@@ -2,7 +2,7 @@
 Admin routes: season setup, roster management, schedule entry, season rollover.
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, abort
 from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission, TournamentEntry, ClubChampionshipResult, RequestLog, BanquetConfig, BanquetAttendee
 from extensions import cache
 from datetime import date, timedelta
@@ -2039,6 +2039,12 @@ def email_compose(season_id, week_num):
                            mail_configured=graph_configured,
                            db_min_games=db_min_games,
                            db_top10=db_top10)
+
+# Module-level MSAL app cache — reuse the same ConfidentialClientApplication
+# instance across calls so its internal token cache is preserved. This avoids
+# a separate OAuth round-trip for every email when sending bulk invites.
+_msal_app_cache: dict = {}
+
 
 def _get_msal_app(tenant_id, client_id, client_secret):
     import msal
