@@ -3,7 +3,7 @@ Admin routes: season setup, roster management, schedule entry, season rollover.
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, abort
-from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission, TournamentEntry, ClubChampionshipResult, RequestLog, BanquetConfig, BanquetAttendee
+from models import db, Season, Team, Roster, Bowler, Week, ScheduleEntry, MatchupEntry, LeagueSettings, LinkedAccount, ViewerPermission, TournamentEntry, ClubChampionshipResult, RequestLog, BanquetConfig, BanquetAttendee, EXTRA_MATCHUP_NUM
 from extensions import cache
 from datetime import date, timedelta
 import io
@@ -1523,6 +1523,7 @@ def assign_matchups(season_id, week_num):
             entries = (MatchupEntry.query
                        .filter_by(season_id=season_id, week_num=week_num,
                                   team_id=team.id, is_blind=False)
+                       .filter(MatchupEntry.matchup_num != EXTRA_MATCHUP_NUM)
                        .join(Bowler, MatchupEntry.bowler_id == Bowler.id)
                        .order_by(Bowler.last_name)
                        .all())
@@ -1838,11 +1839,11 @@ def _resolve_captain_emails(teams, season_id):
 
 def _get_above_average_bowlers(season_id, week_num, threshold=30):
     """Return bowlers who bowled >= threshold pins above their prior running average."""
-    entries = (MatchupEntry.query
+    from calculations import get_bowler_stats, merge_week_entries
+    entries = merge_week_entries(MatchupEntry.query
                .filter_by(season_id=season_id, week_num=week_num, is_blind=False)
                .filter(MatchupEntry.bowler_id.isnot(None))
                .all())
-    from calculations import get_bowler_stats
     results = []
     seen = set()
     for entry in entries:

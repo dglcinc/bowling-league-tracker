@@ -402,6 +402,53 @@
   {% endfor %}
 </div>
 {% endif %}
+
+{% if not week.tournament_type and (current_user.is_editor or extra_entries) %}
+{# Extra bowlers: bowl individually on another lane; count for averages and prizes, not points or wood #}
+<div class="row">
+  <div class="col-12 col-xl-6 mb-3">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <a href="{{ url_for('entry.extra_entry', season_id=season.id, week_num=week.week_num) }}"
+             class="btn btn-sm {{ 'btn-primary' if current_user.is_editor else 'btn-outline-secondary' }}">
+            {% if current_user.is_editor %}{{ 'Edit Scores' if extra_entries else 'Enter Scores' }}
+            {% else %}View Scores{% endif %}
+          </a>
+          <strong>Extra Bowlers</strong>
+        </div>
+        <span class="text-muted small">Not in points or team wood</span>
+      </div>
+      {% if extra_entries %}
+      <div class="card-body p-2">
+        <table class="table table-sm table-bordered mb-0" style="font-size:0.8rem">
+          <thead><tr>
+            <th>Bowler</th>
+            <th>Team</th>
+            <th class="text-center">G1</th>
+            <th class="text-center">G2</th>
+            <th class="text-center">G3</th>
+            <th class="text-center">Tot</th>
+          </tr></thead>
+          <tbody>
+          {% for e in extra_entries %}
+          <tr>
+            <td>{% if e.bowler %}<a href="{{ url_for('reports.bowler_detail', season_id=season.id, bowler_id=e.bowler.id) }}" class="text-decoration-none">{{ bname(e.bowler) }}</a>{% endif %}</td>
+            <td>{{ tname(e.team) }}</td>
+            <td class="text-center">{{ e.game1 if e.game1 is not none else '' }}</td>
+            <td class="text-center">{{ e.game2 if e.game2 is not none else '' }}</td>
+            <td class="text-center">{{ e.game3 if e.game3 is not none else '' }}</td>
+            <td class="text-center fw-bold">{{ (e.game1 or 0) + (e.game2 or 0) + (e.game3 or 0) }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endif %}{# end: not individual tournament #}
 
 {% if weekly_team_pts and weekly_team_pts | selectattr('points', 'gt', 0) | list %}

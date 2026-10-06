@@ -672,7 +672,8 @@ def create_app():
         hg_scratch = None
         hs_scratch = None
         if current_user.is_authenticated:
-            entries = (MatchupEntry.query
+            from calculations import merge_week_entries
+            entries = merge_week_entries(MatchupEntry.query
                        .filter_by(season_id=season.id,
                                   bowler_id=current_user.id)
                        .order_by(MatchupEntry.week_num)
