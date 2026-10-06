@@ -88,7 +88,7 @@ SQLite. Read-only SELECT. Tables you can query:
 - roster(bowler_id, season_id, team_id, active, prior_handicap, joined_week)
 - schedule(season_id, week_num, matchup_num, team1_id, team2_id, lane_pair)
 - weeks(season_id, week_num, date, is_position_night, is_cancelled, is_entered, tournament_type) — tournament_type ∈ {club_championship, indiv_scratch, indiv_hcp_1, indiv_hcp_2, NULL}; NULL = regular week
-- matchup_entries(season_id, week_num, matchup_num, team_id, bowler_id, is_blind, lane_side, game1, game2, game3, game4, game5, game6) — game1-game3 are primary; game4-game6 are legacy and mostly NULL
+- matchup_entries(season_id, week_num, matchup_num, team_id, bowler_id, is_blind, lane_side, game1, game2, game3, game4, game5, game6) — game1-game3 are primary; game4-game6 are legacy and mostly NULL; matchup_num 5 = extra-lane bowler (bowled individually, counts for averages and prizes but not team points), so a bowler can have two rows in one week — sum by (bowler_id, season_id, week_num) for a weekly series
 - team_points(season_id, week_num, matchup_num, team_id, points_earned)
 - tournament_entries(season_id, week_num, bowler_id, guest_name, game1, game2, game3, game4, game5, handicap, place) — place ∈ {1, 2, 3, NULL}; bowler_id NULL means a write-in (use guest_name)
 - club_championship_results(season_id, place, team_id)

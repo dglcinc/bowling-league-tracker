@@ -106,6 +106,8 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 - **snapshots**: season_id, week_num, snapshot_json, created_at
 
 ### Key notes
+- **One row per bowler-week is not guaranteed** (see `extra_entry` under Routes). `merge_week_entries()` in `calculations.py` collapses a bowler's rows for the same week into a `BowlerWeek` that keeps game slots (G1 from the extra lane + G2/G3 from a matchup = one 3-game series). `get_bowler_entries` / `get_bowler_entries_bulk` / `get_weekly_prizes` return merged rows, so averages, handicaps, highs and prizes see one week. Any new code that reads `MatchupEntry` per bowler-week straight from the DB should pass it through `merge_week_entries()`.
+- Team game totals in `score_matchup` / `score_position_night` read `game1`–`game3` by slot, so a bowler who skipped G1 has G2 counted in game 2.
 - `MatchupEntry.matchup_num` (1–4) identifies which lane pair — critical for correct scoring; historical data required manual assignment via admin Assign Matchups tool
 - `TeamPoints.points_earned` is Float to handle tied games (0.5 pts each)
 - `Season.bowling_format`: `'single'` (G1–G3, 8 lanes) or `'double'` (G1–G6, 4 lanes). Both current seasons are 'single'.
@@ -126,6 +128,7 @@ All stats computed on the fly from `matchup_entries` — nothing derived stored 
 - `week_entry` — week summary with matchup cards, recon totals, prize results; cancel/uncancel button
 - `matchup_entry` — score entry form for one lane pair; saves points on POST; triggers position night auto-assignment; blind via dropdown; G4–G6 hidden for 'single' format
 - `reconcile` — blind reconciliation view
+- `extra_entry` (`/entry/season/<id>/week/<n>/extras`) — **extra bowlers**: when a team has more than 8 bowlers, the extras bowl individually on another lane. Stored as `MatchupEntry` rows with `matchup_num = EXTRA_MATCHUP_NUM` (5, defined in `models.py`), `team_id` from the bowler's roster row. No `ScheduleEntry` has matchup 5, so `score_matchup` / `score_position_night` never see them: no game points, series points or matchup wood. The week page shows a fifth "Extra Bowlers" card (regular weeks and position nights only); the form starts with 4 rows plus Add Row, and the pick list is every active bowler, since a bowler can rotate between a matchup and the extra lane. Games go in the slot they were bowled in. Saving warns when a slot is filled both here and on a matchup sheet, and re-scores the week's stored TeamPoints in place (`_rescore_saved_points`) because extra games change tonight's average, and so the handicap, of a new bowler with no prior handicap. Recon totals (week page, reconcile, prizes page, print batch) and Assign Matchups exclude lane 5.
 - `toggle_cancelled` — POST to cancel/uncancel a week
 - `tournament_entry` — individual tournament score entry (Harry Russell/Chad Harris/Shep Belyea); live JS rankings
 

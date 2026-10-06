@@ -12,9 +12,85 @@ from models import db, MatchupEntry, Roster, Season, TeamPoints, ScheduleEntry
 # Core helper: fetch all entries for a bowler in a season
 # ---------------------------------------------------------------------------
 
+class BowlerWeek:
+    """
+    One bowler's games for one week, merged from several MatchupEntry rows.
+
+    A bowler can have two rows in a week when they rotate between a matchup
+    and the extra lane (EXTRA_MATCHUP_NUM). Games keep their slot: G1 bowled
+    on the extra lane and G2/G3 in a matchup merge into one 3-game series.
+    If two rows fill the same slot, the second game is appended to that
+    night's list so no pins are lost. Other attributes (week_num, bowler,
+    team_id, ...) come from the first row.
+    """
+
+    def __init__(self, entries):
+        self.entries = entries
+        slots = [None] * 6
+        overflow = ([], [])
+        for e in entries:
+            for k in range(6):
+                g = getattr(e, f'game{k + 1}')
+                if g is None:
+                    continue
+                if slots[k] is None:
+                    slots[k] = g
+                else:
+                    overflow[0 if k < 3 else 1].append(g)
+        for k in range(6):
+            setattr(self, f'game{k + 1}', slots[k])
+        self.games_night1 = [g for g in slots[:3] if g is not None] + overflow[0]
+        self.games_night2 = [g for g in slots[3:] if g is not None] + overflow[1]
+
+    def __getattr__(self, name):
+        # Only called for attributes not set in __init__.
+        return getattr(self.entries[0], name)
+
+    @property
+    def all_games(self):
+        return self.games_night1 + self.games_night2
+
+    @property
+    def total_pins(self):
+        return sum(self.all_games)
+
+    @property
+    def game_count(self):
+        return len(self.all_games)
+
+
+def merge_week_entries(entries):
+    """
+    Collapse each bowler's rows for the same week into one BowlerWeek.
+    Order is preserved (by each group's first row). Blinds and single-row
+    weeks pass through unchanged.
+    """
+    groups = {}
+    order = []
+    for e in entries:
+        if e.is_blind or not e.bowler_id:
+            order.append(e)
+            continue
+        key = (e.bowler_id, e.season_id, e.week_num)
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(e)
+    result = []
+    for item in order:
+        if isinstance(item, tuple):
+            rows = groups[item]
+            result.append(rows[0] if len(rows) == 1
+                          else BowlerWeek(sorted(rows, key=lambda r: r.matchup_num)))
+        else:
+            result.append(item)
+    return result
+
+
 def get_bowler_entries(bowler_id, season_id):
     """
-    Returns list of MatchupEntry for a bowler, sorted by week.
+    Returns list of MatchupEntry for a bowler, sorted by week, one per week
+    (rows from a matchup and the extra lane merge into a BowlerWeek).
     Tournament weeks are excluded so they don't count toward season averages/handicaps.
     """
     from models import Week
@@ -28,13 +104,14 @@ def get_bowler_entries(bowler_id, season_id):
                .filter_by(bowler_id=bowler_id, season_id=season_id, is_blind=False)
                .order_by(MatchupEntry.week_num)
                .all())
-    return [e for e in entries if e.week_num not in tournament_weeks]
+    return merge_week_entries([e for e in entries if e.week_num not in tournament_weeks])
 
 
 def get_bowler_entries_bulk(bowler_ids, season_id):
     """
     Fetches entries for multiple bowlers in two queries instead of 2N.
-    Returns {bowler_id: [MatchupEntry...]} with tournament weeks excluded.
+    Returns {bowler_id: [MatchupEntry...]} with tournament weeks excluded,
+    one per week (see get_bowler_entries).
     """
     from models import Week
     if not bowler_ids:
@@ -55,7 +132,7 @@ def get_bowler_entries_bulk(bowler_ids, season_id):
     for e in all_entries:
         if e.week_num not in tournament_weeks:
             result[e.bowler_id].append(e)
-    return result
+    return {bid: merge_week_entries(rows) for bid, rows in result.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -324,10 +401,12 @@ def score_matchup(season_id, week_num, matchup_num):
             else:
                 hcp = calculate_handicap(entry.bowler_id, season_id, week_num,
                                          entries_by_bowler.get(entry.bowler_id))
-                scratch_games = entry.games_night1 or []
+                # By slot, so a bowler who skipped G1 scores G2 in game 2
+                scratch_games = [entry.game1, entry.game2, entry.game3]
 
             for i, score in enumerate(scratch_games[:3]):
-                game_totals[i] += score + hcp
+                if score is not None:
+                    game_totals[i] += score + hcp
 
         return game_totals
 
@@ -468,9 +547,10 @@ def get_position_night_breakdown(season_id, week_num, pairing_num):
                 else:
                     hcp = calculate_handicap(entry.bowler_id, season_id, week_num,
                                              entries_by_bowler.get(entry.bowler_id))
-                    games = entry.games_night1 or []
+                    games = [entry.game1, entry.game2, entry.game3]
                 for i, score in enumerate(games[:3]):
-                    agg[i] += score + hcp
+                    if score is not None:
+                        agg[i] += score + hcp
 
     def winner(a, b):
         if a > b: return t1_id
@@ -539,9 +619,10 @@ def score_position_night(season_id, week_num):
                     else:
                         hcp = calculate_handicap(entry.bowler_id, season_id, week_num,
                                                  entries_by_bowler.get(entry.bowler_id))
-                        games = entry.games_night1 or []
+                        games = [entry.game1, entry.game2, entry.game3]
                     for i, score in enumerate(games[:3]):
-                        agg[i] += score + hcp
+                        if score is not None:
+                            agg[i] += score + hcp
 
         t1_pts = 0
         t2_pts = 0
@@ -1126,12 +1207,13 @@ def get_weekly_prizes(season_id, week_num):
     """
     Returns the 4 prize category winners for one week, with tie handling.
     Each category: {'score': int, 'winners': [{'bowler': Bowler, 'score': int}]}
-    Blinds are excluded. Only games_night1 (games 1-3) are used.
+    Blinds are excluded. Only games_night1 (games 1-3) are used. Extra-lane
+    games count, merged with the bowler's matchup games for the same week.
     Returns None if no entries exist.
     """
-    entries = MatchupEntry.query.filter_by(
+    entries = merge_week_entries(MatchupEntry.query.filter_by(
         season_id=season_id, week_num=week_num, is_blind=False
-    ).all()
+    ).all())
 
     bowler_ids = {e.bowler_id for e in entries if e.bowler_id}
     entries_by_bowler = get_bowler_entries_bulk(bowler_ids, season_id)

@@ -3,7 +3,7 @@ Report routes: Wkly Alpha (printable), standings, bowler detail, high games.
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for
-from models import Season, Week, Roster, Bowler, Team, MatchupEntry, TeamPoints, TournamentEntry, PayoutConfig, LeagueSettings, db
+from models import Season, Week, Roster, Bowler, Team, MatchupEntry, TeamPoints, TournamentEntry, PayoutConfig, LeagueSettings, db, EXTRA_MATCHUP_NUM
 from calculations import (get_wkly_alpha, get_team_standings, get_bowler_stats,
                            get_iron_man_status, get_most_improved, get_weekly_prizes,
                            calculate_handicap, get_weekly_team_points, get_matchup_breakdown,
@@ -25,7 +25,9 @@ def build_week_prizes_context(season_id, week_num, min_games, top10):
     season = Season.query.get_or_404(season_id)
     week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
 
-    all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+    # Recon totals cover the four score sheets; extra-lane bowlers are left out
+    all_entries = (MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num)
+                   .filter(MatchupEntry.matchup_num != EXTRA_MATCHUP_NUM).all())
     bowler_ids = {e.bowler_id for e in all_entries if not e.is_blind and e.bowler_id}
     ebowler = get_bowler_entries_bulk(bowler_ids, season_id)
     total_wood = sum(entry_total_wood(e, season, season_id, week_num, ebowler) for e in all_entries)
@@ -306,7 +308,8 @@ def print_batch(season_id, week_num):
 
     # Prizes & Standings data for Group 2 page 4 (regular weeks only)
     prizes = get_weekly_prizes(season_id, week_num) if not week.tournament_type else None
-    all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+    all_entries = (MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num)
+                   .filter(MatchupEntry.matchup_num != EXTRA_MATCHUP_NUM).all())
     pb_bowler_ids = {e.bowler_id for e in all_entries if not e.is_blind and e.bowler_id}
     pb_ebowler = get_bowler_entries_bulk(pb_bowler_ids, season_id)
     total_wood = sum(entry_total_wood(e, season, season_id, week_num, pb_ebowler) for e in all_entries)

@@ -224,6 +224,13 @@ class ScheduleEntry(db.Model):
         return f'<ScheduleEntry week={self.week_num} matchup={self.matchup_num}>'
 
 
+# matchup_num for bowlers who bowl individually on an extra lane when a team
+# has more than 8 bowlers. Their games count toward averages, handicaps and
+# weekly prizes, but no schedule row uses this number, so they never enter
+# game points, series points or matchup wood.
+EXTRA_MATCHUP_NUM = 5
+
+
 class MatchupEntry(db.Model):
     """
     One bowler's (or blind's) scores for one matchup in one week.
@@ -235,7 +242,7 @@ class MatchupEntry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     season_id = db.Column(db.Integer, db.ForeignKey('seasons.id'), nullable=False)
     week_num = db.Column(db.Integer, nullable=False)
-    matchup_num = db.Column(db.Integer, nullable=False)  # 1–4
+    matchup_num = db.Column(db.Integer, nullable=False)  # 1–4, or EXTRA_MATCHUP_NUM
     team_id = db.Column(db.Integer, db.ForeignKey('teams.id'), nullable=False)
     bowler_id = db.Column(db.Integer, db.ForeignKey('bowlers.id'), nullable=True)
     is_blind = db.Column(db.Boolean, default=False)

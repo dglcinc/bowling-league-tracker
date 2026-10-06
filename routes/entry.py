@@ -5,7 +5,7 @@ Score entry routes: weekly matchup entry, blind management, points calculation.
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from models import (db, Season, Week, ScheduleEntry, MatchupEntry,
                     TeamPoints, Roster, Bowler, TournamentEntry, Team,
-                    BanquetConfig, BanquetAttendee)
+                    BanquetConfig, BanquetAttendee, EXTRA_MATCHUP_NUM)
 from calculations import (score_matchup, score_position_night, calculate_handicap,
                           get_weekly_prizes, get_team_standings, get_matchup_breakdown,
                           get_position_night_breakdown, get_bowler_stats,
@@ -81,6 +81,12 @@ def week_entry(season_id, week_num):
                 'roster': roster,
             })
 
+    extra_entries = (MatchupEntry.query
+                     .filter_by(season_id=season_id, week_num=week_num,
+                                matchup_num=EXTRA_MATCHUP_NUM)
+                     .order_by(MatchupEntry.id)
+                     .all())
+
     # Weekly team points (shown whether entered or partially entered)
     teams_all = Team.query.filter_by(season_id=season_id).order_by(Team.number).all()
     wk_pts_raw = TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).all()
@@ -121,7 +127,9 @@ def week_entry(season_id, week_num):
     # Recon summary (only if week is entered)
     recon = None
     if week.is_entered:
-        all_entries = MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num).all()
+        # Extra-lane bowlers are not on any score sheet, so they stay out of the recon
+        all_entries = (MatchupEntry.query.filter_by(season_id=season_id, week_num=week_num)
+                       .filter(MatchupEntry.matchup_num != EXTRA_MATCHUP_NUM).all())
         bowler_ids = {e.bowler_id for e in all_entries if not e.is_blind and e.bowler_id}
         ebowler = get_bowler_entries_bulk(bowler_ids, season_id)
         player_count = sum(1 for e in all_entries if not e.is_blind)
@@ -159,6 +167,7 @@ def week_entry(season_id, week_num):
                            season=season, week=week,
                            matchups=matchups,
                            matchup_data=matchup_data,
+                           extra_entries=extra_entries,
                            recon=recon,
                            weekly_team_pts=weekly_team_pts,
                            pts_by_matchup=pts_by_matchup,
@@ -413,6 +422,139 @@ def matchup_entry(season_id, week_num, matchup_num):
                            tournament_labels=season.tournament_labels)
 
 
+def _rescore_saved_points(season_id, week_num, is_position_night):
+    """
+    Recompute the week's stored TeamPoints in place. Extra-lane games never
+    add pins to a team, but they change tonight's average for a new bowler
+    without a prior handicap, and with it that bowler's handicap on the
+    matchup sheet.
+    """
+    rows = TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).all()
+    if not rows:
+        return
+    if is_position_night:
+        pts = score_position_night(season_id, week_num)
+        for tp in rows:
+            tp.points_earned = pts.get(tp.team_id, tp.points_earned)
+        return
+    results = {}
+    for tp in rows:
+        if tp.matchup_num not in results:
+            results[tp.matchup_num] = score_matchup(season_id, week_num, tp.matchup_num)
+        result = results[tp.matchup_num]
+        tp.points_earned = result.get(tp.team_id, 0)
+        tp.is_forfeit = result.get('forfeit') is not None
+
+
+@entry_bp.route('/season/<int:season_id>/week/<int:week_num>/extras',
+                methods=['GET', 'POST'])
+def extra_entry(season_id, week_num):
+    """
+    Score entry for bowlers who bowl individually on an extra lane when a team
+    has more than 8 bowlers. Stored as MatchupEntry rows with
+    matchup_num=EXTRA_MATCHUP_NUM: the games count toward averages, handicaps
+    and weekly prizes, but no schedule row has that number, so they never
+    affect game points, series points or matchup wood.
+
+    A bowler can rotate between a matchup and the extra lane, so the pick list
+    is every active bowler, and each game goes in the slot it was bowled in.
+    """
+    season = Season.query.get_or_404(season_id)
+    week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
+    if week.tournament_type:
+        flash('Extra bowlers apply only to regular weeks and position nights.', 'warning')
+        return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+    roster = (Roster.query
+              .filter_by(season_id=season_id, active=True)
+              .join(Bowler)
+              .order_by(Bowler.last_name, Bowler.first_name)
+              .all())
+
+    if request.method == 'POST':
+        team_by_bowler = {r.bowler_id: r.team_id for r in
+                          Roster.query.filter_by(season_id=season_id).all()}
+        MatchupEntry.query.filter_by(
+            season_id=season_id, week_num=week_num, matchup_num=EXTRA_MATCHUP_NUM
+        ).delete()
+
+        row_indices = sorted(set(
+            int(k[len('x_row_'):].split('_')[0])
+            for k in request.form if k.startswith('x_row_')
+        ))
+        saved = []
+        for i in row_indices:
+            prefix = f'x_row_{i}_'
+            bowler_id_str = request.form.get(f'{prefix}bowler_id', '').strip()
+            if not bowler_id_str.isdigit():
+                continue  # blank row
+            bowler_id = int(bowler_id_str)
+            team_id = team_by_bowler.get(bowler_id)
+            if team_id is None:
+                continue  # not on this season's roster
+            games = []
+            for g in range(1, 7):
+                val = request.form.get(f'{prefix}game{g}', '').strip()
+                games.append(int(val) if val.isdigit() else None)
+            entry = MatchupEntry(
+                season_id=season_id, week_num=week_num,
+                matchup_num=EXTRA_MATCHUP_NUM, team_id=team_id,
+                bowler_id=bowler_id, is_blind=False,
+                game1=games[0], game2=games[1], game3=games[2],
+                game4=games[3], game5=games[4], game6=games[5],
+            )
+            db.session.add(entry)
+            saved.append(entry)
+
+        db.session.flush()
+        _rescore_saved_points(season_id, week_num, week.is_position_night)
+        db.session.commit()
+
+        # Flag a game slot filled both here and in a matchup (rotation entered
+        # in the wrong column). Both games are kept; the warning asks for a fix.
+        clashes = []
+        for e in saved:
+            others = (MatchupEntry.query
+                      .filter_by(season_id=season_id, week_num=week_num, bowler_id=e.bowler_id)
+                      .filter(MatchupEntry.matchup_num != EXTRA_MATCHUP_NUM)
+                      .all())
+            for o in others:
+                dup = [g for g in range(1, 7)
+                       if getattr(e, f'game{g}') is not None and getattr(o, f'game{g}') is not None]
+                if dup:
+                    clashes.append(f"{e.bowler.last_name} (G{', G'.join(map(str, dup))} "
+                                   f"also in matchup {o.matchup_num})")
+        if clashes:
+            flash('Same game entered twice: ' + '; '.join(clashes)
+                  + '. Each game should be in only one place.', 'warning')
+
+        if week.is_entered:
+            cache.clear()
+            try:
+                save_snapshot(season_id, week_num, Config.SNAPSHOT_DIR)
+            except Exception as e:
+                flash(f'Snapshot error (scores saved): {e}', 'warning')
+
+        flash(f'Extra bowler scores saved ({len(saved)}).', 'success')
+        return redirect(url_for('entry.week_entry', season_id=season_id, week_num=week_num))
+
+    existing = (MatchupEntry.query
+                .filter_by(season_id=season_id, week_num=week_num, matchup_num=EXTRA_MATCHUP_NUM)
+                .order_by(MatchupEntry.id)
+                .all())
+    ebowler = get_bowler_entries_bulk({r.bowler_id for r in roster}, season_id)
+    roster_data = {
+        r.bowler_id: {'handicap': calculate_handicap(r.bowler_id, season_id, week_num,
+                                                     ebowler.get(r.bowler_id)),
+                      'roster': r}
+        for r in roster
+    }
+    return render_template('entry/extra_entry.html',
+                           season=season, week=week,
+                           existing=existing, roster_data=roster_data,
+                           tournament_labels=season.tournament_labels)
+
+
 @entry_bp.route('/season/<int:season_id>/week/<int:week_num>/position/<int:pairing_num>',
                 methods=['GET', 'POST'])
 def position_entry(season_id, week_num, pairing_num):
@@ -557,9 +699,10 @@ def reconcile(season_id, week_num):
     season = Season.query.get_or_404(season_id)
     week = Week.query.filter_by(season_id=season_id, week_num=week_num).first_or_404()
 
-    entries = MatchupEntry.query.filter_by(
-        season_id=season_id, week_num=week_num
-    ).all()
+    entries = (MatchupEntry.query
+               .filter_by(season_id=season_id, week_num=week_num)
+               .filter(MatchupEntry.matchup_num != EXTRA_MATCHUP_NUM)
+               .all())
 
     bowler_ids = {e.bowler_id for e in entries if not e.is_blind and e.bowler_id}
     ebowler = get_bowler_entries_bulk(bowler_ids, season_id)

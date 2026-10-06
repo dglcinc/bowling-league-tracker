@@ -12,7 +12,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from models import Bowler, MatchupEntry, PushSubscription, Roster, ScheduleEntry, Season, Team, TeamPoints, TournamentEntry, Week, db
-from calculations import calculate_handicap, get_team_standings, get_bowler_stats, get_hr_qualifiers, get_latest_entered_week
+from calculations import calculate_handicap, get_team_standings, get_bowler_stats, get_hr_qualifiers, get_latest_entered_week, merge_week_entries
 
 mobile_bp = Blueprint('mobile', __name__)
 
@@ -403,7 +403,8 @@ def week_scores(week_num):
         rows.sort(key=sort_key)
         tournament_rows = rows
     else:
-        entries = (MatchupEntry.query
+        # One row per bowler: extra-lane games merge with matchup games
+        entries = merge_week_entries(MatchupEntry.query
                    .filter_by(season_id=season.id, week_num=week_num)
                    .filter(MatchupEntry.is_blind == False)
                    .filter(MatchupEntry.bowler_id != None)
@@ -444,7 +445,7 @@ def me():
     prior_seasons = []
 
     if season:
-        entries = (MatchupEntry.query
+        entries = merge_week_entries(MatchupEntry.query
                    .filter_by(season_id=season.id, bowler_id=current_user.id)
                    .order_by(MatchupEntry.week_num)
                    .all())
@@ -471,7 +472,7 @@ def me():
     # If no current-season scores, build a per-season history from prior years
     has_current_scores = any(e.games_night1 for e in entries)
     if not has_current_scores:
-        prior_entries = (MatchupEntry.query
+        prior_entries = merge_week_entries(MatchupEntry.query
                          .filter_by(bowler_id=current_user.id, is_blind=False)
                          .filter(MatchupEntry.game1 != None)
                          .all())
