@@ -14,7 +14,7 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
 - No open PRs.
-- PRs #37–#190 merged to main (#190 weekly email: generated sections in the editable body, login footer on every email, review Cancel keeps typing — deployed 2026-10-12); #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138); #145 superseded by #146 (CC-me checkbox replaced by BCC-all-recipients).
+- PRs #37–#191 merged to main (#190 weekly email: generated sections in the editable body, login footer on every email, review Cancel keeps typing; #191 notable bowling skips bowlers with no handicap yet — both deployed 2026-10-12); #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138); #145 superseded by #146 (CC-me checkbox replaced by BCC-all-recipients).
 
 ## League Structure
 
