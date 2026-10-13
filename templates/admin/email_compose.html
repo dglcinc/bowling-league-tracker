@@ -81,13 +81,13 @@
       <div class="mb-3">
         <label class="form-label fw-bold">Subject</label>
         <input type="text" name="subject" class="form-control"
-               value="{{ default_subject }}">
+               value="{{ form_vals.subject }}">
       </div>
 
       <div class="mb-3">
         <label class="form-label fw-bold">TO — Captains</label>
         <input type="text" name="to_emails" class="form-control font-monospace"
-               value="{{ to_captains | map(attribute=2) | join(', ') }}"
+               value="{{ form_vals.to_emails }}"
                placeholder="captain1@example.com, captain2@example.com">
         <div class="form-text">Comma-separated. Resolved from captain names on each team.</div>
       </div>
@@ -95,7 +95,7 @@
       <div class="mb-3">
         <label class="form-label fw-bold">CC</label>
         <input type="text" name="cc_emails" class="form-control font-monospace"
-               value=""
+               value="{{ form_vals.cc_emails }}"
                placeholder="(optional) cc1@example.com, cc2@example.com">
         <div class="form-text">Comma-separated. Anyone you want visibly copied (officers, treasurer, etc.).</div>
       </div>
@@ -104,33 +104,35 @@
         <label class="form-label fw-bold">BCC — Players</label>
         <select name="bcc_scope" id="bccScope" class="form-select form-select-sm w-auto">
           <option value="all">All active players ({{ all_roster|length }})</option>
-          <option value="high_avg">High Averages (<span id="highAvgCount">…</span>)</option>
+          <option value="high_avg" {{ 'selected' if form_vals.bcc_scope == 'high_avg' }}>High Averages (<span id="highAvgCount">…</span>)</option>
           {% for team in teams %}
-          <option value="{{ team.number }}">{{ team.name }} only</option>
+          <option value="{{ team.number }}" {{ 'selected' if form_vals.bcc_scope == team.number|string }}>{{ team.name }} only</option>
           {% endfor %}
         </select>
       </div>
 
       <div class="mb-3">
-        <label class="form-label fw-bold">Your Message</label>
-        <textarea name="body_text" class="form-control" rows="10"
-                  placeholder="Type your weekly commentary here…&#10;&#10;The auto-generated prize and standings data will be appended below your message."></textarea>
+        <label class="form-label fw-bold">Message</label>
+        <textarea name="body_text" class="form-control" rows="20">{{ form_vals.body_text }}</textarea>
         <div class="form-text">
-          Prize winners, notable performances (30+ over average), and standings are added automatically below your text.
+          Notable bowling (30+ over average), prize winners, and standings are filled in
+          for you. Type your commentary above them and edit anything; the email is
+          exactly this text, followed by &ldquo;Don&rsquo;t forget to log into the app
+          at https://mlb.dglc.com&rdquo;.
         </div>
       </div>
 
       <div class="mb-3">
         <div class="form-check mb-1">
           <input type="checkbox" class="form-check-input" name="include_banquet" value="1"
-                 id="includeBanquetWk">
+                 id="includeBanquetWk" {{ 'checked' if form_vals.include_banquet }}>
           <label class="form-check-label" for="includeBanquetWk">
             Include banquet attendance list (appended to the HTML body)
           </label>
         </div>
         <div class="form-check mb-1">
           <input type="checkbox" class="form-check-input" name="attach_pdf" value="1"
-                 id="attachPdf" checked>
+                 id="attachPdf" {{ 'checked' if form_vals.attach_pdf }}>
           <label class="form-check-label" for="attachPdf">
             Attach Prizes &amp; Standings PDF (Week {{ week_num }})
           </label>
@@ -176,56 +178,9 @@
     </script>
   </div>
 
-  {# ── Right: auto-generated data preview ────────────────────────────── #}
+  {# ── Right: High Averages recipients, mailing list ─────────────────── #}
   <div class="col-12 col-xl-5">
-    <div class="card">
-      <div class="card-header fw-bold">Auto-generated content preview</div>
-      <div class="card-body" style="font-size:0.85rem">
-
-        {% if above_avg %}
-        <p class="mb-1"><strong>Notable bowling (30+ above average):</strong></p>
-        <p class="mb-3">{{ above_avg | map(attribute='bowler') | map(attribute='last_name') | join(', ') }}.</p>
-        {% else %}
-        <p class="text-muted mb-3"><em>No bowlers 30+ above average this week.</em></p>
-        {% endif %}
-
-        {% if prizes %}
-        <p class="mb-1"><strong>Weekly Prizes:</strong></p>
-        <ul class="mb-3" style="padding-left:1.2rem">
-          {% macro pline(cat, label) %}
-          <li>{{ label }}:
-            {% if cat and cat.winners %}
-              <strong>{% for w in cat.winners %}{{ w.bowler.last_name }}{% if not loop.last %} / {% endif %}{% endfor %}</strong>
-              {% if cat.winners|length > 1 %}<em>(tie)</em>{% endif %} — {{ cat.score }}
-            {% else %}—{% endif %}
-          </li>
-          {% endmacro %}
-          {{ pline(prizes.hg_hcp,     'High Game — Handicap') }}
-          {{ pline(prizes.hg_scratch, 'High Game — Scratch') }}
-          {{ pline(prizes.hs_hcp,     'High Series — Handicap') }}
-          {{ pline(prizes.hs_scratch, 'High Series — Scratch') }}
-        </ul>
-        {% endif %}
-
-        {% if standings %}
-        <p class="mb-1"><strong>Standings through Week {{ week_num }}:</strong></p>
-        <table class="table table-sm table-bordered mb-0" style="max-width:250px">
-          <thead><tr><th>Team</th><th class="text-end">Pts</th></tr></thead>
-          <tbody>
-          {% for s in standings %}
-          <tr>
-            <td>{{ s['team'].name }}</td>
-            <td class="text-end fw-bold">{{ s['points'] }}</td>
-          </tr>
-          {% endfor %}
-          </tbody>
-        </table>
-        {% endif %}
-
-      </div>
-    </div>
-
-    <div id="highAvgPreview" class="card mt-3" style="display:none">
+    <div id="highAvgPreview" class="card" style="display:none">
       <div class="card-header fw-bold">High Averages recipients</div>
       <div class="card-body" style="font-size:0.85rem">
         <p class="mb-0 text-muted" id="highAvgPreviewList"></p>

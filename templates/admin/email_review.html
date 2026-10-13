@@ -76,8 +76,9 @@
 
   <div class="mb-3">
     <label class="form-label fw-semibold">Body</label>
-    <textarea class="form-control" name="body" rows="10" required>{{ body_text }}</textarea>
+    <textarea class="form-control" name="body" rows="{{ 20 if cancel_to_compose else 10 }}" required>{{ body_text }}</textarea>
     {% if body_note %}<div class="form-text">{{ body_note }}</div>{% endif %}
+    <div class="form-text">The email ends with &ldquo;Don&rsquo;t forget to log into the app at https://mlb.dglc.com&rdquo;.</div>
   </div>
 
   {% if generated_attachments or attach_files or allow_attachments %}
@@ -98,8 +99,14 @@
   {% endif %}
 
   <div class="d-flex gap-2">
+    {% if cancel_to_compose %}
+    {# Posts the edited fields back so the compose page reopens with them. #}
+    <button type="submit" class="btn btn-secondary" name="back_to_compose" value="1"
+            formaction="{{ cancel_url }}" formnovalidate>Cancel</button>
+    {% else %}
     <a href="{{ cancel_url | default(url_for('admin.season_detail', season_id=season.id)) }}"
        class="btn btn-secondary">Cancel</a>
+    {% endif %}
     <button type="submit" class="btn btn-primary" id="sendNowBtn">Send Now</button>
   </div>
 </form>
@@ -112,6 +119,7 @@
   var btn = document.getElementById('sendNowBtn');
   if (form && btn) {
     form.addEventListener('submit', function(e) {
+      if (e.submitter && e.submitter !== btn) return;  // Cancel back to compose
       if (btn.disabled) { e.preventDefault(); return; }
       btn.disabled = true;
       btn.textContent = 'Sending\u2026';

@@ -952,6 +952,19 @@ def _recipient_lists(form):
     return addrs('to_emails'), addrs('cc_emails'), addrs('bcc_emails')
 
 
+APP_URL = 'https://mlb.dglc.com'
+EMAIL_FOOTER_TEXT = f"Don't forget to log into the app at {APP_URL}"
+
+
+def _with_footer(html_body):
+    """Append the app-login reminder that ends every league email."""
+    footer = (f'<p style="margin-top:1.5em">Don&#39;t forget to log into the app at '
+              f'<a href="{APP_URL}">{APP_URL}</a></p>')
+    if '</body>' in html_body:
+        return html_body.replace('</body>', footer + '\n</body>', 1)
+    return html_body + footer
+
+
 def _paragraph_html(body_text):
     import html as _html
     return '<p>' + _html.escape(body_text).replace('\n', '<br>') + '</p>'
@@ -1027,7 +1040,7 @@ def _send_reviewed_email(*, ok_url, fail_url=None, label='Email',
               f'{_fmt_size(ATTACH_MAX_TOTAL)} per email. Email not sent.', 'danger')
         return redirect(fail_url)
 
-    html_body = (html_body_fn or _paragraph_html)(body_text)
+    html_body = _with_footer((html_body_fn or _paragraph_html)(body_text))
     try:
         _send_via_graph(current_app.config, subject, html_body,
                         to_list, bcc_list, cc_list=cc_list, attachments=attachments)
@@ -1927,7 +1940,31 @@ def email_compose(season_id, week_num):
     compose_url = url_for('admin.email_compose', season_id=season_id, week_num=week_num)
     week_url = url_for('entry.week_entry', season_id=season_id, week_num=week_num)
 
-    if request.method == 'POST':
+    # What the compose form shows: defaults on a fresh visit, or what the
+    # editor had on the review page when they press Cancel there.
+    form_vals = {
+        'subject': default_subject,
+        'to_emails': ', '.join(e for _t, _b, e in to_captains),
+        'cc_emails': '',
+        'bcc_scope': 'all',
+        'body_text': _weekly_auto_text(above_avg, prizes, standings, week_num),
+        'include_banquet': False,
+        'attach_pdf': True,
+    }
+
+    if request.method == 'POST' and request.form.get('back_to_compose') == '1':
+        _discard_attachments(request.form.get('attach_token', ''))
+        to_list, cc_list, _bcc = _recipient_lists(request.form)
+        form_vals.update({
+            'subject': request.form.get('subject', default_subject),
+            'to_emails': ', '.join(to_list),
+            'cc_emails': ', '.join(cc_list),
+            'bcc_scope': request.form.get('bcc_scope', 'all'),
+            'body_text': request.form.get('body', ''),
+            'include_banquet': request.form.get('include_banquet') == '1',
+            'attach_pdf': request.form.get('attach_pdf') == '1',
+        })
+    elif request.method == 'POST':
         send_confirmed = request.form.get('send_confirmed') == '1'
         test_only = request.form.get('test_only') == '1'
         attach_pdf = request.form.get('attach_pdf') == '1'
@@ -1945,7 +1982,7 @@ def email_compose(season_id, week_num):
         db_top10 = pdf_top10
 
         def build_html(body_text):
-            html_body = _build_email_html(body_text, above_avg, season, week)
+            html_body = _build_email_html(body_text)
             if include_banquet:
                 html_body += _banquet_block_html(season_id)
             return html_body
@@ -1971,11 +2008,17 @@ def email_compose(season_id, week_num):
         bcc_scope = request.form.get('bcc_scope', 'all')
         to_list = [e.strip() for e in request.form.get('to_emails', '').split(',') if e.strip()]
         cc_list = [e.strip() for e in request.form.get('cc_emails', '').split(',') if e.strip()]
+        # A failed test send re-renders the compose page with what was typed.
+        form_vals.update({'subject': subject, 'to_emails': ', '.join(to_list),
+                          'cc_emails': ', '.join(cc_list), 'bcc_scope': bcc_scope,
+                          'body_text': body_text, 'include_banquet': include_banquet,
+                          'attach_pdf': attach_pdf})
 
         if test_only:
             sender = current_app.config.get('GRAPH_SENDER_EMAIL', '')
             try:
-                _send_via_graph(current_app.config, f'[TEST] {subject}', build_html(body_text),
+                _send_via_graph(current_app.config, f'[TEST] {subject}',
+                                _with_footer(build_html(body_text)),
                                 [sender] if sender else [], [], cc_list=[],
                                 attachments=build_attachments())
                 flash(f'Test email sent to {sender or "you"}.', 'success')
@@ -2013,9 +2056,9 @@ def email_compose(season_id, week_num):
                 action_url=compose_url, cancel_url=compose_url,
                 page_title=f'Review Weekly Email — Week {week_num}',
                 bcc_label='Players',
-                body_note='Prize winners, notable bowling, and standings are appended '
-                          'automatically below this text.',
-                hidden_fields={'attach_pdf': '1' if attach_pdf else '0',
+                cancel_to_compose=True,
+                hidden_fields={'bcc_scope': bcc_scope,
+                               'attach_pdf': '1' if attach_pdf else '0',
                                'include_banquet': '1' if include_banquet else '0',
                                'pdf_min_games': pdf_min_games,
                                'pdf_top10': '1' if pdf_top10 else '0'},
@@ -2039,7 +2082,8 @@ def email_compose(season_id, week_num):
                            league_name=league_name,
                            mail_configured=graph_configured,
                            db_min_games=db_min_games,
-                           db_top10=db_top10)
+                           db_top10=db_top10,
+                           form_vals=form_vals)
 
 # Module-level MSAL app cache — reuse the same ConfidentialClientApplication
 # instance across calls so its internal token cache is preserved. This avoids
@@ -2335,38 +2379,60 @@ def _banquet_block_text(season_id):
     return '\n'.join(lines)
 
 
-def _build_email_html(body_text, above_avg, season, week):
-    """Build the HTML email body from user narrative + auto-generated data."""
-    import html as h
+def _fmt_points(p):
+    return str(int(p)) if float(p).is_integer() else f'{p:g}'
 
-    above_html = ''
+
+def _weekly_auto_text(above_avg, prizes, standings, week_num):
+    """Plain-text notable bowling, weekly prizes and standings.
+
+    The compose page puts this in the message box so it is part of the
+    editable body, and what the editor sees is what gets sent.
+    """
+    sections = []
     if above_avg:
-        # Group by team, preserving team number order
+        lines = ['Notable bowling (30+ above average):']
         teams_seen = {}
         for r in above_avg:
-            tid = r['team'].id
-            if tid not in teams_seen:
-                teams_seen[tid] = {'team': r['team'], 'bowlers': []}
-            teams_seen[tid]['bowlers'].append(r)
-        groups = sorted(teams_seen.values(), key=lambda g: g['team'].number)
-
-        block = ''
-        for g in groups:
-            block += f"<br><strong>{h.escape(g['team'].name)}:</strong><br>"
+            teams_seen.setdefault(r['team'].id, {'team': r['team'], 'bowlers': []})
+            teams_seen[r['team'].id]['bowlers'].append(r)
+        for g in sorted(teams_seen.values(), key=lambda g: g['team'].number):
+            lines.append(f"{g['team'].name}:")
             for r in g['bowlers']:
                 b = r['bowler']
-                full = h.escape(f"{b.first_name} {b.last_name}" if b.first_name else b.last_name)
-                nick = f" - {h.escape(b.nickname)}" if b.nickname else ""
-                scores = '/'.join(str(s) for s in r['games'])
-                block += f"&nbsp;&nbsp;{full}{nick} - {r['diff']} ({scores}-{r['handicap']})<br>"
-        above_html = f'<p>Notable bowling (30+ above average):<br>{block}</p>'
+                full = f'{b.first_name} {b.last_name}' if b.first_name else b.last_name
+                nick = f' - {b.nickname}' if b.nickname else ''
+                scores = '/'.join(str(x) for x in r['games'])
+                lines.append(f"  {full}{nick} - {r['diff']} ({scores}-{r['handicap']})")
+        sections.append('\n'.join(lines))
+    if prizes:
+        lines = ['Weekly Prizes:']
+        for key, label in (('hg_hcp', 'High Game - Handicap'),
+                           ('hg_scratch', 'High Game - Scratch'),
+                           ('hs_hcp', 'High Series - Handicap'),
+                           ('hs_scratch', 'High Series - Scratch')):
+            cat = prizes.get(key)
+            if cat and cat['winners']:
+                names = ' / '.join(w['bowler'].last_name for w in cat['winners'])
+                tie = ' (tie)' if len(cat['winners']) > 1 else ''
+                lines.append(f"  {label}: {names}{tie} - {cat['score']}")
+        sections.append('\n'.join(lines))
+    if standings:
+        lines = [f'Standings through Week {week_num}:']
+        lines += [f"  {s['team'].name} - {_fmt_points(s['points'])}" for s in standings]
+        sections.append('\n'.join(lines))
+    return '\n\n'.join(sections)
 
-    body_html = body_text.replace('\n', '<br>\n') if body_text else ''
 
-    return f'''<html><body style="font-family:Arial,sans-serif;font-size:14px">
-{body_html}
-{above_html}
-</body></html>'''
+def _build_email_html(body_text):
+    """HTML email body from the reviewed plain text, line breaks and indents kept."""
+    import html as h
+    lines = []
+    for line in h.escape(body_text).split('\n'):
+        stripped = line.lstrip(' ')
+        lines.append('&nbsp;' * (len(line) - len(stripped)) + stripped)
+    return ('<html><body style="font-family:Arial,sans-serif;font-size:14px">\n'
+            + '<br>\n'.join(lines) + '\n</body></html>')
 
 
 def _generate_prizes_pdf(season_id, week_num, min_games=9, top10=False):
