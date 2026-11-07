@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 Authentication blueprint — login, magic link send/validate, logout.
 All routes here are public (exempt from the before_request auth check in app.py).

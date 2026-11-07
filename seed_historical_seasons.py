@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 Import all 6 historical bowling seasons from XLS spreadsheets.
 

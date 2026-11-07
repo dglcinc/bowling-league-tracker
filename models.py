@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 SQLAlchemy models for Bowling League Tracker.
 All stats are computed on the fly from matchup_entries — nothing derived is stored.

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 Configuration for Bowling League Tracker.
 DB is stored in ~/bowling-data/ (NOT OneDrive — cloud sync corrupts SQLite).

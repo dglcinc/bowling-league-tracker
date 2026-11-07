@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 Import bowler roster from end-of-season XLS into the active season.
 

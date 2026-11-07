@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 Cloud LLM chat endpoint — viewer-gated streaming Q&A over the bowling stats.
 

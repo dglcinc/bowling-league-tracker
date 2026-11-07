@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 All bowling stat calculations for the league tracker.
 All functions take SQLAlchemy session/model data and return plain Python values.

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 Generate bowling-ball app icons for the PWA manifest.
 Run once from the repo root: python generate_icons.py
