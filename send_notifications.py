@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 send_notifications.py — Web Push notification sender for Bowling League Tracker.
 

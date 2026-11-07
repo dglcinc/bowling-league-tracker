@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 Mobile PWA routes — /m/
 Serves a phone-optimised view of standings, scores, lane assignments, and bowler stats.

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 Auto-snapshot: after each week's scores are saved, write a JSON file
 to the OneDrive snapshots directory and store a copy in the DB.

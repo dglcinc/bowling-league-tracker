@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 Emergency / bootstrap magic link generator.
 Run from the terminal to get a sign-in URL without email.

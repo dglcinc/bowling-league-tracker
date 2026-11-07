@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 Seed the 2025-2026 historical season structure from the Week 22 scoring spreadsheet.
 

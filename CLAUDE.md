@@ -1,5 +1,7 @@
 # Bowling League Tracker — Project Context
 
+**Licensing (since 2026-11-07):** code and templates are PolyForm Noncommercial 1.0.0 (`LICENSE`), `docs/` CC BY-NC 4.0 (`LICENSE-DOCS`). New files start with an `SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0` line and `Copyright David Lewis` in their comment syntax (a `{# ... #}` comment above `{% extends %}` in templates).
+
 ## Overview
 
 **Mountain Lakes Men's Bowling League** season tracker. The existing source of truth is an Excel workbook — analyzed but not committed (contains personal info). This project replaces it with a proper web application.
