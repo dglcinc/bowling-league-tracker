@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 Payout routes: weekly prize overview, season payout config, summary, and award pages.
 """

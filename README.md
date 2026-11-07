@@ -295,3 +295,14 @@ Set `DYLD_LIBRARY_PATH=/opt/homebrew/lib` in your `.env`.
 ## Configuring for a Different League
 
 All configuration (team count, number of weeks, handicap formula, blind scores, bowling format) is per-season in the admin UI. The handicap formula defaults (base 200, factor 0.9) can be adjusted for different league rules. League name and display options are in Admin → League Settings.
+
+## Licensing
+
+This repository is free for personal and other noncommercial use, including running it for a bowling league. Commercial use needs a separate licence from the copyright holder; ask through [github.com/dglcinc](https://github.com/dglcinc).
+
+| Content | Licence |
+|---------|---------|
+| Code, templates, scripts | PolyForm Noncommercial 1.0.0 (`LICENSE`) |
+| Documents in `docs/` | CC BY-NC 4.0 (`LICENSE-DOCS`) |
+
+Source files carry an `SPDX-License-Identifier` line. The league's logo (`static/ml_logo.jpg`) belongs to the league, and the libraries in `requirements.txt` keep their own licences.

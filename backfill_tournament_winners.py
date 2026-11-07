@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright David Lewis
 """
 Backfill 2nd and 3rd place tournament winners from historical XLS files.
 

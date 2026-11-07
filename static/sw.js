@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+// Copyright David Lewis
 // Service worker — enables PWA install and handles push notifications
 const CACHE = 'bowl-tracker-v1';
 
