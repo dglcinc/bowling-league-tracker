@@ -16,7 +16,7 @@ Teams: 4. Bowlers: ~65 total (mix of active and inactive).
 - GitHub: `dglcinc/bowling-league-tracker` (private)
 - Local clone: `~/github/bowling-league-tracker`
 - No open PRs.
-- PRs #37–#193 merged to main (#192 licence files and SPDX headers; #193 partial blinds score in the game slots they cover, deployed 2026-11-23 with 2026-2027 week 8 matchup 3 rescored); #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138); #145 superseded by #146 (CC-me checkbox replaced by BCC-all-recipients).
+- PRs #37–#194 merged to main (#192 licence files and SPDX headers; #193 partial blinds score in the game slots they cover, with 2026-2027 week 8 matchup 3 rescored; #194 weekly email standings show each team's points for the week — both deployed 2026-11-23); #133 closed unmerged (functionality replaced by `query_db` in #135; tool-schema shape obsoleted by #138); #145 superseded by #146 (CC-me checkbox replaced by BCC-all-recipients).
 
 ## League Structure
 
