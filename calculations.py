@@ -201,6 +201,23 @@ def entry_handicap(entry, season, season_id, week_num, entries_by_bowler=None):
     return calculate_handicap(entry.bowler_id, season_id, week_num, prior_entries)
 
 
+def entry_game_slots(entry, season):
+    """
+    Returns [game1, game2, game3] scratch scores for team game totals, each
+    in the slot it was bowled in (None = the row has no score that game).
+
+    A blind scores season.blind_scratch in each slot it covers, so a blind
+    that replaces a bowler who left after game 2 counts in game 3 only. A
+    blind row with no games stored covers all three.
+    """
+    slots = [entry.game1, entry.game2, entry.game3]
+    if not entry.is_blind:
+        return slots
+    if all(g is None for g in slots):
+        return [season.blind_scratch] * 3
+    return [season.blind_scratch if g is not None else None for g in slots]
+
+
 def entry_total_wood(entry, season, season_id, week_num, entries_by_bowler=None):
     """Returns total handicap wood (scratch pins + hcp × games) for a MatchupEntry."""
     hcp = entry_handicap(entry, season, season_id, week_num, entries_by_bowler)
@@ -399,14 +416,14 @@ def score_matchup(season_id, week_num, matchup_num):
         for entry in entries:
             if entry.is_blind:
                 hcp = season.blind_handicap
-                scratch_games = [season.blind_scratch] * min(entry.game_count or 3, 3)
             else:
                 hcp = calculate_handicap(entry.bowler_id, season_id, week_num,
                                          entries_by_bowler.get(entry.bowler_id))
-                # By slot, so a bowler who skipped G1 scores G2 in game 2
-                scratch_games = [entry.game1, entry.game2, entry.game3]
+            # By slot, so a bowler who skipped G1 scores G2 in game 2, and a
+            # blind added mid-series scores only in the games it covered
+            scratch_games = entry_game_slots(entry, season)
 
-            for i, score in enumerate(scratch_games[:3]):
+            for i, score in enumerate(scratch_games):
                 if score is not None:
                     game_totals[i] += score + hcp
 
@@ -545,12 +562,11 @@ def get_position_night_breakdown(season_id, week_num, pairing_num):
             for entry in entries_by_mnum_team.get((mnum, team_id), []):
                 if entry.is_blind:
                     hcp = season.blind_handicap
-                    games = [season.blind_scratch] * (entry.game_count or 3)
                 else:
                     hcp = calculate_handicap(entry.bowler_id, season_id, week_num,
                                              entries_by_bowler.get(entry.bowler_id))
-                    games = [entry.game1, entry.game2, entry.game3]
-                for i, score in enumerate(games[:3]):
+                games = entry_game_slots(entry, season)
+                for i, score in enumerate(games):
                     if score is not None:
                         agg[i] += score + hcp
 
@@ -617,12 +633,11 @@ def score_position_night(season_id, week_num):
                 for entry in entries:
                     if entry.is_blind:
                         hcp = season.blind_handicap
-                        games = [season.blind_scratch] * (entry.game_count or 3)
                     else:
                         hcp = calculate_handicap(entry.bowler_id, season_id, week_num,
                                                  entries_by_bowler.get(entry.bowler_id))
-                        games = [entry.game1, entry.game2, entry.game3]
-                    for i, score in enumerate(games[:3]):
+                    games = entry_game_slots(entry, season)
+                    for i, score in enumerate(games):
                         if score is not None:
                             agg[i] += score + hcp
 
