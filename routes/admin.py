@@ -1953,7 +1953,8 @@ def email_compose(season_id, week_num):
         'to_emails': ', '.join(e for _t, _b, e in to_captains),
         'cc_emails': '',
         'bcc_scope': 'all',
-        'body_text': _weekly_auto_text(above_avg, prizes, standings, week_num),
+        'body_text': _weekly_auto_text(above_avg, prizes, standings, week_num,
+                                       _week_team_points(season_id, week_num)),
         'include_banquet': False,
         'attach_pdf': True,
     }
@@ -2389,8 +2390,20 @@ def _fmt_points(p):
     return str(int(p)) if float(p).is_integer() else f'{p:g}'
 
 
-def _weekly_auto_text(above_avg, prizes, standings, week_num):
+def _week_team_points(season_id, week_num):
+    """{team_id: points earned in this one week}; empty when no points are stored."""
+    from models import TeamPoints
+    totals = {}
+    for tp in TeamPoints.query.filter_by(season_id=season_id, week_num=week_num).all():
+        totals[tp.team_id] = totals.get(tp.team_id, 0) + tp.points_earned
+    return totals
+
+
+def _weekly_auto_text(above_avg, prizes, standings, week_num, week_points=None):
     """Plain-text notable bowling, weekly prizes and standings.
+
+    Each standings line carries the team's season total and, when
+    `week_points` has points for the week, what the team earned this week.
 
     The compose page puts this in the message box so it is part of the
     editable body, and what the editor sees is what gets sent.
@@ -2425,7 +2438,12 @@ def _weekly_auto_text(above_avg, prizes, standings, week_num):
         sections.append('\n'.join(lines))
     if standings:
         lines = [f'Standings through Week {week_num}:']
-        lines += [f"  {s['team'].name} - {_fmt_points(s['points'])}" for s in standings]
+        for s in standings:
+            line = f"  {s['team'].name} - {_fmt_points(s['points'])}"
+            if week_points:
+                earned = week_points.get(s['team'].id, 0)
+                line += f' ({_fmt_points(earned)} this week)'
+            lines.append(line)
         sections.append('\n'.join(lines))
     return '\n\n'.join(sections)
 
